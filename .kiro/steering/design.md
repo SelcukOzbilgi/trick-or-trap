@@ -1,11 +1,10 @@
 ---
-inclusion: always
-fileMatch:
+inclusion: fileMatch
+fileMatchPattern:
   - "app/**/*.tsx"
   - "app/**/*.css"
   - "components/**/*.tsx"
   - "components/**/*.css"
-fileMatchPattern: "\\.(tsx|css)$"
 ---
 
 # Design: Night Shift Field Guide
