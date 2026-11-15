@@ -1,0 +1,14 @@
+# Do not ignore .kiro/ (required by the Kiroween rules)
+node_modules/
+.next/
+out/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+.vercel
+.DS_Store
+*.log
+playwright-report/
+test-results/
