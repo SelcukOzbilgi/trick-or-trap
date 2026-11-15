@@ -118,7 +118,7 @@ Why: it stays inside the known stack and one a mid-tier Kiro agent can implement
 - The repo needs a root `/.kiro` folder and an open-source license.
 - Turkey is not on the excluded-countries list [R https://kiroween.devpost.com/rules].
 - Vercel Hobby's commercial-use terms: [CNV].
-- `/Users/efe/EFE/trick-or-trap` was empty at research time, so nothing constrained the layout.
+- The project folder was empty at research time, so nothing constrained the layout.
 
 ## 7. Kiro specs, in order
 

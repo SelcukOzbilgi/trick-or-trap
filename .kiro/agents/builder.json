@@ -1,6 +1,6 @@
 {
   "name": "builder",
-  "description": "Workspace-contained build agent for Trick or Trap. File access is limited to this repository; shell is limited to an allow list.",
+  "description": "Build agent for Trick or Trap. Kiro's file tools are allowed only inside this repository; shell is limited to an allow list. Not a hard sandbox: allowed npm and npx commands can run arbitrary code.",
   "tools": ["*"],
   "resources": ["file://.kiro/steering/**/*.md"],
   "permissions": {
@@ -10,11 +10,9 @@
       { "capability": "fs_read",  "match": ["./.env", "./.env.*"], "exclude": ["./.env.example"], "effect": "deny" },
       { "capability": "fs_write", "match": ["./.env", "./.env.*"], "exclude": ["./.env.example"], "effect": "deny" },
       { "capability": "fs_write", "match": ["./.kiro/agents/**", "./.kiro/hooks/**", "./.kiro/settings/**", "./.git/**", "./.gitattributes", "./.npmrc"], "effect": "deny" },
-      { "capability": "fs_read",  "match": ["/Users/efe/EFE/EFE/**", "/Users/efe/.ssh/**", "/Users/efe/.claude/**", "/Users/efe/.aws/**", "/Users/efe/Documents/**", "/Users/efe/Library/**"], "effect": "deny" },
-      { "capability": "fs_write", "match": ["/Users/efe/EFE/EFE/**", "/Users/efe/.ssh/**", "/Users/efe/.claude/**", "/Users/efe/.aws/**", "/Users/efe/Documents/**", "/Users/efe/Library/**"], "effect": "deny" },
       { "capability": "shell",
         "match": ["npm install*", "npm ci*", "npm run *", "npm test*", "npx create-next-app*", "npx shadcn*", "npx playwright*", "npx tsc*", "npx vitest*", "npx eslint*", "npx next *", "node --test*", "node --version"],
-        "exclude": ["*..*", "* /*", "* ~*", "*$*", "*`*", "*;*", "*&&*", "*|*", "*>*", "*&*", "*<*", "*(*", "*)*"],
+        "exclude": ["*..*", "* /*", "* ~*", "*$*", "*`*", "*;*", "*&&*", "*|*", "*>*", "*&*", "*<*", "*(*", "*)*", "*run dev*", "*next dev*", "*next start*", "*run start*", "*--watch*"],
         "effect": "allow" }
     ]
   }
