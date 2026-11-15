@@ -1,0 +1,20 @@
+{
+  "name": "builder",
+  "description": "Workspace-contained build agent for Trick or Trap. File access is limited to this repository; shell is limited to an allow list.",
+  "tools": ["*"],
+  "resources": ["file://.kiro/steering/**/*.md"],
+  "permissions": {
+    "rules": [
+      { "capability": "fs_read",  "match": ["./**"], "effect": "allow" },
+      { "capability": "fs_write", "match": ["./**"], "effect": "allow" },
+      { "capability": "fs_read",  "match": ["./.env", "./.env.*"], "exclude": ["./.env.example"], "effect": "deny" },
+      { "capability": "fs_write", "match": ["./.env", "./.env.*"], "exclude": ["./.env.example"], "effect": "deny" },
+      { "capability": "fs_read",  "match": ["/Users/efe/EFE/EFE/**", "/Users/efe/.ssh/**", "/Users/efe/.claude/**", "/Users/efe/.aws/**", "/Users/efe/Documents/**", "/Users/efe/Library/**"], "effect": "deny" },
+      { "capability": "fs_write", "match": ["/Users/efe/EFE/EFE/**", "/Users/efe/.ssh/**", "/Users/efe/.claude/**", "/Users/efe/.aws/**", "/Users/efe/Documents/**", "/Users/efe/Library/**"], "effect": "deny" },
+      { "capability": "shell",
+        "match": ["npm install*", "npm ci*", "npm run *", "npm test*", "npx create-next-app*", "npx shadcn*", "npx playwright*", "npx tsc*", "npx vitest*", "npx eslint*", "npx next *", "node --test*", "node --version", "git status*", "git diff*", "git log*"],
+        "exclude": ["*..*", "* /*", "* ~*", "*$*", "*`*", "*;*", "*&&*", "*|*", "*>*"],
+        "effect": "allow" }
+    ]
+  }
+}
