@@ -25,7 +25,7 @@
 
 1.3. WHEN TypeScript is configured, THE SYSTEM SHALL enable strict mode (`"strict": true` in `tsconfig.json`).
 
-1.4. WHEN Tailwind CSS is configured, THE SYSTEM SHALL wire the design token colours, fonts, radii, shadows, and spacing defined in the design steering into `tailwind.config.ts` as named theme extensions so they are available as utility classes throughout the application.
+1.4. WHEN Tailwind CSS is configured, THE SYSTEM SHALL use CSS-first configuration: `app/globals.css` shall import `tailwindcss` and declare the design token colours, fonts, radii, shadows, and z-index values from the design steering in an `@theme` block so they are available as named Tailwind utility classes throughout the application; and `postcss.config.mjs` shall use the `@tailwindcss/postcss` plugin.
 
 1.5. WHEN the application is built with `npm run build`, THE SYSTEM SHALL complete without type errors or compilation failures.
 
@@ -51,7 +51,7 @@
 
 **Acceptance criteria:**
 
-3.1. WHEN `lib/types/index.ts` is imported, THE SYSTEM SHALL export a `PatternIdSchema` Zod schema whose valid values are exactly the eight pattern identifiers: `fake-urgency`, `fake-scarcity`, `confirmshaming`, `preselection`, `visual-interference`, `sneak-into-basket`, `drip-pricing`, `hard-to-cancel`.
+3.1. WHEN `lib/types/index.ts` is imported, THE SYSTEM SHALL export a `PatternIdSchema` Zod schema whose valid values are exactly the nine canonical pattern identifiers: `fake-urgency`, `fake-scarcity`, `fake-activity`, `confirmshaming`, `preselection`, `visual-interference`, `sneak-into-basket`, `drip-pricing`, `hard-to-cancel`.
 
 3.2. WHEN `lib/types/index.ts` is imported, THE SYSTEM SHALL export a `ConfidenceSchema` Zod schema whose valid values are exactly `high`, `medium`, and `low`.
 
@@ -59,7 +59,7 @@
 
 3.4. WHEN `lib/types/index.ts` is imported, THE SYSTEM SHALL export an `ElementSnapshotSchema` Zod schema containing: a string `id`, a string `tag`, an optional string `role`, an optional string `text` (visible text content), a `BoundingBoxSchema` field `boundingBox`, computed style fields `color`, `backgroundColor`, `fontSize`, `opacity`, `display`, `visibility`, and `position` (all strings), and boolean form-state fields `checked` and `selected`.
 
-3.5. WHEN `lib/types/index.ts` is imported, THE SYSTEM SHALL export a `PageSnapshotSchema` Zod schema containing: a string `url`, an ISO-8601 string `capturedAt`, numeric `viewportWidth` and `viewportHeight`, numeric `fullWidth` and `fullHeight`, an array of `ElementSnapshotSchema` named `elements`, optional `secondSample` (another `PageSnapshotSchema`) and `afterReload` (another `PageSnapshotSchema`) for timer and counter comparison, and an optional string `screenshotRef`.
+3.5. WHEN `lib/types/index.ts` is imported, THE SYSTEM SHALL export a `BaseSnapshotSchema` Zod schema containing: a string `url`, an ISO-8601 string `capturedAt`, numeric `viewportWidth` and `viewportHeight`, numeric `fullWidth` and `fullHeight`, an array of `ElementSnapshotSchema` named `elements`, and an optional string `screenshotRef`. THE SYSTEM SHALL also export a `PageSnapshotSchema` that extends `BaseSnapshotSchema` with two additional optional fields — `secondSample` and `afterReload` — both typed as `BaseSnapshot`, so that change-detection logic can compare two loads without recursive schema complexity.
 
 3.6. WHEN `lib/types/index.ts` is imported, THE SYSTEM SHALL export an `EvidenceSchema` Zod schema with a required string `text` and an optional record `measuredValues` mapping string keys to numbers.
 
@@ -67,7 +67,7 @@
 
 3.8. WHEN a `FindingSchema` is parsed with a `title` that does not start with `"Possible"`, THE SYSTEM SHALL throw a Zod validation error.
 
-3.9. WHEN `lib/types/index.ts` is imported, THE SYSTEM SHALL export TypeScript types inferred from each schema using `z.infer<>`, named `PatternId`, `Confidence`, `BoundingBox`, `ElementSnapshot`, `PageSnapshot`, `Evidence`, and `Finding` (without a `Schema` suffix).
+3.9. WHEN `lib/types/index.ts` is imported, THE SYSTEM SHALL export TypeScript types inferred from each schema using `z.infer<>`, named `PatternId`, `Confidence`, `BoundingBox`, `ElementSnapshot`, `BaseSnapshot`, `PageSnapshot`, `Evidence`, and `Finding` (without a `Schema` suffix).
 
 ---
 

@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Colours ─────────────────────────────────────────────── */
+  --color-bg:           #13101E;
+  --color-surface:      #1D1830;
+  --color-surface-2:    #28213F;
+  --color-border:       #3A3158;
+  --color-text:         #F4F0FF;
+  --color-muted:        #B9B0D1;
+  --color-primary:      #FF9A3C;
+  --color-on-primary:   #1A0F05;
+  --color-accent:       #B99BFF;
+  --color-danger:       #FF6B8A;
+  --color-focus:        #FFD84D;
+  --color-success:      #7BE0A4;
+
+  /* Severity */
+  --color-severity-high:   #FF9A3C;
+  --color-severity-medium: #B99BFF;
+  --color-severity-low:    #8C84A8;
+
+  /* ── Typography ──────────────────────────────────────────── */
+  --font-display: "Fraunces", serif;
+  --font-body:    "Space Grotesk", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+
+  /* Type scale (font-size / line-height) */
+  --font-size-xs:   0.75rem;
+  --font-size-sm:   0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg:   1.125rem;
+  --font-size-xl:   1.375rem;
+  --font-size-2xl:  1.875rem;
+  --font-size-3xl:  2.5rem;
+  --font-size-4xl:  3.5rem;
+
+  /* ── Border radii ────────────────────────────────────────── */
+  --radius-sm:   6px;
+  --radius-md:   12px;
+  --radius-lg:   20px;
+  --radius-full: 999px;
+
+  /* ── Shadows ─────────────────────────────────────────────── */
+  --shadow-card:   0 8px 24px rgba(0,0,0,.35), inset 0 0 0 1px #3A3158;
+  --shadow-marker: 0 4px 12px rgba(0,0,0,.5);
+  --shadow-glow:   0 0 24px rgba(185,155,255,.35);
+
+  /* ── Z-index ─────────────────────────────────────────────── */
+  --z-index-base:             0;
+  --z-index-screenshot:       1;
+  --z-index-marker-cluster:  10;
+  --z-index-marker:          20;
+  --z-index-marker-selected: 30;
+  --z-index-popover:         40;
+  --z-index-sticky-header:   50;
+  --z-index-sheet:           60;
+  --z-index-modal:           70;
+  --z-index-toast:           80;
+}

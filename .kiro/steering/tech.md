@@ -7,7 +7,7 @@ inclusion: always
 ## Core stack
 
 - **Next.js App Router** with TypeScript strict mode throughout.
-- **Tailwind CSS** with **shadcn/ui** components.
+- **Tailwind CSS** with **shadcn/ui** components. Tailwind uses CSS-first configuration: `app/globals.css` imports `tailwindcss` and declares design tokens in an `@theme` block; PostCSS uses the `@tailwindcss/postcss` plugin; there is no `tailwind.config.ts` unless the installed version requires one.
 - **Vitest** for unit and integration tests.
 - **Playwright** for browser capture and flow walking.
 - **Supabase** Postgres for scan results and Storage for screenshots.

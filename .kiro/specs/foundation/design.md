@@ -34,13 +34,15 @@ tests/
 
 ### `PatternId`
 
-A string union of the eight pattern identifiers used as a discriminating key across the whole codebase. Defined once in `lib/types`; imported everywhere else.
+A string union of the nine canonical pattern identifiers used as a discriminating key across the whole codebase. Defined once in `lib/types`; imported everywhere else. The value `none` is not a `PatternId`; it is reserved for honest look-alike entries in the Boo-tique ground-truth fixture only.
 
-### `PageSnapshot`
+### `BaseSnapshot` and `PageSnapshot`
 
-The input contract for every detector. It captures everything a detector might need from a single page load: the URL, the capture timestamp, viewport and full-page dimensions, a flat list of `ElementSnapshot` objects (one per DOM element the extractor decided was relevant), and optional second-sample and after-reload snapshots for change-detection logic. An optional `screenshotRef` holds a Storage path; detectors never read it.
+`BaseSnapshot` is the flat, non-recursive record of a single page capture: URL, timestamp, dimensions, elements, and an optional screenshot reference. It contains everything a detector needs from one load.
 
-`PageSnapshot` is intentionally recursive for `secondSample` and `afterReload` (both are `PageSnapshot`). Zod handles this with `z.lazy`.
+`PageSnapshot` extends `BaseSnapshot` with two optional fields — `secondSample` and `afterReload` — both typed as `BaseSnapshot`. This two-level structure avoids recursive Zod schemas while still letting detectors compare two captures (e.g. to detect countdown resets or stock-count changes). Detectors that do not need a second load simply receive a `PageSnapshot` where those fields are absent.
+
+No `z.lazy` is needed.
 
 ### `ElementSnapshot`
 
@@ -78,15 +80,17 @@ Carries the human-readable `text` that appears on the finding card and an option
 
 ## Tailwind and design tokens
 
-The design steering defines a full token sheet (colours, fonts, radii, shadows, spacing, z-index, motion). These are added to `tailwind.config.ts` under `theme.extend` so Tailwind's defaults remain available. Each token maps to a named utility class:
+Tailwind uses its CSS-first configuration. `app/globals.css` imports `tailwindcss` and declares all design tokens in a single `@theme` block. `postcss.config.mjs` references `@tailwindcss/postcss`. There is no `tailwind.config.ts`.
 
-- Colours → `theme.extend.colors` (e.g. `bg-bg`, `text-text`, `text-primary`).
-- Font families → `theme.extend.fontFamily` (`display`, `body`, `mono`).
-- Font size / line-height pairs → `theme.extend.fontSize`.
-- Border radii → `theme.extend.borderRadius` (`sm`, `md`, `lg`, `full`).
-- Box shadows → `theme.extend.boxShadow` (`card`, `marker`, `glow`).
-- Spacing → Tailwind's default 4 px base already covers the specified scale; no extension needed.
-- Z-index → `theme.extend.zIndex`.
+Token mapping inside the `@theme` block:
+
+- Colours — `--color-bg: #13101E`, `--color-surface: #1D1830`, `--color-surface-2: #28213F`, `--color-border: #3A3158`, `--color-text: #F4F0FF`, `--color-muted: #B9B0D1`, `--color-primary: #FF9A3C`, `--color-on-primary: #1A0F05`, `--color-accent: #B99BFF`, `--color-danger: #FF6B8A`, `--color-focus: #FFD84D`, `--color-success: #7BE0A4`, `--color-severity-high: #FF9A3C`, `--color-severity-medium: #B99BFF`, `--color-severity-low: #8C84A8`.
+- Font families — `--font-display`, `--font-body`, `--font-mono`.
+- Border radii — `--radius-sm: 6px`, `--radius-md: 12px`, `--radius-lg: 20px`, `--radius-full: 999px`.
+- Box shadows — `--shadow-card`, `--shadow-marker`, `--shadow-glow`.
+- Z-index — `--z-screenshot: 1`, `--z-marker-cluster: 10`, `--z-marker: 20`, `--z-marker-selected: 30`, `--z-popover: 40`, `--z-sticky-header: 50`, `--z-sheet: 60`, `--z-modal: 70`, `--z-toast: 80`.
+
+Tailwind's CSS-variable-based approach makes these available as utility classes: `bg-bg`, `text-text`, `text-primary`, `font-display`, `shadow-card`, etc.
 
 The root `app/layout.tsx` applies `bg-bg text-text` to the `<body>` element to establish the dark base.
 
@@ -94,10 +98,12 @@ The root `app/layout.tsx` applies `bg-bg text-text` to the `<body>` element to e
 
 ## Test strategy
 
-### Unit-tested (Vitest, no browser)
+### Unit-tested (Vitest, `node` environment)
 
 - **`tests/types/schemas.test.ts`**: exercises every Zod schema with at least one valid fixture and at least one invalid fixture per required field. Specifically tests the `title` refinement with both a passing and a failing case.
-- **`tests/detectors/registry.test.ts`**: creates a fresh registry (or resets the module between tests using `vi.resetModules()`), registers a fake detector, calls `runDetectors`, and asserts on the return value. Tests the error path with a detector that returns a bad finding.
+- **`tests/detectors/registry.test.ts`**: isolates the registry per test (via `vi.resetModules()` or equivalent), registers a fake detector, calls `runDetectors`, and asserts on the return value. Tests the error path with a detector that returns a bad finding.
+
+No jsdom, no React component rendering, and no `@vitejs/plugin-react` are needed in this spec. All tested code is pure TypeScript with no DOM dependency.
 
 ### Requires a fixture or mock
 
@@ -106,5 +112,20 @@ None in this spec. The schemas are pure data-shape validators; no external depen
 ### Out of scope for automated testing
 
 - Visual correctness of the landing page (colour rendering, font loading). Verified manually or in a later Playwright spec.
-- Production build success (`npm run build`). Run once manually or as a final CI check; not part of the iterative Vitest suite.
-- ESLint rule violations. `npm run lint` is a separate script; not run from Vitest.
+- Production build success. Run once as the final verification step (task 11.4), not during iterative development.
+- ESLint rule violations. `npm run lint` is a separate script invoked in task 11.2; not run from Vitest.
+
+---
+
+## Pinned dependency versions
+
+Record the exact installed versions here after running `npm install` in task 1.2:
+
+| Package | Installed version |
+|---|---|
+| `next` | 16.4.6 |
+| `react` | 19.3.1 |
+| `tailwindcss` | 4.3.5 |
+| `typescript` | 5.9.3 (downgraded from 7.0.2 — typescript-eslint in eslint-config-next@16 requires TypeScript ≤6) |
+| `vitest` | 5.1.0 |
+| `zod` | 4.6.7 |

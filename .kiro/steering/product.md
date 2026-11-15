@@ -16,25 +16,32 @@ The Boo-tique (`/boo-tique` route group) is a companion fake shop built into the
 
 ## Phases
 
-**Phase 1 — single-page patterns (five detector types)**
+**Phase 1 — single-page patterns (five detector types, six pattern ids)**
 
-| Pattern | Monster |
+| Pattern id | Monster |
 |---|---|
-| Fake urgency | Skeleton |
-| Fake scarcity or fake activity | Ghost |
-| Confirmshaming | Witch |
-| Preselected paid or consent options | Spider |
-| Visual interference | Mummy |
+| `fake-urgency` | Skeleton |
+| `fake-scarcity` | Ghost |
+| `fake-activity` | Ghost |
+| `confirmshaming` | Witch |
+| `preselection` | Spider |
+| `visual-interference` | Mummy |
+
+`fake-scarcity` and `fake-activity` share the Ghost monster because both exploit perceived shortage; they are separate pattern ids so detectors can be precise about which claim they observed.
 
 **Phase 2 — flow patterns (walked only on The Boo-tique)**
 
-| Pattern | Monster |
+| Pattern id | Monster |
 |---|---|
-| Sneak into basket | Werewolf |
-| Drip pricing | Vampire |
-| Hard to cancel | Zombie |
+| `sneak-into-basket` | Werewolf |
+| `drip-pricing` | Vampire |
+| `hard-to-cancel` | Zombie |
 
 Phase 2 patterns are detected by the flow walker, which navigates the Boo-tique step by step and diffs cart lines and totals. Phase 2 is never run on third-party sites.
+
+## Ground-truth fixture note
+
+`docs/research/boo-tique-ground-truth.json` is a research draft that uses older short names (`urgency`, `scarcity`, `activity`). The test fixture created in the Boo-tique spec must use the canonical ids listed above. The value `none` is reserved for honest look-alike entries in the fixture only; it is not a valid `PatternId`.
 
 ## Non-goals
 
