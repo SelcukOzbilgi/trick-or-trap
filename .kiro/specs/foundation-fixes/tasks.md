@@ -26,12 +26,12 @@ Rules for every task:
   - [x] 2.6 Run `npx vitest run tests/types/schemas.test.ts --maxWorkers=2` and `npx tsc --noEmit`. Fix any failure in the touched files and run them again. Do not edit the registry test in this task. If `tests/detectors/registry.test.ts` fixtures break, report it instead of fixing it here.
   _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 3. Design tokens, fonts and landing page
-  - [ ] 3.1 In `app/globals.css`, replace the `--font-size-*` block in the `@theme` block with the `--text-*` sizes, `--text-*--line-height` values and `--text-4xl--letter-spacing: -0.02em` listed in `design.md`. Keep the colour, radius, shadow and `--z-index-*` declarations exactly as they are.
-  - [ ] 3.2 In `app/globals.css`, remove `--font-display`, `--font-body` and `--font-mono` from the first `@theme` block and add a separate `@theme inline` block that declares them as `var(--font-fraunces), serif`, `var(--font-space-grotesk), system-ui, sans-serif` and `var(--font-jetbrains-mono), ui-monospace, monospace`.
-  - [ ] 3.3 In `app/layout.tsx`, import `Fraunces`, `Space_Grotesk` and `JetBrains_Mono` from `next/font/google`, call each with `subsets: ["latin"]`, `display: "swap"` and the `variable` names `--font-fraunces`, `--font-space-grotesk` and `--font-jetbrains-mono`, put the three `.variable` class names on `<html>`, and change the body class to `bg-bg text-text font-body`. Keep the `metadata` export and the rest of the layout unchanged.
-  - [ ] 3.4 In `app/page.tsx`, change `text-muted` to `text-text` on the paragraph. Change nothing else.
-  - [ ] 3.5 Run `npx tsc --noEmit`. Read `app/globals.css`, `app/layout.tsx` and `app/page.tsx` back and check them against criteria 8.1 to 8.6, 9.1 to 9.7 and 10.1 to 10.2. There is no automated test for this task. Do not run `npm run build`; the owner checks the built CSS.
+- [x] 3. Design tokens, fonts and landing page
+  - [x] 3.1 In `app/globals.css`, replace the `--font-size-*` block in the `@theme` block with the `--text-*` sizes, `--text-*--line-height` values and `--text-4xl--letter-spacing: -0.02em` listed in `design.md`. Keep the colour, radius, shadow and `--z-index-*` declarations exactly as they are.
+  - [x] 3.2 In `app/globals.css`, remove `--font-display`, `--font-body` and `--font-mono` from the first `@theme` block and add a separate `@theme inline` block that declares them as `var(--font-fraunces), serif`, `var(--font-space-grotesk), system-ui, sans-serif` and `var(--font-jetbrains-mono), ui-monospace, monospace`.
+  - [x] 3.3 In `app/layout.tsx`, import `Fraunces`, `Space_Grotesk` and `JetBrains_Mono` from `next/font/google`, call each with `subsets: ["latin"]`, `display: "swap"` and the `variable` names `--font-fraunces`, `--font-space-grotesk` and `--font-jetbrains-mono`, put the three `.variable` class names on `<html>`, and change the body class to `bg-bg text-text font-body`. Keep the `metadata` export and the rest of the layout unchanged.
+  - [x] 3.4 In `app/page.tsx`, change `text-muted` to `text-text` on the paragraph. Change nothing else.
+  - [x] 3.5 Run `npx tsc --noEmit`. Read `app/globals.css`, `app/layout.tsx` and `app/page.tsx` back and check them against criteria 8.1 to 8.6, 9.1 to 9.7 and 10.1 to 10.2. There is no automated test for this task. Do not run `npm run build`; the owner checks the built CSS.
   _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 10.1, 10.2_
 
 - [ ] 4. Steering and docs

@@ -21,19 +21,28 @@
   --color-severity-low:    #8C84A8;
 
   /* ── Typography ──────────────────────────────────────────── */
-  --font-display: "Fraunces", serif;
-  --font-body:    "Space Grotesk", system-ui, sans-serif;
-  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
+  /* Font families (--font-display/body/mono) are in the @theme inline block below. */
 
-  /* Type scale (font-size / line-height) */
-  --font-size-xs:   0.75rem;
-  --font-size-sm:   0.875rem;
-  --font-size-base: 1rem;
-  --font-size-lg:   1.125rem;
-  --font-size-xl:   1.375rem;
-  --font-size-2xl:  1.875rem;
-  --font-size-3xl:  2.5rem;
-  --font-size-4xl:  3.5rem;
+  /* Type scale: Tailwind v4 reads font sizes from the --text-* namespace.
+     Sizes and line heights follow the design steering (px / line-height):
+     xs 12/16, sm 14/20, base 16/24, lg 18/28, xl 22/30, 2xl 30/36, 3xl 40/44, 4xl 56/60. */
+  --text-xs:   0.75rem;
+  --text-xs--line-height:   1rem;
+  --text-sm:   0.875rem;
+  --text-sm--line-height:   1.25rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.5rem;
+  --text-lg:   1.125rem;
+  --text-lg--line-height:   1.75rem;
+  --text-xl:   1.375rem;
+  --text-xl--line-height:   1.875rem;
+  --text-2xl:  1.875rem;
+  --text-2xl--line-height:  2.25rem;
+  --text-3xl:  2.5rem;
+  --text-3xl--line-height:  2.75rem;
+  --text-4xl:  3.5rem;
+  --text-4xl--line-height:  3.75rem;
+  --text-4xl--letter-spacing: -0.02em;
 
   /* ── Border radii ────────────────────────────────────────── */
   --radius-sm:   6px;
@@ -57,4 +66,12 @@
   --z-index-sheet:           60;
   --z-index-modal:           70;
   --z-index-toast:           80;
+}
+
+/* Font families. Declared with `inline` because the values reference the CSS
+   variables that next/font defines on <html> (see app/layout.tsx). */
+@theme inline {
+  --font-display: var(--font-fraunces), serif;
+  --font-body:    var(--font-space-grotesk), system-ui, sans-serif;
+  --font-mono:    var(--font-jetbrains-mono), ui-monospace, monospace;
 }
