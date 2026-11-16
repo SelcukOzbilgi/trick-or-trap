@@ -4,6 +4,17 @@ Paste an online shop URL and Trick or Trap opens the page in a real browser, fla
 
 **Status:** Work in progress. Implementation is written by Kiro from specs in `.kiro/specs/`.
 
+## Run locally
+
+Requires Node 20.9 or newer.
+
+- `npm install`: install dependencies.
+- `npm run dev`: start the development server at http://localhost:3000.
+- `npm test`: run the unit tests once (Vitest, no watch mode).
+- `npm run typecheck`: run the TypeScript compiler without emitting files.
+- `npm run lint`: run ESLint.
+- `npm run build`: create a production build. It downloads Google Fonts at build time, so it needs network access.
+
 ## Research notes
 
 - `docs/research/architecture.md`: architecture recommendation.

@@ -46,7 +46,7 @@ Every external dependency — the browser endpoint, the LLM judge, Supabase — 
 
 ## Secrets and environment variables
 
-Secrets live only in environment variables. They are never committed to the repository. `.env.example` lists the required variable names with placeholder values and is the only `.env*` file in version control. **The agent must not read or write `.env` files** — only `.env.example`.
+Secrets live only in environment variables. They are never committed to the repository. `.env.example` lists the required variable names with empty values (`NAME=`) and a one-line comment each, with no placeholder values, and is the only `.env*` file in version control. **The agent must not read or write `.env` files** — only `.env.example`.
 
 ## Data model (Supabase)
 

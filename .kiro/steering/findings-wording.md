@@ -8,7 +8,7 @@ These rules apply to every user-facing string produced by detectors, the judge, 
 
 ## Required wording
 
-- Every finding title and description **must start with "Possible"** — for example, "Possible fake urgency" not "Fake urgency detected".
+- Every finding **title must start with "Possible"**, for example "Possible fake urgency" not "Fake urgency detected". The description has no prefix rule, but it still describes what is on the screen, states the evidence, and does not assert intent.
 - Every finding must state the on-page evidence: quote or describe exactly what was observed (the text, the element, the measured numbers). Do not paraphrase beyond what the page shows.
 - Every finding must include a confidence level — **high**, **medium**, or **low** — written out as a word, not a colour alone.
 - Every result page must carry a date-stamp showing when the scan ran.

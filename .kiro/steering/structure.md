@@ -89,8 +89,8 @@ trick-or-trap/
 - **Zod schemas:** PascalCase with a `Schema` suffix (`FindingSchema`, `PageSnapshotSchema`).
 - **Types inferred from Zod:** PascalCase without suffix (`Finding`, `PageSnapshot`).
 - **Detector files:** one file per detector, named after the pattern (`fake-urgency.ts`). The default export is the detector function.
-- **Test files:** mirror the `lib/` path under `tests/`, with a `.test.ts` suffix.
+- **Test files:** the test for `lib/<area>/<name>.ts` is `tests/<area>/<name>.test.ts`. The test for `lib/<area>/index.ts` is `tests/<area>/<topic>.test.ts`, where `<topic>` names what the tests cover. Examples: `tests/types/schemas.test.ts` for `lib/types/index.ts` and `tests/detectors/registry.test.ts` for `lib/detectors/index.ts`.
 
 ## Specs
 
-Each feature has its own spec directory under `.kiro/specs/<feature-name>/`, containing `requirements.md` and `tasks.md`. See `specs.md` steering file for the required format. Detectors get individual specs (e.g. `.kiro/specs/detector-fake-urgency/`).
+Each feature has its own spec directory under `.kiro/specs/<feature-name>/`, containing three files: `requirements.md`, `design.md` and `tasks.md`. See `specs.md` steering file for the required format. Detectors get individual specs (e.g. `.kiro/specs/detector-fake-urgency/`).
