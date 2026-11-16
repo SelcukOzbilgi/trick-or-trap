@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ZodError } from "zod";
 import {
+  BoundingBoxSchema,
   FindingSchema,
   PageSnapshotSchema,
   BaseSnapshotSchema,
@@ -128,5 +129,151 @@ describe("BaseSnapshotSchema", () => {
   it("throws ZodError when viewportWidth is missing", () => {
     const { viewportWidth: _vw, ...bad } = validBaseSnapshot;
     expect(() => BaseSnapshotSchema.parse(bad)).toThrowError(ZodError);
+  });
+});
+
+// ── ISO-8601 timestamps (foundation-fixes 5.1 to 5.4) ──────────────────────
+
+describe("timestamp validation", () => {
+  const badDates = ["not a date", "2025-01-01"];
+
+  it("still accepts a valid ISO-8601 capturedAt and detectedAt", () => {
+    expect(() => BaseSnapshotSchema.parse(validBaseSnapshot)).not.toThrow();
+    expect(() => PageSnapshotSchema.parse(validBaseSnapshot)).not.toThrow();
+    expect(() => FindingSchema.parse(validFinding)).not.toThrow();
+  });
+
+  it.each(badDates)("FindingSchema rejects detectedAt %j", (detectedAt) => {
+    const bad = { ...validFinding, detectedAt };
+    expect(() => FindingSchema.parse(bad)).toThrowError(ZodError);
+  });
+
+  it.each(badDates)("BaseSnapshotSchema rejects capturedAt %j", (capturedAt) => {
+    const bad = { ...validBaseSnapshot, capturedAt };
+    expect(() => BaseSnapshotSchema.parse(bad)).toThrowError(ZodError);
+  });
+
+  it.each(badDates)("PageSnapshotSchema rejects capturedAt %j", (capturedAt) => {
+    const bad = { ...validBaseSnapshot, capturedAt };
+    expect(() => PageSnapshotSchema.parse(bad)).toThrowError(ZodError);
+  });
+});
+
+// ── Nested samples (foundation-fixes 5.5, 6.3 to 6.5) ──────────────────────
+
+describe("PageSnapshotSchema nested samples", () => {
+  it("rejects an invalid capturedAt inside secondSample", () => {
+    const bad = {
+      ...validBaseSnapshot,
+      secondSample: { ...validBaseSnapshot, capturedAt: "not a date" },
+    };
+    const result = PageSnapshotSchema.safeParse(bad);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path[0]).toBe("secondSample");
+  });
+
+  it("rejects an invalid capturedAt inside afterReload", () => {
+    const bad = {
+      ...validBaseSnapshot,
+      afterReload: { ...validBaseSnapshot, capturedAt: "2025-01-01" },
+    };
+    const result = PageSnapshotSchema.safeParse(bad);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path[0]).toBe("afterReload");
+  });
+
+  it("rejects a secondSample element without tag, with the full path", () => {
+    const { tag: _tag, ...elementWithoutTag } = validElement;
+    const bad = {
+      ...validBaseSnapshot,
+      secondSample: { ...validBaseSnapshot, elements: [elementWithoutTag] },
+    };
+    const result = PageSnapshotSchema.safeParse(bad);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path).toEqual([
+      "secondSample",
+      "elements",
+      0,
+      "tag",
+    ]);
+  });
+
+  it("rejects an invalid element inside afterReload", () => {
+    const bad = {
+      ...validBaseSnapshot,
+      afterReload: {
+        ...validBaseSnapshot,
+        elements: [{ ...validElement, checked: "yes" }],
+      },
+    };
+    const result = PageSnapshotSchema.safeParse(bad);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path.slice(0, 3)).toEqual([
+      "afterReload",
+      "elements",
+      0,
+    ]);
+  });
+
+  it("rejects a secondSample without url", () => {
+    const { url: _url, ...sampleWithoutUrl } = validBaseSnapshot;
+    const bad = { ...validBaseSnapshot, secondSample: sampleWithoutUrl };
+    const result = PageSnapshotSchema.safeParse(bad);
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].path[0]).toBe("secondSample");
+  });
+});
+
+// ── BoundingBoxSchema (foundation-fixes 5.6 to 5.9) ────────────────────────
+
+describe("BoundingBoxSchema", () => {
+  it("rejects a negative width", () => {
+    const bad = { ...validBoundingBox, width: -1 };
+    expect(() => BoundingBoxSchema.parse(bad)).toThrowError(ZodError);
+  });
+
+  it("rejects a negative height", () => {
+    const bad = { ...validBoundingBox, height: -1 };
+    expect(() => BoundingBoxSchema.parse(bad)).toThrowError(ZodError);
+  });
+
+  it("accepts a width and height of 0", () => {
+    const zero = { ...validBoundingBox, width: 0, height: 0 };
+    expect(() => BoundingBoxSchema.parse(zero)).not.toThrow();
+  });
+
+  it("accepts a negative x and y", () => {
+    const offscreen = { ...validBoundingBox, x: -20, y: -5 };
+    expect(() => BoundingBoxSchema.parse(offscreen)).not.toThrow();
+  });
+
+  it("rejects a negative width inside FindingSchema.boundingBoxes", () => {
+    const bad = {
+      ...validFinding,
+      boundingBoxes: [{ ...validBoundingBox, width: -1 }],
+    };
+    expect(() => FindingSchema.parse(bad)).toThrowError(ZodError);
+  });
+});
+
+// ── "Possible" rule applies to the title only (foundation-fixes 6.1, 6.2) ──
+
+describe("FindingSchema title and description", () => {
+  it("accepts a valid title with a description that does not start with 'Possible'", () => {
+    const finding = {
+      ...validFinding,
+      title: "Possible fake urgency",
+      description: "A countdown timer was observed.",
+    };
+    expect(() => FindingSchema.parse(finding)).not.toThrow();
+  });
+
+  it("still rejects a title without the 'Possible' prefix", () => {
+    const bad = {
+      ...validFinding,
+      title: "Fake urgency detected",
+      description: "Possible fake urgency was observed.",
+    };
+    expect(() => FindingSchema.parse(bad)).toThrowError(ZodError);
   });
 });

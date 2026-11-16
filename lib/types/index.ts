@@ -27,8 +27,8 @@ export type Confidence = z.infer<typeof ConfidenceSchema>;
 export const BoundingBoxSchema = z.object({
   x: z.number(),
   y: z.number(),
-  width: z.number(),
-  height: z.number(),
+  width: z.number().nonnegative(),
+  height: z.number().nonnegative(),
 });
 
 export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
@@ -63,7 +63,7 @@ export type ElementSnapshot = z.infer<typeof ElementSnapshotSchema>;
 
 export const BaseSnapshotSchema = z.object({
   url: z.string(),
-  capturedAt: z.string(), // ISO-8601
+  capturedAt: z.iso.datetime(), // ISO-8601 datetime string
   viewportWidth: z.number(),
   viewportHeight: z.number(),
   fullWidth: z.number(),
@@ -102,11 +102,12 @@ export type Evidence = z.infer<typeof EvidenceSchema>;
 export const FindingSchema = z.object({
   patternId: PatternIdSchema,
   confidence: ConfidenceSchema,
-  /** Must start with "Possible". Enforced at the Zod layer. */
+  /** Must start with "Possible". Enforced at the Zod layer. Only the title is prefix-checked. */
   title: z.string().refine(
     (v) => v.startsWith("Possible"),
     "Finding title must start with 'Possible'"
   ),
+  /** No prefix rule. Describes what is on the screen. */
   description: z.string(),
   evidence: EvidenceSchema,
   /** Synthetic element ids (from ElementSnapshot.id) the finding references. */
@@ -116,7 +117,7 @@ export const FindingSchema = z.object({
   /** One-sentence explanation of why this pattern matters to users. */
   explanation: z.string(),
   detectorName: z.string(),
-  detectedAt: z.string(), // ISO-8601
+  detectedAt: z.iso.datetime(), // ISO-8601 datetime string
 });
 
 export type Finding = z.infer<typeof FindingSchema>;
