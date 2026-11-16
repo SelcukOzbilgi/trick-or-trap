@@ -1,0 +1,211 @@
+/* The Boo-tique demo shop. Every selector is scoped to a bt- class so
+   nothing leaks into the Trick or Trap theme. */
+
+.bt-root {
+  --bt-bg: #fbf3e4;
+  --bt-paper: #fff9ee;
+  --bt-ink: #2a1512;
+  --bt-blood: #8b1a1a;
+  --bt-blood-dark: #6e1212;
+  --bt-muted: #6b5a52;
+  --bt-line: #e3d2b2;
+
+  min-height: 100dvh;
+  background: var(--bt-bg);
+  color: var(--bt-ink);
+  padding-bottom: 112px;
+  font-family: var(--font-jost), system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.bt-root *,
+.bt-root *::before,
+.bt-root *::after {
+  box-sizing: border-box;
+}
+
+.bt-root h1,
+.bt-root h2,
+.bt-root h3 {
+  font-family: var(--font-cormorant), Georgia, serif;
+  color: var(--bt-ink);
+  line-height: 1.15;
+  margin: 0 0 12px;
+}
+
+.bt-root a {
+  color: var(--bt-blood);
+}
+
+.bt-root p {
+  margin: 0 0 8px;
+}
+
+/* Single-column page layout */
+
+.bt-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.bt-notice {
+  background: var(--bt-blood-dark);
+  color: #ffffff;
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
+.bt-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid var(--bt-line);
+}
+
+.bt-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.bt-footer {
+  padding: 24px 16px;
+  border-top: 1px solid var(--bt-line);
+  color: var(--bt-muted);
+  font-size: 14px;
+}
+
+/* Cards and product tiles */
+
+.bt-card {
+  background: var(--bt-paper);
+  border: 1px solid var(--bt-line);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.bt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bt-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 140px;
+  border-radius: 8px;
+  background: var(--bt-line);
+  color: var(--bt-blood);
+}
+
+.bt-price {
+  font-weight: 600;
+}
+
+.bt-muted {
+  color: var(--bt-muted);
+}
+
+.bt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Toggle switch. The knob is aligned with flex. */
+
+.bt-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 44px;
+  height: 24px;
+  padding: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bt-line);
+}
+
+.bt-toggle[aria-checked="true"] {
+  justify-content: flex-end;
+  background: var(--bt-blood);
+}
+
+.bt-toggle-knob {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+}
+
+/* Overlays. Stacking: banner 40, backdrop 50, dialog 60, toast 70. */
+
+.bt-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 96px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 16px;
+  background: var(--bt-paper);
+  border-top: 1px solid var(--bt-line);
+}
+
+.bt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(42, 21, 18, 0.45);
+}
+
+.bt-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 60;
+  width: 100%;
+  max-width: 480px;
+  max-height: 80vh;
+  overflow: auto;
+  padding: 24px;
+  background: var(--bt-paper);
+  border: 1px solid var(--bt-line);
+  border-radius: 12px;
+}
+
+.bt-toast {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  z-index: 70;
+  width: 320px;
+  padding: 12px 16px;
+  background: var(--bt-paper);
+  border: 1px solid var(--bt-line);
+  border-radius: 8px;
+}
