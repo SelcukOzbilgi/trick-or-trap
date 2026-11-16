@@ -35,14 +35,14 @@ Rules for every task:
   - [x] 2.5 Run `npx vitest run tests/boo-tique/contrast.test.ts --maxWorkers=2`, then `npx vitest run tests/boo-tique/styles.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 2.3, 2.4, 2.5, 2.10, 15.4, 15.5, 17.11_
 
-- [ ] 3. Shell, demo notice, noindex metadata and layout
-  - [ ] 3.1 Create `tests/boo-tique/shell.test.ts` first. Render `BooTiqueShell` with `createElement` and `renderToStaticMarkup`: the markup has one `bt-root` wrapper; contains the text "Demo shop, nothing is for sale" exactly once on `data-testid="bt-demo-notice"`; contains no `<html` or `<body`; has `<a>` links with relative `/boo-tique` hrefs; applies `fontClassName` to the wrapper. Source scans over `components/boo-tique/` and `lib/boo-tique/`: no `next/font`, `next/link`, `next/image` or `next/navigation`.
-  - [ ] 3.2 Create `tests/boo-tique/metadata.test.ts` first: `booTiqueMetadata.robots` equals `{ index: false, follow: false }`; reading `app/boo-tique/layout.tsx` as text shows it imports `next/font/google`, imports the CSS, and exports `metadata` from `booTiqueMetadata`; `app/(boo-tique)` does not exist and `app/page.tsx` does.
-  - [ ] 3.3 Create `lib/boo-tique/content.ts` (`BOO_TIQUE_BASE_PATH`, `DEMO_NOTICE_TEXT`, `NAV_LINKS`) and `lib/boo-tique/metadata.ts` (`booTiqueMetadata` with a title, a description and `robots`).
-  - [ ] 3.4 Create `components/boo-tique/shell.tsx`: `BooTiqueShell({ children, fontClassName })` with the `bt-root` wrapper, the notice, a header with plain-anchor navigation, `<main>` and a footer saying the shop is fictional. No font import, no `<html>` or `<body>`.
-  - [ ] 3.5 Create `app/boo-tique/layout.tsx`: `Cormorant_Garamond` (weights `400`, `600`, `700`, variable `--font-cormorant`) and `Jost` (variable `--font-jost`) from `next/font/google`, import `./boo-tique.css`, `export const metadata: Metadata = booTiqueMetadata`, render the shell with the font class names.
-  - [ ] 3.6 Delete `components/boo-tique/smoke.tsx` and `tests/boo-tique/tsx-smoke.test.ts` (the shell test now proves TSX loading).
-  - [ ] 3.7 Run `npx vitest run tests/boo-tique/shell.test.ts --maxWorkers=2`, then `npx vitest run tests/boo-tique/metadata.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+- [x] 3. Shell, demo notice, noindex metadata and layout
+  - [x] 3.1 Create `tests/boo-tique/shell.test.ts` first. Render `BooTiqueShell` with `createElement` and `renderToStaticMarkup`: the markup has one `bt-root` wrapper; contains the text "Demo shop, nothing is for sale" exactly once on `data-testid="bt-demo-notice"`; contains no `<html` or `<body`; has `<a>` links with relative `/boo-tique` hrefs; applies `fontClassName` to the wrapper. Source scans over `components/boo-tique/` and `lib/boo-tique/`: no `next/font`, `next/link`, `next/image` or `next/navigation`.
+  - [x] 3.2 Create `tests/boo-tique/metadata.test.ts` first: `booTiqueMetadata.robots` equals `{ index: false, follow: false }`; reading `app/boo-tique/layout.tsx` as text shows it imports `next/font/google`, imports the CSS, and exports `metadata` from `booTiqueMetadata`; `app/(boo-tique)` does not exist and `app/page.tsx` does.
+  - [x] 3.3 Create `lib/boo-tique/content.ts` (`BOO_TIQUE_BASE_PATH`, `DEMO_NOTICE_TEXT`, `NAV_LINKS`) and `lib/boo-tique/metadata.ts` (`booTiqueMetadata` with a title, a description and `robots`).
+  - [x] 3.4 Create `components/boo-tique/shell.tsx`: `BooTiqueShell({ children, fontClassName })` with the `bt-root` wrapper, the notice, a header with plain-anchor navigation, `<main>` and a footer saying the shop is fictional. No font import, no `<html>` or `<body>`.
+  - [x] 3.5 Create `app/boo-tique/layout.tsx`: `Cormorant_Garamond` (weights `400`, `600`, `700`, variable `--font-cormorant`) and `Jost` (variable `--font-jost`) from `next/font/google`, import `./boo-tique.css`, `export const metadata: Metadata = booTiqueMetadata`, render the shell with the font class names.
+  - [x] 3.6 Delete `components/boo-tique/smoke.tsx` and `tests/boo-tique/tsx-smoke.test.ts` (the shell test now proves TSX loading).
+  - [x] 3.7 Run `npx vitest run tests/boo-tique/shell.test.ts --maxWorkers=2`, then `npx vitest run tests/boo-tique/metadata.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 1.15, 2.1, 2.2, 2.6, 2.7, 2.9, 3.1, 3.2, 3.4_
 
 - [ ] 4. Variant helper, render harness and coverage test
