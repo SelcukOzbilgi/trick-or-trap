@@ -62,6 +62,16 @@ describe("route completeness guards", () => {
     }
   });
 
+  it("has an empty PENDING_ROUTES", () => {
+    expect(PENDING_ROUTES).toEqual([]);
+  });
+
+  it("has a route-table entry for every distinct fixture route", () => {
+    for (const route of ALL_ROUTES) {
+      expect(tableCovers(route), route).toBe(true);
+    }
+  });
+
   it("matches every ROUTE_TABLE pattern to at least one fixture route", () => {
     for (const entry of ROUTE_TABLE) {
       const matched = ALL_ROUTES.some(

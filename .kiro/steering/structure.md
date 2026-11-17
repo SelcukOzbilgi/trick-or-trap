@@ -16,7 +16,7 @@ trick-or-trap/
 │   ├── api/
 │   │   └── scan/
 │   │       └── route.ts           # POST /api/scan
-│   └── (boo-tique)/               # route group – Boo-tique fake shop
+│   └── boo-tique/                 # real segment – Boo-tique fake shop (a route group would put its page at /)
 │       ├── layout.tsx             # light theme override
 │       ├── page.tsx               # home with hero, cookie banner, countdown
 │       ├── product/[slug]/
@@ -38,6 +38,7 @@ trick-or-trap/
 ├── lib/
 │   ├── types/
 │   │   └── index.ts               # PageSnapshot, Finding, Scan – all zod-validated
+│   ├── boo-tique/                 # palette, styles, variants, timers, content, ground-truth schema
 │   ├── capture/
 │   │   ├── browser.ts             # getBrowser() with three modes
 │   │   └── extractor.ts           # page.evaluate script → PageSnapshot
@@ -59,6 +60,7 @@ trick-or-trap/
 │   └── storage/
 │       └── supabase.ts            # scan persistence and screenshot upload
 ├── tests/
+│   ├── boo-tique/                 # page, safety and coverage tests, plus helpers/
 │   ├── detectors/
 │   │   ├── fake-urgency.test.ts
 │   │   ├── fake-scarcity.test.ts
@@ -70,7 +72,7 @@ trick-or-trap/
 │   ├── walker/
 │   │   └── walker.test.ts
 │   └── fixtures/
-│       ├── boo-tique-ground-truth.json  # copy of docs/research file
+│       ├── boo-tique-ground-truth.json  # copy of docs/research file, canonical pattern ids
 │       └── snapshots/                   # PageSnapshot fixtures per Boo-tique page
 ├── .kiro/
 │   ├── steering/                  # these files
