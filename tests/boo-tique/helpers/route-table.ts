@@ -24,4 +24,6 @@ export type RouteTableEntry = {
  * One entry per built page. A page task adds its `load` line here, for example
  * `{ pattern: "/boo-tique", load: () => import("@/app/boo-tique/page") }`.
  */
-export const ROUTE_TABLE: readonly RouteTableEntry[] = [];
+export const ROUTE_TABLE: readonly RouteTableEntry[] = [
+  { pattern: "/boo-tique", load: () => import("@/app/boo-tique/page") },
+];

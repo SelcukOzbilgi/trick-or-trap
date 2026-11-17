@@ -1,9 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { renderRoute } from "./helpers/render-route";
 import type { RouteTableEntry } from "./helpers/route-table";
-import { countTestId, textOf, visibleText } from "./helpers/markup";
+import {
+  attr,
+  countTestId,
+  openTag,
+  textOf,
+  visibleText,
+} from "./helpers/markup";
 
-/** Local one-entry table: the home page is not in ROUTE_TABLE until task 6. */
+/** Local one-entry table, used by the grid and urgency tests. */
 const TABLE: readonly RouteTableEntry[] = [
   { pattern: "/boo-tique", load: () => import("@/app/boo-tique/page") },
 ];
@@ -127,4 +133,162 @@ describe("home page variant query values", () => {
       render("/boo-tique?banner=foo&banner=ghost&modal=bar&modal=exit-intent"),
     ).resolves.toContain("Ghost Pepper Candle");
   });
+});
+
+// ---- Cookie banner variants (rendered through ROUTE_TABLE) ----
+
+/** Opening tag of the first `<button>` or `<a>` whose text is exactly `label`. */
+function controlTag(markup: string, tagName: "button" | "a", label: string): string {
+  const re = new RegExp(`<${tagName}\\b[^>]*>\\s*${label}\\s*</${tagName}>`);
+  const match = re.exec(markup);
+  if (!match) throw new Error(`No <${tagName}> labelled "${label}"`);
+  return /^<[^>]*>/.exec(match[0])![0];
+}
+
+function bannerCount(markup: string): number {
+  return (markup.match(/class="bt-banner"/g) ?? []).length;
+}
+
+function style(tag: string): string {
+  const value = attr(tag, "style");
+  if (value === undefined) throw new Error(`No style attribute on ${tag}`);
+  return value;
+}
+
+const URGENCY_IDS = [
+  "home-hero-countdown-restart",
+  "home-rolling-midnight-text",
+  "home-fixed-date-sale",
+];
+
+describe("default cookie banner", () => {
+  it("has the entry id once on a bt-banner region", async () => {
+    const markup = await renderRoute("/boo-tique");
+    expect(countTestId(markup, "home-cookie-accept-dominant")).toBe(1);
+    const tag = openTag(markup, "home-cookie-accept-dominant");
+    expect(attr(tag, "class")).toBe("bt-banner");
+    expect(attr(tag, "role")).toBe("region");
+    expect(attr(tag, "aria-label")).toBe("Cookie preferences");
+  });
+
+  it("styles Accept all as the large filled button", async () => {
+    const markup = await renderRoute("/boo-tique");
+    const accept = style(controlTag(markup, "button", "Accept all"));
+    for (const declaration of [
+      "font-size:20px",
+      "font-weight:700",
+      "padding:16px 48px",
+      "min-height:56px",
+      "background:#8b1a1a",
+      "color:#ffffff",
+    ]) {
+      expect(accept, declaration).toContain(declaration);
+    }
+  });
+
+  it("has a small grey options link", async () => {
+    const markup = await renderRoute("/boo-tique");
+    const link = style(controlTag(markup, "a", "options"));
+    expect(link).toContain("font-size:11px");
+    expect(link).toContain("color:#9a9a9a");
+  });
+
+  it("has no Reject control", async () => {
+    const markup = await renderRoute("/boo-tique");
+    expect(markup).not.toContain("Reject");
+    expect(markup).not.toContain("reject");
+  });
+
+  it("is the only cookie banner and sits in the initial HTML", async () => {
+    const markup = await renderRoute("/boo-tique");
+    expect(bannerCount(markup)).toBe(1);
+  });
+
+  it("keeps the urgency block", async () => {
+    const markup = await renderRoute("/boo-tique");
+    for (const id of URGENCY_IDS) expect(countTestId(markup, id), id).toBe(1);
+  });
+});
+
+describe("ghost cookie banner", () => {
+  it("has the entry id once on a bt-banner region", async () => {
+    const markup = await renderRoute("/boo-tique?banner=ghost");
+    expect(countTestId(markup, "home-cookie-ghost-reject")).toBe(1);
+    expect(attr(openTag(markup, "home-cookie-ghost-reject"), "class")).toBe(
+      "bt-banner",
+    );
+  });
+
+  it("fades the Reject button", async () => {
+    const markup = await renderRoute("/boo-tique?banner=ghost");
+    const reject = style(controlTag(markup, "button", "Reject"));
+    for (const declaration of [
+      "font-size:14px",
+      "color:#b3b3b3",
+      "background:transparent",
+      "border:1px solid #b3b3b3",
+      "opacity:0.6",
+    ]) {
+      expect(reject, declaration).toContain(declaration);
+    }
+  });
+
+  it("keeps the large Accept all button", async () => {
+    const markup = await renderRoute("/boo-tique?banner=ghost");
+    const accept = style(controlTag(markup, "button", "Accept all"));
+    expect(accept).toContain("font-size:20px");
+    expect(accept).toContain("background:#8b1a1a");
+  });
+
+  it("has no urgency element and no default banner id", async () => {
+    const markup = await renderRoute("/boo-tique?banner=ghost");
+    for (const id of URGENCY_IDS) expect(countTestId(markup, id), id).toBe(0);
+    expect(countTestId(markup, "home-cookie-accept-dominant")).toBe(0);
+    expect(countTestId(markup, "home-cookie-equal-buttons")).toBe(0);
+  });
+
+  it("is the only cookie banner", async () => {
+    expect(bannerCount(await renderRoute("/boo-tique?banner=ghost"))).toBe(1);
+  });
+});
+
+describe("equal cookie banner", () => {
+  it("has the entry id once on a bt-banner region", async () => {
+    const markup = await renderRoute("/boo-tique?banner=equal");
+    expect(countTestId(markup, "home-cookie-equal-buttons")).toBe(1);
+    expect(attr(openTag(markup, "home-cookie-equal-buttons"), "class")).toBe(
+      "bt-banner",
+    );
+  });
+
+  it("gives Accept and Reject identical style attributes", async () => {
+    const markup = await renderRoute("/boo-tique?banner=equal");
+    const accept = style(controlTag(markup, "button", "Accept all"));
+    const reject = style(controlTag(markup, "button", "Reject all"));
+    expect(accept).toBe(reject);
+    expect(accept).toContain("min-width:160px");
+  });
+
+  it("has no urgency element and no other banner id", async () => {
+    const markup = await renderRoute("/boo-tique?banner=equal");
+    for (const id of URGENCY_IDS) expect(countTestId(markup, id), id).toBe(0);
+    expect(countTestId(markup, "home-cookie-accept-dominant")).toBe(0);
+    expect(countTestId(markup, "home-cookie-ghost-reject")).toBe(0);
+  });
+
+  it("is the only cookie banner", async () => {
+    expect(bannerCount(await renderRoute("/boo-tique?banner=equal"))).toBe(1);
+  });
+});
+
+describe("cookie banner buttons", () => {
+  it.each(["/boo-tique", "/boo-tique?banner=ghost", "/boo-tique?banner=equal"])(
+    "gives every button type=button on %s",
+    async (route) => {
+      const markup = await renderRoute(route);
+      const buttons = markup.match(/<button\b[^>]*>/g) ?? [];
+      expect(buttons.length).toBeGreaterThan(0);
+      for (const tag of buttons) expect(attr(tag, "type"), tag).toBe("button");
+    },
+  );
 });

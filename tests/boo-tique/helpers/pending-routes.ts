@@ -4,9 +4,6 @@
  * list is empty.
  */
 export const PENDING_ROUTES: readonly string[] = [
-  "/boo-tique",
-  "/boo-tique?banner=ghost",
-  "/boo-tique?banner=equal",
   "/boo-tique/product/ghost-pepper-candle",
   "/boo-tique/cart",
   "/boo-tique/checkout",
