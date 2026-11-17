@@ -11,10 +11,10 @@ Rules for every task:
 - Never read or write `.env` files. Only task 6 edits `.env.example`. Do not touch `.github/`, `.githooks/`, `scripts/`, `SECURITY.md`, `.kiro/agents/`, `app/`, or any spec other than the ones a task names.
 - Use the names of `design.md` exactly. Tests import with the `@/` alias. The library never calls `console.*`. Tests use sentinel strings as secrets, never real values.
 
-- [ ] 1. Dependency: jsdom
-  - [ ] 1.1 Extend `tests/capture/dependencies.test.ts` first: `devDependencies.jsdom` is exactly `"31.0.1"` (no `^`, `~`, `latest`); the `dependencies` keys are exactly `next`, `playwright-core`, `react`, `react-dom`, `server-only`, `zod` with their present values; the `scripts` keys are exactly `dev`, `build`, `start`, `lint`, `typecheck`, `test`, `hooks:enable`; the text of `vitest.config.ts` has no `jsdom`; no file under `lib/` (read recursively with `readdirSync`) contains `jsdom`.
-  - [ ] 1.2 Run `npx vitest run tests/capture/dependencies.test.ts --maxWorkers=2`; the jsdom case fails. Run `npm install --save-dev --save-exact jsdom@31.0.1` (the only place this command is allowed). Read `package.json` and confirm only `devDependencies` gained `jsdom` at `31.0.1`.
-  - [ ] 1.3 Run the test file again, then `npx tsc --noEmit`.
+- [x] 1. Dependency: jsdom
+  - [x] 1.1 Extend `tests/capture/dependencies.test.ts` first: `devDependencies.jsdom` is exactly `"31.0.1"` (no `^`, `~`, `latest`); the `dependencies` keys are exactly `next`, `playwright-core`, `react`, `react-dom`, `server-only`, `zod` with their present values; the `scripts` keys are exactly `dev`, `build`, `start`, `lint`, `typecheck`, `test`, `hooks:enable`; the text of `vitest.config.ts` has no `jsdom`; no file under `lib/` (read recursively with `readdirSync`) contains `jsdom`.
+  - [x] 1.2 Run `npx vitest run tests/capture/dependencies.test.ts --maxWorkers=2`; the jsdom case fails. Run `npm install --save-dev --save-exact jsdom@31.0.1` (the only place this command is allowed). Read `package.json` and confirm only `devDependencies` gained `jsdom` at `31.0.1`.
+  - [x] 1.3 Run the test file again, then `npx tsc --noEmit`.
   _Requirements: 24.1, 24.2, 24.3, 24.4, 24.5_
 
 - [ ] 2. N1: the test-id attribute out of the snapshot, the code and the old spec
