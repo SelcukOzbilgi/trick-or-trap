@@ -2,7 +2,7 @@ import { PRODUCTS, type Product } from "@/lib/boo-tique/content";
 
 const MAX_STARS = 5;
 
-function Tile() {
+export function Tile() {
   return (
     <div className="bt-tile" aria-hidden="true">
       <svg
@@ -23,7 +23,7 @@ function Tile() {
   );
 }
 
-function Stars({ rating }: { rating: number }) {
+export function Stars({ rating }: { rating: number }) {
   const full = "★".repeat(rating);
   const empty = "☆".repeat(MAX_STARS - rating);
   return (

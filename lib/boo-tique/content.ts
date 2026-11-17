@@ -41,6 +41,25 @@ export const ROLLING_MIDNIGHT_TEXT = "Black Friday of the Dead ends at midnight"
 /** Label before the hero countdown time. */
 export const HERO_COUNTDOWN_LABEL = "Boo-nanza ends in";
 
+/** Slug of the only product that has a page. */
+export const PRODUCT_PAGE_SLUG = "ghost-pepper-candle";
+
+export type VariantKey = "large-jar" | "travel-tin";
+
+/** Real, fixed inventory per variant. It does not change between loads. */
+export const INVENTORY: Readonly<Record<"travel-tin", number>> = {
+  "travel-tin": 3,
+};
+
+/** Variant rows on the product page. Only the Travel tin has an inventory count. */
+export const PRODUCT_VARIANTS: ReadonlyArray<{
+  readonly key: VariantKey;
+  readonly label: string;
+}> = [
+  { key: "large-jar", label: "Large jar" },
+  { key: "travel-tin", label: "Travel tin" },
+];
+
 /** Header navigation. Plain anchors with relative hrefs. */
 export const NAV_LINKS: readonly NavLink[] = [
   { label: "Home", href: BOO_TIQUE_BASE_PATH },
