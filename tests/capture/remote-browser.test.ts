@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { collectInPage } from "@/lib/capture/extractor";
+import { COLLECT_LIMITS } from "@/lib/capture/constants";
 import { createRemoteBrowser, DISCONNECT_TIMEOUT_MS } from "@/lib/capture/remote-browser";
 import type { CaptureConfig } from "@/lib/capture/config";
 import type { BrowserSessionHandle, CapturePage, GuardEvent, PageGuards } from "@/lib/capture/seam";
@@ -31,6 +32,7 @@ const COLLECT_OPTIONS: CollectOptions = {
   maxTextChars: 300,
   maxAttrChars: 200,
   attributeNames: "full",
+  limits: COLLECT_LIMITS,
 };
 
 const RAW_READ: RawPageRead = {

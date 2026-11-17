@@ -2,12 +2,19 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { CollectOptions } from "@/lib/capture/types";
+import { COLLECT_LIMITS } from "@/lib/capture/constants";
 import { CaptureFailure } from "@/lib/capture/types";
 import type { PageGuards, SessionRequest } from "@/lib/capture/seam";
 import { createFakeBrowser, createRawPageRead } from "./helpers/fake-browser";
 
 const request: SessionRequest = { timeoutMinutes: 2, proxy: "off", viewport: { width: 1280, height: 800 } };
-const collectOptions: CollectOptions = { maxElements: 10, maxTextChars: 30, maxAttrChars: 20, attributeNames: "full" };
+const collectOptions: CollectOptions = {
+  maxElements: 10,
+  maxTextChars: 30,
+  maxAttrChars: 20,
+  attributeNames: "full",
+  limits: COLLECT_LIMITS,
+};
 
 async function isPending(promise: Promise<unknown>): Promise<boolean> {
   const settled = Symbol("settled");

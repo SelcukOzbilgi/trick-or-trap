@@ -10,6 +10,7 @@ vi.mock("@/lib/capture/config", async (importOriginal) => ({
 
 import { capturePage, type CaptureDeps } from "@/lib/capture/capture";
 import type { CaptureConfig } from "@/lib/capture/config";
+import { COLLECT_LIMITS } from "@/lib/capture/constants";
 import type { GetBrowserResult } from "@/lib/capture/seam";
 import type { CaptureResult, RawElement } from "@/lib/capture/types";
 import type { Resolver } from "@/lib/capture/url-check";
@@ -160,6 +161,7 @@ describe("capturePage: success", () => {
       maxTextChars: 300,
       maxAttrChars: 200,
       attributeNames: "full",
+      limits: COLLECT_LIMITS,
     });
   });
 

@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 
 import { capturePage, type CaptureDeps } from "@/lib/capture/capture";
 import type { CaptureConfig } from "@/lib/capture/config";
+import { COLLECT_LIMITS } from "@/lib/capture/constants";
 import type { GetBrowserResult } from "@/lib/capture/seam";
 import { CaptureFailure } from "@/lib/capture/types";
 import type { CaptureResult, RawElement, RawPageRead } from "@/lib/capture/types";
@@ -135,8 +136,14 @@ describe("capturePage: reload sample", () => {
       "stop",
     ]);
     expect(fake.collectOptions).toEqual([
-      { maxElements: 1_500, maxTextChars: 300, maxAttrChars: 200, attributeNames: "full" },
-      { maxElements: 750, maxTextChars: 120, maxAttrChars: 200, attributeNames: ["type", "name", "disabled"] },
+      { maxElements: 1_500, maxTextChars: 300, maxAttrChars: 200, attributeNames: "full", limits: COLLECT_LIMITS },
+      {
+        maxElements: 750,
+        maxTextChars: 120,
+        maxAttrChars: 200,
+        attributeNames: ["type", "name", "disabled"],
+        limits: COLLECT_LIMITS,
+      },
     ]);
     expect(fake.screenshotRequests).toHaveLength(1);
     expect(fake.scrollRequests).toEqual([]);

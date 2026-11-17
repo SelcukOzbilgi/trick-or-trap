@@ -19,6 +19,7 @@ import {
   API_FETCH_TIMEOUT_MS,
   BROWSER_VIEWPORT,
   CAPTURE_TIMEOUT_MS,
+  COLLECT_LIMITS,
   MAX_ATTR_CHARS,
   MAX_ELEMENTS,
   MAX_ELEMENTS_LIGHT,
@@ -240,6 +241,7 @@ async function runCapture(
         maxTextChars: MAX_TEXT_CHARS,
         maxAttrChars: MAX_ATTR_CHARS,
         attributeNames: "full",
+        limits: COLLECT_LIMITS,
       }),
     "page-read-failed",
   );
@@ -281,6 +283,7 @@ async function runCapture(
           maxTextChars: MAX_TEXT_CHARS_LIGHT,
           maxAttrChars: MAX_ATTR_CHARS,
           attributeNames: LIGHT_ATTRIBUTE_NAMES,
+          limits: COLLECT_LIMITS,
         }),
       );
       const second = buildSample(reloadRaw, {

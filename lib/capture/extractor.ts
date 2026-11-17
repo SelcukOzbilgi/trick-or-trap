@@ -16,15 +16,23 @@ import {
   MAX_ATTR_CHARS,
 } from "./constants";
 import { isOutsideImages, toDocumentBox, type ImageBox, type ScreenshotMode } from "./geometry";
-import type { CollectOptions, RawElement, RawPageRead } from "./types";
+import type { CollectOptions, RawCollection, RawElement, RawPageRead } from "./types";
 
 /**
- * Runs in the page's main world, serialised by Playwright. It must stay
- * self-contained: no imports, no closures over module scope, no named inner
- * functions (a build step may wrap those in helpers that do not exist in the page),
- * and plain ES2017 syntax. One call reads every element and the page metrics.
+ * Runs inside the page (in an isolated world once task 10 lands), serialised by
+ * Playwright or CDP. It must stay self-contained: no imports, no closures over
+ * module scope, no named inner functions (a build step may wrap those in helpers that
+ * do not exist in the page), and plain ES2017 syntax apart from `catch` without a
+ * binding. One call reads every element and returns the pixel ratio. It returns no
+ * other page metric: those come from CDP.
+ *
+ * The collector applies `options.limits` to what it returns, so less data crosses the
+ * wire. It cuts strings with `substring`, and reads styles inside `try`, so that a
+ * page that tampers with `slice` or `getComputedStyle` cannot make it throw. The
+ * outside pass (`buildSample`) never trusts the result and applies the caps again.
  */
-export function collectInPage(options: CollectOptions): RawPageRead {
+export function collectInPage(options: CollectOptions): RawCollection {
+  const limits = options.limits;
   const full = options.attributeNames === "full";
   const names: readonly string[] = full
     ? ["disabled", "type", "name", "href", "for", "placeholder", "value"]
@@ -32,20 +40,31 @@ export function collectInPage(options: CollectOptions): RawPageRead {
   const valueTypes = ["checkbox", "radio", "submit", "button", "reset"];
   const skipTags = ["script", "style", "noscript", "template", "head"];
   const controlTags = ["input", "select", "textarea", "button"];
+  const styleNames = ["color", "backgroundColor", "fontSize", "opacity", "display", "visibility", "position"];
 
   const elements: RawElement[] = [];
   let eligibleCount = 0;
-  const stack: { el: Element; path: number[] }[] = [{ el: document.documentElement, path: [] }];
+  // `path` is null for an element deeper than `limits.maxPathDepth`: it is still
+  // visited and counted, but no path array is built for it, and it is not collected.
+  const stack: { el: Element; path: number[] | null; depth: number }[] = [
+    { el: document.documentElement, path: [], depth: 0 },
+  ];
 
   while (stack.length > 0) {
-    const item = stack.pop() as { el: Element; path: number[] };
+    const item = stack.pop() as { el: Element; path: number[] | null; depth: number };
     const el = item.el;
-    const tag = el.tagName.toLowerCase();
-    if (skipTags.indexOf(tag) >= 0) continue;
+    const fullTag = el.tagName.toLowerCase();
+    if (skipTags.indexOf(fullTag) >= 0) continue;
+    const tag = fullTag.length > limits.maxTagChars ? fullTag.substring(0, limits.maxTagChars) : fullTag;
 
     const children = el.children;
+    const childPath = item.path !== null && item.depth < limits.maxPathDepth ? item.path : null;
     for (let i = children.length - 1; i >= 0; i--) {
-      stack.push({ el: children[i], path: item.path.concat([i]) });
+      stack.push({
+        el: children[i],
+        path: childPath === null ? null : childPath.concat([i]),
+        depth: item.depth + 1,
+      });
     }
 
     // Eligibility.
@@ -86,22 +105,26 @@ export function collectInPage(options: CollectOptions): RawPageRead {
     if (!isControl && (rect.width <= 0 || rect.height <= 0)) continue;
 
     eligibleCount++;
-    if (elements.length >= options.maxElements) continue;
+    // An element past the depth cap or the element cap is counted and not collected.
+    if (item.path === null || elements.length >= options.maxElements) continue;
 
     // Text.
     let rawText = ownText;
     if (visibleText) {
+      // Some DOM implementations used in tests have no `innerText`; fall back to `textContent`.
       const inner = (el as HTMLElement).innerText;
       rawText = typeof inner === "string" ? inner : el.textContent || "";
     }
     const collapsed = rawText.replace(/\s+/g, " ").trim();
     const cut = collapsed.length > options.maxTextChars;
 
-    // Attributes.
+    // Attributes: allowlist, at most `maxAttrsPerElement`, names and values cut.
     const attrs: Record<string, string> = {};
+    let attrCount = 0;
     const inputType = (el.getAttribute("type") || "").toLowerCase();
-    for (let i = 0; i < el.attributes.length; i++) {
+    for (let i = 0; i < el.attributes.length && attrCount < limits.maxAttrsPerElement; i++) {
       const attr = el.attributes[i];
+      if (attr.name.length > limits.maxAttrNameChars) continue;
       const name = attr.name.toLowerCase();
       if (!(names.indexOf(name) >= 0 || (full && name.indexOf("aria-") === 0))) continue;
       if (
@@ -110,41 +133,49 @@ export function collectInPage(options: CollectOptions): RawPageRead {
       ) {
         continue;
       }
-      attrs[name] = attr.value.length > options.maxAttrChars ? attr.value.slice(0, options.maxAttrChars) : attr.value;
+      attrs[name] =
+        attr.value.length > options.maxAttrChars ? attr.value.substring(0, options.maxAttrChars) : attr.value;
+      attrCount++;
     }
 
-    const style = getComputedStyle(el);
+    // Role and styles, cut at their caps. A style that cannot be read becomes "".
+    const roleAttr = el.getAttribute("role");
+    const role =
+      roleAttr !== null && roleAttr.length > limits.maxRoleChars ? roleAttr.substring(0, limits.maxRoleChars) : roleAttr;
+    let style: CSSStyleDeclaration | null = null;
+    try {
+      style = getComputedStyle(el);
+    } catch {
+      style = null;
+    }
+    const styleOut: Record<string, string> = {};
+    for (let i = 0; i < styleNames.length; i++) {
+      let value = "";
+      try {
+        const read: unknown = style === null ? "" : (style as unknown as Record<string, unknown>)[styleNames[i]];
+        value = typeof read === "string" ? read : "";
+      } catch {
+        value = "";
+      }
+      styleOut[styleNames[i]] = value.length > limits.maxStyleChars ? value.substring(0, limits.maxStyleChars) : value;
+    }
+
     elements.push({
       path: item.path,
       tag,
-      role: el.getAttribute("role"),
-      text: cut ? collapsed.slice(0, options.maxTextChars) : collapsed,
+      role,
+      text: cut ? collapsed.substring(0, options.maxTextChars) : collapsed,
       textTruncated: cut,
       rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
-      style: {
-        color: style.color,
-        backgroundColor: style.backgroundColor,
-        fontSize: style.fontSize,
-        opacity: style.opacity,
-        display: style.display,
-        visibility: style.visibility,
-        position: style.position,
-      },
+      style: styleOut as RawElement["style"],
       checked: (el as HTMLInputElement).checked === true,
       selected: (el as HTMLOptionElement).selected === true,
       attrs,
     });
   }
 
-  const root = document.documentElement;
   return {
-    innerWidth: window.innerWidth,
-    innerHeight: window.innerHeight,
     devicePixelRatio: window.devicePixelRatio,
-    scrollX: window.scrollX,
-    scrollY: window.scrollY,
-    scrollWidth: root.scrollWidth,
-    scrollHeight: root.scrollHeight,
     eligibleCount,
     elements,
   };

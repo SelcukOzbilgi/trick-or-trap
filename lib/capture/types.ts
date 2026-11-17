@@ -151,6 +151,7 @@ export type CollectOptions = {
   maxTextChars: number;
   maxAttrChars: number;
   attributeNames: readonly string[] | "full"; // "full" = the full allowlist
+  limits: CollectLimits;
 };
 
 export type RawElement = {
