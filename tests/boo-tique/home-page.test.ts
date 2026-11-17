@@ -20,13 +20,112 @@ function render(route: string): Promise<string> {
 }
 
 const PRODUCTS: ReadonlyArray<readonly [string, string]> = [
-  ["Cursed Candle Set", "$24"],
-  ["Phantom Hoodie", "$58"],
-  ["Moon-Phase Mug", "$22"],
-  ["Crypt Keeper Tote", "$26"],
-  ["Raven Feather Quill Pen", "$14"],
-  ["Ghost Pepper Candle", "$18"],
+  ["Cursed Candle Set", "$24.00"],
+  ["Phantom Hoodie", "$58.00"],
+  ["Moon-Phase Mug", "$22.00"],
+  ["Crypt Keeper Tote", "$26.00"],
+  ["Raven Feather Quill Pen", "$14.00"],
+  ["Ghost Pepper Candle", "$18.00"],
 ];
+
+/** Expected tile icon and star rating per card, in grid order (5.6, 5.8). */
+const CARD_ICONS = ["candle", "hoodie", "mug", "tote", "quill", "candle"] as const;
+const CARD_RATINGS = [4, 5, 4, 4, 3, 5] as const;
+
+const HOME_VARIANTS = [
+  "/boo-tique",
+  "/boo-tique?banner=ghost",
+  "/boo-tique?banner=equal",
+  "/boo-tique?modal=exit-intent",
+] as const;
+
+const HERO_OPEN = '<section class="bt-hero" aria-labelledby="bt-hero-heading">';
+const HERO_H1 = '<h1 id="bt-hero-heading">The Boo-tique</h1>';
+const HERO_TAGLINE = '<p class="bt-hero-tagline">Gothic goods for living ghouls</p>';
+
+describe("home page hero and outline", () => {
+  it.each(HOME_VARIANTS)("has one h1 inside the hero, then the tagline, on %s", async (route) => {
+    const markup = await renderRoute(route);
+    expect((markup.match(/<h1\b/g) ?? []).length).toBe(1);
+    const open = markup.indexOf(HERO_OPEN);
+    expect(open).toBeGreaterThan(-1);
+    const close = markup.indexOf("</section>", open);
+    const hero = markup.slice(open, close);
+    expect(hero.startsWith(`${HERO_OPEN}${HERO_H1}${HERO_TAGLINE}`)).toBe(true);
+  });
+
+  it.each(HOME_VARIANTS)("puts the h1 before the products heading on %s", async (route) => {
+    const markup = await renderRoute(route);
+    const h1 = markup.indexOf("<h1");
+    const h2 = markup.indexOf('<h2 id="bt-products-heading">Shop the crypt</h2>');
+    expect(h1).toBeGreaterThan(-1);
+    expect(h2).toBeGreaterThan(h1);
+  });
+
+  it("puts one promo block inside the hero of the default variant, after the tagline", async () => {
+    const markup = await renderRoute("/boo-tique");
+    expect(markup.split('class="bt-promo"').length - 1).toBe(1);
+    const open = markup.indexOf(HERO_OPEN);
+    const close = markup.indexOf("</section>", open);
+    const tagline = markup.indexOf(HERO_TAGLINE);
+    const promo = markup.indexOf('<div class="bt-promo">');
+    expect(promo).toBeGreaterThan(tagline);
+    expect(promo).toBeLessThan(close);
+  });
+
+  it("orders the three urgency entries countdown, midnight, fixed date", async () => {
+    const markup = await renderRoute("/boo-tique");
+    const countdown = markup.indexOf('data-testid="home-hero-countdown-restart"');
+    const midnight = markup.indexOf('data-testid="home-rolling-midnight-text"');
+    const fixed = markup.indexOf('data-testid="home-fixed-date-sale"');
+    expect(countdown).toBeGreaterThan(-1);
+    expect(midnight).toBeGreaterThan(countdown);
+    expect(fixed).toBeGreaterThan(midnight);
+  });
+
+  it.each(HOME_VARIANTS.slice(1))("has no promo block and no urgency id on %s", async (route) => {
+    const markup = await renderRoute(route);
+    expect(markup).not.toContain("bt-promo");
+    for (const id of [
+      "home-hero-countdown-restart",
+      "home-rolling-midnight-text",
+      "home-fixed-date-sale",
+    ]) {
+      expect(countTestId(markup, id), id).toBe(0);
+    }
+  });
+});
+
+describe("home page product tiles and stars", () => {
+  it("gives each card a tile with one svg and the icon of its product", async () => {
+    const markup = await renderRoute("/boo-tique");
+    const tiles = [
+      ...markup.matchAll(
+        /<div class="bt-tile bt-tile--([a-z]+)" aria-hidden="true">([\s\S]*?)<\/div>/g,
+      ),
+    ];
+    expect(tiles).toHaveLength(6);
+    expect(tiles.map((tile) => tile[1])).toEqual([...CARD_ICONS]);
+    for (const tile of tiles) expect((tile[2].match(/<svg\b/g) ?? []).length).toBe(1);
+    expect(new Set(tiles.map((tile) => tile[1])).size).toBe(5);
+  });
+
+  it("uses no img and no external url in a tile", async () => {
+    const markup = await renderRoute("/boo-tique");
+    expect(markup).not.toContain("<img");
+    expect(markup).not.toMatch(/https?:\/\//);
+  });
+
+  it("outputs each star rating as a role=img paragraph", async () => {
+    const markup = await renderRoute("/boo-tique");
+    const stars = [
+      ...markup.matchAll(
+        /<p class="bt-muted" role="img" aria-label="Rated (\d) out of 5">[★☆]{5}<\/p>/g,
+      ),
+    ];
+    expect(stars.map((star) => Number(star[1]))).toEqual([...CARD_RATINGS]);
+  });
+});
 
 describe("home page product grid", () => {
   it("shows the six product names and prices", async () => {

@@ -240,7 +240,24 @@ describe("product page content", () => {
   it("shows the product name and price", async () => {
     const markup = await render();
     expect(markup).toContain("Ghost Pepper Candle");
-    expect(markup).toContain("$18.00");
+    expect(markup).toContain('<p class="bt-price">$18.00</p>');
+  });
+
+  it("renders the candle tile, one h1 and a star rating with a role", async () => {
+    const markup = await render();
+    expect(markup).toContain('<div class="bt-tile bt-tile--candle" aria-hidden="true">');
+    const h1s = markup.match(/<h1\b[^>]*>[^<]*<\/h1>/g) ?? [];
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]?.replace(/<[^>]*>/g, "")).toBe("Ghost Pepper Candle");
+    expect(markup).toContain(
+      '<p class="bt-muted" role="img" aria-label="Rated 5 out of 5">',
+    );
+  });
+
+  it("keeps the 'Only N left!' text with the injected value", async () => {
+    // draw 0.5 -> STOCK_VALUES[floor(0.5 * 7)] = 6
+    const markup = await render(() => 0.5);
+    expect(textOf(markup, "product-low-stock-random")).toBe("Only 6 left!");
   });
 
   it("has an inert 'Add to cart' button of type button", async () => {

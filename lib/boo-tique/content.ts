@@ -70,6 +70,19 @@ export const PRODUCT_VARIANTS: ReadonlyArray<{
 export const NAV_LINKS: readonly NavLink[] = [
   { label: "Home", href: BOO_TIQUE_BASE_PATH },
   { label: "Cart", href: `${BOO_TIQUE_BASE_PATH}/cart` },
+  { label: "Checkout", href: `${BOO_TIQUE_BASE_PATH}/checkout` },
   { label: "Club", href: `${BOO_TIQUE_BASE_PATH}/club` },
   { label: "Account", href: `${BOO_TIQUE_BASE_PATH}/account/subscription` },
 ];
+
+export type ProductIcon = "candle" | "hoodie" | "mug" | "tote" | "quill";
+
+/** Tile icon per product slug. */
+export const PRODUCT_ICONS: Readonly<Record<string, ProductIcon>> = {
+  "cursed-candle-set": "candle",
+  "phantom-hoodie": "hoodie",
+  "moon-phase-mug": "mug",
+  "crypt-keeper-tote": "tote",
+  "raven-feather-quill-pen": "quill",
+  "ghost-pepper-candle": "candle",
+};
