@@ -9,7 +9,7 @@
       { "capability": "fs_write", "match": ["./**"], "effect": "allow" },
       { "capability": "fs_read",  "match": ["./.env", "./.env.*"], "exclude": ["./.env.example"], "effect": "deny" },
       { "capability": "fs_write", "match": ["./.env", "./.env.*"], "exclude": ["./.env.example"], "effect": "deny" },
-      { "capability": "fs_write", "match": ["./.kiro/agents/**", "./.kiro/hooks/**", "./.kiro/settings/**", "./.git/**", "./.gitattributes", "./.npmrc"], "effect": "deny" },
+      { "capability": "fs_write", "match": ["./.kiro/agents/**", "./.kiro/hooks/**", "./.kiro/settings/**", "./.git/**", "./.gitattributes", "./.npmrc", "./.githooks/**", "./.github/**", "./scripts/enable-hooks.mjs", "./.gitleaks.toml", "./SECURITY.md"], "effect": "deny" },
       { "capability": "shell",
         "match": ["npm install*", "npm ci*", "npm run *", "npm test*", "npx create-next-app*", "npx shadcn*", "npx playwright*", "npx tsc*", "npx vitest*", "npx eslint*", "npx next *", "node --test*", "node --version"],
         "exclude": ["*..*", "* /*", "* ~*", "*$*", "*`*", "*;*", "*&&*", "*|*", "*>*", "*&*", "*<*", "*(*", "*)*", "*run dev*", "*next dev*", "*next start*", "*run start*", "*--watch*"],
