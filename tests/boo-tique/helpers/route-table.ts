@@ -27,4 +27,15 @@ export type RouteTableEntry = {
 export const ROUTE_TABLE: readonly RouteTableEntry[] = [
   { pattern: "/boo-tique", load: () => import("@/app/boo-tique/page") },
   { pattern: "/boo-tique/club", load: () => import("@/app/boo-tique/club/page") },
+  {
+    pattern: "/boo-tique/product/[slug]",
+    // The page takes `{ slug }`; the harness passes a generic params record, so adapt it.
+    load: async () => {
+      const mod = await import("@/app/boo-tique/product/[slug]/page");
+      return {
+        default: ({ params }: PageProps) =>
+          mod.default({ params: params.then((all) => ({ slug: all.slug })) }),
+      };
+    },
+  },
 ];

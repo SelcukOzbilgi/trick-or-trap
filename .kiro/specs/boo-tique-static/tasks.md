@@ -98,13 +98,13 @@ Rules for every task:
   - [x] 9.6 Run `npx vitest run tests/boo-tique/per-load.test.ts --maxWorkers=2`, `npx vitest run tests/boo-tique/product-page.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 1.5, 1.14, 10.1, 10.2, 10.3, 10.4, 10.5, 10.9, 14.3, 14.4, 14.5, 14.6, 14.7, 14.8, 15.7_
 
-- [ ] 10. Product page overlays: sold toast and upsell dialog
-  - [ ] 10.1 Extend `tests/boo-tique/per-load.test.ts` first: `nextToastIndex` wraps around, `SOLD_TOAST_MESSAGES` has four entries, the first is "Morgan from Ohio just bought the Cursed Candle Set", and `SOLD_TOAST_INTERVAL_MS` is 6000.
-  - [ ] 10.2 Extend `tests/boo-tique/product-page.test.ts` first: `product-sold-toast` is a `role="status"` element with the class `bt-toast`, a dismiss button, and the first message; `product-upsell-modal-tiny-close` is the dialog root with `role="dialog"`, `aria-modal="true"` and `tabindex="-1"`, and a backdrop is present; "Add crypt keeper bundle" has `font-size:20px`, `font-weight:700` and full width; the close button is "x" with `font-size:8px`, `#cfc6bc` and `aria-label="Close"`; both overlays are in the initial HTML; the dialog and the toast are the only overlays on the page.
-  - [ ] 10.3 Extend `lib/boo-tique/countdown.ts` with `SOLD_TOAST_MESSAGES`, `SOLD_TOAST_INTERVAL_MS` and `nextToastIndex`. Create `components/boo-tique/sold-toast.tsx` (`"use client"`; first message on the server; rotates in `useEffect` every 6000 ms; dismiss button hides it).
-  - [ ] 10.4 Create `components/boo-tique/upsell-modal.tsx` (heading, the large "Add crypt keeper bundle" button, the tiny "x" close button, using `OverlayDialog`). Edit `components/boo-tique/product-page.tsx` to render the toast and the dialog.
-  - [ ] 10.5 Add the product `load` line to `ROUTE_TABLE` and remove `/boo-tique/product/ghost-pepper-candle` from `PENDING_ROUTES`.
-  - [ ] 10.6 Run `npx vitest run tests/boo-tique/per-load.test.ts --maxWorkers=2`, `npx vitest run tests/boo-tique/product-page.test.ts --maxWorkers=2`, `npx vitest run tests/boo-tique/coverage.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+- [x] 10. Product page overlays: sold toast and upsell dialog
+  - [x] 10.1 Extend `tests/boo-tique/per-load.test.ts` first: `nextToastIndex` wraps around, `SOLD_TOAST_MESSAGES` has four entries, the first is "Morgan from Ohio just bought the Cursed Candle Set", and `SOLD_TOAST_INTERVAL_MS` is 6000.
+  - [x] 10.2 Extend `tests/boo-tique/product-page.test.ts` first: `product-sold-toast` is a `role="status"` element with the class `bt-toast`, a dismiss button, and the first message; `product-upsell-modal-tiny-close` is the dialog root with `role="dialog"`, `aria-modal="true"` and `tabindex="-1"`, and a backdrop is present; "Add crypt keeper bundle" has `font-size:20px`, `font-weight:700` and full width; the close button is "x" with `font-size:8px`, `#cfc6bc` and `aria-label="Close"`; both overlays are in the initial HTML; the dialog and the toast are the only overlays on the page.
+  - [x] 10.3 Extend `lib/boo-tique/countdown.ts` with `SOLD_TOAST_MESSAGES`, `SOLD_TOAST_INTERVAL_MS` and `nextToastIndex`. Create `components/boo-tique/sold-toast.tsx` (`"use client"`; first message on the server; rotates in `useEffect` every 6000 ms; dismiss button hides it).
+  - [x] 10.4 Create `components/boo-tique/upsell-modal.tsx` (heading, the large "Add crypt keeper bundle" button, the tiny "x" close button, using `OverlayDialog`). Edit `components/boo-tique/product-page.tsx` to render the toast and the dialog.
+  - [x] 10.5 Add the product `load` line to `ROUTE_TABLE` and remove `/boo-tique/product/ghost-pepper-candle` from `PENDING_ROUTES`.
+  - [x] 10.6 Run `npx vitest run tests/boo-tique/per-load.test.ts --maxWorkers=2`, `npx vitest run tests/boo-tique/product-page.test.ts --maxWorkers=2`, `npx vitest run tests/boo-tique/coverage.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 10.6, 10.7, 10.8, 14.9, 15.8, 15.9, 17.3, 17.4, 17.9, 17.12_
 
 - [ ] 11. Cart page with preselection entries and the insurance preview

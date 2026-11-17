@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { perLoadValues } from "@/lib/boo-tique/per-load";
+import {
+  SOLD_TOAST_INTERVAL_MS,
+  SOLD_TOAST_MESSAGES,
+  nextToastIndex,
+} from "@/lib/boo-tique/countdown";
 
 /** Returns the given numbers in order, then repeats the last one. */
 function sequence(...values: number[]): () => number {
@@ -40,6 +45,32 @@ describe("perLoadValues", () => {
 
   it("gives different values for different sources", () => {
     expect(perLoadValues(() => 0.1)).not.toEqual(perLoadValues(() => 0.9));
+  });
+});
+
+describe("sold toast helpers", () => {
+  it("has four fixed messages", () => {
+    expect(SOLD_TOAST_MESSAGES).toHaveLength(4);
+    expect(new Set(SOLD_TOAST_MESSAGES).size).toBe(4);
+  });
+
+  it("starts with the Morgan message", () => {
+    expect(SOLD_TOAST_MESSAGES[0]).toBe("Morgan from Ohio just bought the Cursed Candle Set");
+  });
+
+  it("rotates every 6000 ms", () => {
+    expect(SOLD_TOAST_INTERVAL_MS).toBe(6000);
+  });
+
+  it("moves to the next index and wraps around", () => {
+    expect(nextToastIndex(0, 4)).toBe(1);
+    expect(nextToastIndex(2, 4)).toBe(3);
+    expect(nextToastIndex(3, 4)).toBe(0);
+  });
+
+  it("returns 0 for an empty list and for an out-of-range index", () => {
+    expect(nextToastIndex(0, 0)).toBe(0);
+    expect(nextToastIndex(9, 4)).toBe(0);
   });
 });
 

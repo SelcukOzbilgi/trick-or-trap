@@ -126,6 +126,116 @@ describe("real inventory look-alike", () => {
   });
 });
 
+const OVERLAY_IDS = ["product-sold-toast", "product-upsell-modal-tiny-close"] as const;
+
+/** Opening tags of every button in the markup. */
+function buttonTags(markup: string): string[] {
+  return markup.match(/<button\b[^>]*>/g) ?? [];
+}
+
+describe("sold toast", () => {
+  it("is present once in the initial HTML", async () => {
+    expect(countTestId(await render(), "product-sold-toast")).toBe(1);
+  });
+
+  it("is a role=status element with the bt-toast class", async () => {
+    const tag = openTag(await render(), "product-sold-toast");
+    expect(attr(tag, "role")).toBe("status");
+    expect((attr(tag, "class") ?? "").split(/\s+/)).toContain("bt-toast");
+  });
+
+  it("shows the first message first", async () => {
+    const text = textOf(await render(), "product-sold-toast");
+    expect(text).toContain("Morgan from Ohio just bought the Cursed Candle Set");
+  });
+
+  it("has a dismiss button of type button", async () => {
+    const markup = await render();
+    const dismiss = buttonTags(markup).filter((tag) => attr(tag, "aria-label") === "Dismiss");
+    expect(dismiss).toHaveLength(1);
+    expect(attr(dismiss[0], "type")).toBe("button");
+  });
+
+  it("is the same markup for any injected random source", async () => {
+    const a = textOf(await render(() => 0), "product-sold-toast");
+    const b = textOf(await render(() => 0.999999), "product-sold-toast");
+    expect(a).toBe(b);
+  });
+});
+
+describe("upsell dialog", () => {
+  it("is present once in the initial HTML", async () => {
+    expect(countTestId(await render(), "product-upsell-modal-tiny-close")).toBe(1);
+  });
+
+  it("is an open modal dialog with tabindex -1", async () => {
+    const tag = openTag(await render(), "product-upsell-modal-tiny-close");
+    expect(tag.startsWith("<section")).toBe(true);
+    expect(attr(tag, "role")).toBe("dialog");
+    expect(attr(tag, "aria-modal")).toBe("true");
+    expect(attr(tag, "tabindex")).toBe("-1");
+    expect(attr(tag, "aria-label")).toBe("Bundle offer");
+  });
+
+  it("has a backdrop", async () => {
+    const markup = await render();
+    expect(countTestId(markup, "bt-backdrop")).toBe(1);
+    expect(attr(openTag(markup, "bt-backdrop"), "class")).toContain("bt-backdrop");
+  });
+
+  it("has a large full-width 'Add crypt keeper bundle' button", async () => {
+    const markup = await render();
+    const buttons = (markup.match(/<button\b[^>]*>[^<]*<\/button>/g) ?? []).filter((button) =>
+      button.includes("Add crypt keeper bundle"),
+    );
+    expect(buttons).toHaveLength(1);
+    const style = attr(buttons[0], "style") ?? "";
+    expect(attr(buttons[0], "type")).toBe("button");
+    expect(style).toContain("font-size:20px");
+    expect(style).toContain("font-weight:700");
+    expect(style).toContain("width:100%");
+  });
+
+  it("has a tiny 'x' close button", async () => {
+    const markup = await render();
+    const closes = (markup.match(/<button\b[^>]*>[^<]*<\/button>/g) ?? []).filter(
+      (button) => attr(button, "aria-label") === "Close",
+    );
+    expect(closes).toHaveLength(1);
+    const style = attr(closes[0], "style") ?? "";
+    expect(attr(closes[0], "type")).toBe("button");
+    expect(closes[0].replace(/<[^>]*>/g, "")).toBe("x");
+    expect(style).toContain("font-size:8px");
+    expect(style).toContain("color:#cfc6bc");
+  });
+
+  it("sits inside the dialog, after the backdrop", async () => {
+    const markup = await render();
+    const backdrop = markup.indexOf('data-testid="bt-backdrop"');
+    const dialog = markup.indexOf('data-testid="product-upsell-modal-tiny-close"');
+    const close = markup.indexOf('aria-label="Close"');
+    expect(backdrop).toBeGreaterThan(-1);
+    expect(dialog).toBeGreaterThan(backdrop);
+    expect(close).toBeGreaterThan(dialog);
+  });
+});
+
+describe("overlays on the product page", () => {
+  it("has exactly one dialog, one status toast and one backdrop", async () => {
+    const markup = await render();
+    expect(markup.split('role="dialog"').length - 1).toBe(1);
+    expect(markup.split('role="status"').length - 1).toBe(1);
+    expect(countTestId(markup, "bt-backdrop")).toBe(1);
+    expect(markup).not.toContain("bt-banner");
+  });
+
+  it("does not render the overlays for an unknown slug", async () => {
+    const markup = await render(() => 0, "/boo-tique/product/some-other-thing");
+    for (const id of OVERLAY_IDS) expect(countTestId(markup, id), id).toBe(0);
+    expect(markup).not.toContain("bt-backdrop");
+  });
+});
+
 describe("product page content", () => {
   it("shows the product name and price", async () => {
     const markup = await render();
@@ -159,7 +269,7 @@ describe("product page content", () => {
   it("carries no other entry id, and every extra test id starts with bt-", async () => {
     const ids = testIds(await render());
     for (const id of ids) {
-      if (!(CONTENT_IDS as readonly string[]).includes(id)) {
+      if (!(CONTENT_IDS as readonly string[]).includes(id) && !(OVERLAY_IDS as readonly string[]).includes(id)) {
         expect(id.startsWith("bt-"), id).toBe(true);
       }
     }
@@ -167,7 +277,7 @@ describe("product page content", () => {
 
   it("has no stock, viewer or urgency copy outside the planted elements", async () => {
     const text = visibleText(await render(() => 0), {
-      exclude: [...CONTENT_IDS, "bt-variant-travel-tin"],
+      exclude: [...CONTENT_IDS, ...OVERLAY_IDS, "bt-variant-travel-tin"],
     }).toLowerCase();
     for (const word of ["left", "viewing", "selling", "hurry", "ends", "gone", "sold"]) {
       expect(text, word).not.toContain(word);
