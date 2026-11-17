@@ -11,5 +11,4 @@ export const PENDING_ROUTES: readonly string[] = [
   "/boo-tique/club",
   "/boo-tique/account/subscription",
   "/boo-tique/account/subscription?plan=honest",
-  "/boo-tique?modal=exit-intent",
 ];

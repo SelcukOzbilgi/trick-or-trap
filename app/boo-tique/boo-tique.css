@@ -198,6 +198,13 @@
   border-radius: 12px;
 }
 
+.bt-dialog-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  cursor: pointer;
+}
+
 .bt-toast {
   position: fixed;
   bottom: 16px;

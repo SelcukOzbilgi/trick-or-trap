@@ -4,6 +4,7 @@ import type { RouteTableEntry } from "./helpers/route-table";
 import {
   attr,
   countTestId,
+  hasAttr,
   openTag,
   textOf,
   visibleText,
@@ -278,6 +279,109 @@ describe("equal cookie banner", () => {
 
   it("is the only cookie banner", async () => {
     expect(bannerCount(await renderRoute("/boo-tique?banner=equal"))).toBe(1);
+  });
+});
+
+describe("exit-intent newsletter modal", () => {
+  const ROUTE = "/boo-tique?modal=exit-intent";
+
+  it("has the partners checkbox once, checked", async () => {
+    const markup = await renderRoute(ROUTE);
+    expect(countTestId(markup, "newsletter-partners-prechecked")).toBe(1);
+    const tag = openTag(markup, "newsletter-partners-prechecked");
+    expect(tag.startsWith("<input")).toBe(true);
+    expect(attr(tag, "type")).toBe("checkbox");
+    expect(hasAttr(tag, "checked")).toBe(true);
+  });
+
+  it("labels the partners checkbox", async () => {
+    const markup = await renderRoute(ROUTE);
+    expect(visibleText(markup)).toContain("Share my details with trusted partners");
+  });
+
+  it("leaves the modal's own newsletter checkbox unchecked", async () => {
+    const markup = await renderRoute(ROUTE);
+    const tag = openTag(markup, "bt-exit-newsletter-optin");
+    expect(attr(tag, "type")).toBe("checkbox");
+    expect(hasAttr(tag, "checked")).toBe(false);
+  });
+
+  it("makes the dialog root a modal dialog that can take focus", async () => {
+    const markup = await renderRoute(ROUTE);
+    const tag = openTag(markup, "bt-exit-intent-dialog");
+    expect(attr(tag, "role")).toBe("dialog");
+    expect(attr(tag, "aria-modal")).toBe("true");
+    expect(attr(tag, "tabindex")).toBe("-1");
+    expect(attr(tag, "class")).toBe("bt-dialog");
+    expect(attr(tag, "aria-label")).toBeTruthy();
+  });
+
+  it("renders a backdrop in the initial HTML", async () => {
+    const markup = await renderRoute(ROUTE);
+    expect(countTestId(markup, "bt-backdrop")).toBe(1);
+    expect(attr(openTag(markup, "bt-backdrop"), "class")).toBe("bt-backdrop");
+  });
+
+  it("puts the partners checkbox inside the dialog", async () => {
+    const markup = await renderRoute(ROUTE);
+    const dialog = textOf(markup, "bt-exit-intent-dialog");
+    expect(dialog).toContain("Share my details with trusted partners");
+    const open = markup.indexOf('data-testid="bt-exit-intent-dialog"');
+    const partners = markup.indexOf('data-testid="newsletter-partners-prechecked"');
+    expect(partners).toBeGreaterThan(open);
+  });
+
+  it("gives Subscribe and Not now the same style attribute", async () => {
+    const markup = await renderRoute(ROUTE);
+    const subscribe = style(controlTag(markup, "button", "Subscribe"));
+    const decline = style(controlTag(markup, "button", "Not now"));
+    expect(decline).toBe(subscribe);
+  });
+
+  it("has a close button", async () => {
+    const markup = await renderRoute(ROUTE);
+    const close = /<button\b[^>]*aria-label="Close"[^>]*>/.exec(markup);
+    expect(close).not.toBeNull();
+    expect(attr(close![0], "type")).toBe("button");
+  });
+
+  it("has no cookie banner, no urgency element and no promo block", async () => {
+    const markup = await renderRoute(ROUTE);
+    expect(bannerCount(markup)).toBe(0);
+    for (const id of [
+      ...URGENCY_IDS,
+      "home-cookie-accept-dominant",
+      "home-cookie-ghost-reject",
+      "home-cookie-equal-buttons",
+    ]) {
+      expect(countTestId(markup, id), id).toBe(0);
+    }
+  });
+
+  it("has no text input", async () => {
+    const markup = await renderRoute(ROUTE);
+    const inputs = markup.match(/<input\b[^>]*>/g) ?? [];
+    expect(inputs.length).toBe(2);
+    for (const tag of inputs) expect(attr(tag, "type"), tag).toBe("checkbox");
+    expect(markup).not.toContain("<textarea");
+  });
+
+  it("still shows the product grid", async () => {
+    const markup = await renderRoute(ROUTE);
+    expect(markup.split('data-testid="bt-product-card"').length - 1).toBe(6);
+  });
+
+  it("wins over a banner value", async () => {
+    const markup = await renderRoute(`${ROUTE}&banner=ghost`);
+    expect(bannerCount(markup)).toBe(0);
+    expect(countTestId(markup, "newsletter-partners-prechecked")).toBe(1);
+  });
+
+  it("gives every button type=button", async () => {
+    const markup = await renderRoute(ROUTE);
+    const buttons = markup.match(/<button\b[^>]*>/g) ?? [];
+    expect(buttons.length).toBeGreaterThan(0);
+    for (const tag of buttons) expect(attr(tag, "type"), tag).toBe("button");
   });
 });
 

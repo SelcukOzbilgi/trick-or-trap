@@ -1,4 +1,5 @@
 import { CookieBanner } from "@/components/boo-tique/cookie-banner";
+import { ExitIntentModal } from "@/components/boo-tique/exit-intent-modal";
 import { HeroCountdown } from "@/components/boo-tique/hero-countdown";
 import { ProductGrid } from "@/components/boo-tique/product-grid";
 import { FIXED_SALE_TEXT, ROLLING_MIDNIGHT_TEXT } from "@/lib/boo-tique/content";
@@ -27,6 +28,7 @@ export default async function BooTiqueHomePage({
         </section>
       ) : null}
       <ProductGrid />
+      {modal === "exit-intent" ? <ExitIntentModal /> : null}
       {modal === "none" ? <CookieBanner variant={banner} /> : null}
     </>
   );
