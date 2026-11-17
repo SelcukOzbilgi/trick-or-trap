@@ -19,7 +19,7 @@ export function Phase2Preview({
   const Tag = as;
   return (
     <Tag data-testid={id} data-anchor="phase-2" className="bt-variant-row">
-      <span>{children}</span>
+      <div>{children}</div>
       <small className="bt-muted">{PHASE2_PREVIEW_LABEL}</small>
     </Tag>
   );

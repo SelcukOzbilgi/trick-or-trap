@@ -28,6 +28,11 @@ export const ROUTE_TABLE: readonly RouteTableEntry[] = [
   { pattern: "/boo-tique", load: () => import("@/app/boo-tique/page") },
   { pattern: "/boo-tique/club", load: () => import("@/app/boo-tique/club/page") },
   { pattern: "/boo-tique/cart", load: () => import("@/app/boo-tique/cart/page") },
+  { pattern: "/boo-tique/checkout", load: () => import("@/app/boo-tique/checkout/page") },
+  {
+    pattern: "/boo-tique/account/subscription",
+    load: () => import("@/app/boo-tique/account/subscription/page"),
+  },
   {
     pattern: "/boo-tique/product/[slug]",
     // The page takes `{ slug }`; the harness passes a generic params record, so adapt it.

@@ -3,9 +3,4 @@
  * adds the page's `load` line to ROUTE_TABLE in the same step. The last task asserts this
  * list is empty.
  */
-export const PENDING_ROUTES: readonly string[] = [
-  "/boo-tique/checkout",
-  "/boo-tique/checkout?flow=honest",
-  "/boo-tique/account/subscription",
-  "/boo-tique/account/subscription?plan=honest",
-];
+export const PENDING_ROUTES: readonly string[] = [];
