@@ -149,11 +149,15 @@ describe("sold toast", () => {
     expect(text).toContain("Morgan from Ohio just bought the Cursed Candle Set");
   });
 
-  it("has a dismiss button of type button", async () => {
+  it("has a dismiss button of type button with the quiet button classes", async () => {
     const markup = await render();
     const dismiss = buttonTags(markup).filter((tag) => attr(tag, "aria-label") === "Dismiss");
     expect(dismiss).toHaveLength(1);
     expect(attr(dismiss[0], "type")).toBe("button");
+    const classes = (attr(dismiss[0], "class") ?? "").split(/\s+/);
+    for (const name of ["bt-toast-dismiss", "bt-button", "bt-button--quiet"]) {
+      expect(classes, name).toContain(name);
+    }
   });
 
   it("is the same markup for any injected random source", async () => {

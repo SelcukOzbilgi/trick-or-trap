@@ -28,6 +28,16 @@ const ALLOWED_USE_CLIENT = [
 const PAYMENT_WORDS = /card|cvc|cvv|iban|expir|payment/i;
 const EXTERNAL_URL = /^(https?:)?\/\//i;
 const FORBIDDEN_ELEMENTS = ["<img", "<iframe", "<script", "<link"];
+const CLASS_ID_WORDS =
+  /urgency|scarcity|activity|shaming|preselect|interference|sneak|drip/i;
+const PHASE2_PREVIEW_FILE = join(ROOT, "components", "boo-tique", "phase2-preview.tsx");
+const PREVIEW_SOURCE_WORDS = [
+  "data-anchor",
+  "Phase2Preview",
+  "PHASE2_PREVIEW_LABEL",
+  "Static preview",
+  "later flow",
+];
 
 function listFiles(dir: string, pattern: RegExp): string[] {
   const out: string[] = [];
@@ -106,6 +116,22 @@ describe.each(fixtureRoutes())("fake-shop safety of %s", (route) => {
     const markup = await renderRoute(route);
     for (const element of FORBIDDEN_ELEMENTS) {
       expect(markup, element).not.toContain(element);
+    }
+  });
+
+  it("has no phase-2 anchor or preview wording in the markup", async () => {
+    const markup = await renderRoute(route);
+    const lower = markup.toLowerCase();
+    for (const word of ["data-anchor", "phase-2", "later flow", "static preview"]) {
+      expect(lower, word).not.toContain(word);
+    }
+    expect(visibleText(markup)).not.toContain("Static preview of a later flow");
+  });
+
+  it("has no class or id value that names a pattern", async () => {
+    const markup = await renderRoute(route);
+    for (const match of markup.matchAll(/\s(class|id)="([^"]*)"/g)) {
+      expect(match[2], `${match[1]}="${match[2]}"`).not.toMatch(CLASS_ID_WORDS);
     }
   });
 
@@ -206,6 +232,18 @@ describe("source scans", () => {
       }
     }
   });
+
+  it("has no phase2-preview component file", () => {
+    expect(existsSync(PHASE2_PREVIEW_FILE)).toBe(false);
+  });
+
+  for (const word of PREVIEW_SOURCE_WORDS) {
+    it(`contains no ${word} in the source`, () => {
+      for (const file of codeFiles()) {
+        expect(readFileSync(file, "utf8"), shortName(file)).not.toContain(word);
+      }
+    });
+  }
 
   it("keeps testid out of the detector, judge and capture sources", () => {
     for (const name of ["detectors", "judge", "capture"]) {

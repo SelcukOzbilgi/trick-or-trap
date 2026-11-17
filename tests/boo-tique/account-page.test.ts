@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { renderRoute } from "./helpers/render-route";
 import type { RouteTableEntry } from "./helpers/route-table";
 import { attr, countTestId, hasAttr, openTag, textOf, visibleText } from "./helpers/markup";
+import { ACCOUNT_PLANS, formatUsd } from "@/lib/boo-tique/cart";
 
 /** Local one-entry table, so this test does not depend on ROUTE_TABLE. */
 const TABLE: readonly RouteTableEntry[] = [
@@ -15,8 +16,23 @@ const DEFAULT_ROUTE = "/boo-tique/account/subscription";
 const HONEST_ROUTE = "/boo-tique/account/subscription?plan=honest";
 const CANCEL_ID = "account-cancel-five-screens";
 const HONEST_ID = "account-one-click-cancel-plan";
-const PREVIEW_LABEL = "Static preview of a later flow";
 const WORDS = ["insurance", "handling", "haunting", "phone"];
+const CLUB_PLAN_TEXT = `${ACCOUNT_PLANS.club.name}, ${formatUsd(ACCOUNT_PLANS.club.cents)}/month`;
+const BASIC_PLAN_TEXT = `${ACCOUNT_PLANS.basic.name}, ${formatUsd(ACCOUNT_PLANS.basic.cents)}/month`;
+
+/** Attribute names of an opening tag, sorted. */
+function attrNames(tag: string): string[] {
+  const afterName = tag.replace(/^<[a-zA-Z][a-zA-Z0-9-]*/, "");
+  return [...afterName.matchAll(/\s([^\s=/>"']+)(?:="[^"]*")?/g)].map((m) => m[1]).sort();
+}
+
+/** Opening tag of the first <section> that has the given aria-labelledby value. */
+function sectionTagLabelledBy(markup: string, labelId: string): string {
+  const tags = markup.match(/<section\b[^>]*>/g) ?? [];
+  const found = tags.find((tag) => attr(tag, "aria-labelledby") === labelId);
+  expect(found, labelId).toBeDefined();
+  return found ?? "";
+}
 
 function render(route: string): Promise<string> {
   return renderRoute(route, { table: TABLE });
@@ -33,42 +49,57 @@ function elementMarkup(markup: string, id: string, tag: string): string {
 }
 
 describe("account page default view", () => {
-  it("shows the plan Midnight Club Monthly at $9.99/month", async () => {
+  it("shows the plan from ACCOUNT_PLANS, Midnight Club Monthly, $9.99/month", async () => {
     const text = visibleText(await render(DEFAULT_ROUTE));
-    expect(text).toContain("Midnight Club Monthly");
-    expect(text).toContain("$9.99/month");
+    expect(CLUB_PLAN_TEXT).toBe("Midnight Club Monthly, $9.99/month");
+    expect(text).toContain(CLUB_PLAN_TEXT);
   });
 
-  it("has account-cancel-five-screens once, as a visible <section>", async () => {
+  it("has account-cancel-five-screens once, as a visible <section> with the cancel heading label", async () => {
     const markup = await render(DEFAULT_ROUTE);
     expect(countTestId(markup, CANCEL_ID)).toBe(1);
     const tag = openTag(markup, CANCEL_ID);
     expect(tag.startsWith("<section")).toBe(true);
-    expect(attr(tag, "data-anchor")).toBe("phase-2");
+    expect(attr(tag, "class")).toBe("bt-card");
+    expect(attr(tag, "aria-labelledby")).toBe("bt-cancel-heading");
     expect(hasAttr(tag, "hidden")).toBe(false);
   });
 
-  it("heads the section Cancel membership and tells the member to call the shop", async () => {
+  it("heads the section Cancel membership and tells the member to call during opening hours", async () => {
     const markup = await render(DEFAULT_ROUTE);
     const section = elementMarkup(markup, CANCEL_ID, "section");
-    expect(/<h[1-6][^>]*>Cancel membership<\/h[1-6]>/.test(section)).toBe(true);
-    const text = textOf(markup, CANCEL_ID);
-    expect(text.toLowerCase()).toContain("call the shop");
-    expect(text).toContain(PREVIEW_LABEL);
+    expect(section).toContain('<h2 id="bt-cancel-heading">Cancel membership</h2>');
+    expect(textOf(markup, CANCEL_ID)).toBe(
+      "Cancel membership To cancel, call us during opening hours.",
+    );
   });
 
-  it("has no phone number, link, button or input inside the section", async () => {
+  it("has no digit, link, button or input inside the section", async () => {
     const markup = await render(DEFAULT_ROUTE);
     const section = elementMarkup(markup, CANCEL_ID, "section");
     expect(section).not.toContain("<a ");
     expect(section).not.toContain("<button");
     expect(section).not.toContain("<input");
     expect(section).not.toContain("tel:");
-    expect(/\d[\d\s().-]{6,}\d/.test(textOf(markup, CANCEL_ID))).toBe(false);
+    expect(textOf(markup, CANCEL_ID)).not.toMatch(/\d/);
   });
 
-  it("has none of insurance, handling, haunting or phone outside the section", async () => {
-    const text = visibleText(await render(DEFAULT_ROUTE), { exclude: [CANCEL_ID] }).toLowerCase();
+  it("gives the cancel section the attribute names of the plan card plus data-testid", async () => {
+    const markup = await render(DEFAULT_ROUTE);
+    const plan = sectionTagLabelledBy(markup, "bt-plan-heading");
+    const cancel = openTag(markup, CANCEL_ID);
+    expect(attrNames(cancel)).toEqual([...attrNames(plan), "data-testid"].sort());
+  });
+
+  it("has no data- attribute other than the one data-testid on the cancel section", async () => {
+    const markup = await render(DEFAULT_ROUTE);
+    const section = elementMarkup(markup, CANCEL_ID, "section");
+    const dataAttrs = [...section.matchAll(/\sdata-[a-z-]+/g)].map((m) => m[0].trim());
+    expect(dataAttrs).toEqual(["data-testid"]);
+  });
+
+  it("has none of insurance, handling, haunting or phone in the visible text of the page", async () => {
+    const text = visibleText(await render(DEFAULT_ROUTE)).toLowerCase();
     for (const word of WORDS) expect(text, word).not.toContain(word);
   });
 
@@ -98,18 +129,18 @@ describe("account page honest view", () => {
     expect(hasAttr(tag, "hidden")).toBe(false);
   });
 
-  it("shows Moonlight Basic at $4.99/month in the card", async () => {
+  it("shows the plan from ACCOUNT_PLANS, Moonlight Basic, $4.99/month, in the card", async () => {
     const text = textOf(await render(HONEST_ROUTE), HONEST_ID);
-    expect(text).toContain("Moonlight Basic");
-    expect(text).toContain("$4.99/month");
+    expect(BASIC_PLAN_TEXT).toBe("Moonlight Basic, $4.99/month");
+    expect(text).toContain(BASIC_PLAN_TEXT);
   });
 
-  it("has exactly one button, a type=button Cancel plan, and no input", async () => {
+  it("has exactly one button, a plain bt-button Cancel plan, and no input", async () => {
     const markup = await render(HONEST_ROUTE);
     const buttons = markup.match(/<button\b[^>]*>[^<]*<\/button>/g) ?? [];
     expect(buttons).toHaveLength(1);
-    expect(attr(buttons[0] ?? "", "type")).toBe("button");
-    expect(buttons[0] ?? "").toMatch(/>Cancel plan<\/button>$/);
+    expect(buttons[0]).toBe('<button type="button" class="bt-button">Cancel plan</button>');
+    expect(attr(buttons[0] ?? "", "class")).not.toContain("bt-button--quiet");
     expect(markup).not.toContain("<input");
     expect(markup).not.toContain("<form");
   });
@@ -124,19 +155,27 @@ describe("account page honest view", () => {
     for (const word of WORDS) expect(text, word).not.toContain(word);
   });
 
-  it("has no retention offer text, no call-the-shop text and no phone number", async () => {
+  it("has no retention offer text, no call text and no phone number", async () => {
     const text = visibleText(await render(HONEST_ROUTE)).toLowerCase();
-    for (const phrase of ["call the shop", "discount", "% off", "stay", "before you go", "offer"]) {
+    for (const phrase of [
+      "call us",
+      "call the shop",
+      "discount",
+      "% off",
+      "stay",
+      "before you go",
+      "offer",
+      ...WORDS,
+    ]) {
       expect(text, phrase).not.toContain(phrase);
     }
     expect(/\d[\d\s().-]{6,}\d/.test(text)).toBe(false);
   });
 
-  it("has no phase-2 preview and no default cancel section", async () => {
+  it("has no default cancel section and no hidden preview marker", async () => {
     const markup = await render(HONEST_ROUTE);
     expect(countTestId(markup, CANCEL_ID)).toBe(0);
-    expect(markup).not.toContain("phase-2");
-    expect(visibleText(markup)).not.toContain(PREVIEW_LABEL);
+    expect(markup).not.toContain("data-anchor");
   });
 });
 
