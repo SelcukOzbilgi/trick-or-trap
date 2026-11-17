@@ -4,7 +4,7 @@ import { join, relative, sep } from "node:path";
 import { DEMO_NOTICE_TEXT, PRODUCTS } from "@/lib/boo-tique/content";
 import { fixtureRoutes } from "./helpers/fixture";
 import { renderRoute } from "./helpers/render-route";
-import { attr, countTestId, visibleText } from "./helpers/markup";
+import { attr, countTestId, hasAttr, visibleText } from "./helpers/markup";
 import { BRAND_TRIPWIRE } from "./helpers/brand-tripwire";
 
 const ROOT = process.cwd();
@@ -38,6 +38,38 @@ const PREVIEW_SOURCE_WORDS = [
   "Static preview",
   "later flow",
 ];
+
+const PATTERN_IDS = [
+  "fake-urgency",
+  "fake-scarcity",
+  "fake-activity",
+  "confirmshaming",
+  "preselection",
+  "visual-interference",
+  "sneak-into-basket",
+  "drip-pricing",
+  "hard-to-cancel",
+];
+const VERDICT_WORDS = [
+  "dark pattern",
+  "lookalike",
+  "look-alike",
+  "honest twin",
+  "planted",
+  "not scored",
+];
+/** `.tsx` files that this spec added under components/boo-tique. */
+const NEW_COMPONENT_FILES = ["toggle-switch.tsx", "summary-list.tsx"];
+const FORBIDDEN_NEXT_IMPORTS = ["next/link", "next/image", "next/navigation", "next/font"];
+
+/** Removes block and line comments. A line comment must start the line or follow whitespace, so `https://` survives. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|\s)\/\/.*$/gm, "$1");
+}
+
+function tsxFiles(): string[] {
+  return SOURCE_DIRS.slice(0, 2).flatMap((dir) => listFiles(dir, /\.tsx$/));
+}
 
 function listFiles(dir: string, pattern: RegExp): string[] {
   const out: string[] = [];
@@ -141,6 +173,23 @@ describe.each(fixtureRoutes())("fake-shop safety of %s", (route) => {
       expect(text, brand).not.toMatch(wholeWord(brand));
     }
   });
+
+  it("never gives a bt-button class to an inline-styled button or link", async () => {
+    const markup = await renderRoute(route);
+    for (const element of ["button", "a"]) {
+      for (const tag of tagsOf(markup, element)) {
+        if (!hasAttr(tag, "style")) continue;
+        expect(attr(tag, "class") ?? "", tag).not.toContain("bt-button");
+      }
+    }
+  });
+
+  it("keeps verdict and pattern vocabulary out of its visible text", async () => {
+    const text = visibleText(await renderRoute(route)).toLowerCase();
+    for (const word of [...PATTERN_IDS, ...VERDICT_WORDS]) {
+      expect(text, word).not.toContain(word);
+    }
+  });
 });
 
 describe("product names", () => {
@@ -241,6 +290,44 @@ describe("source scans", () => {
     it(`contains no ${word} in the source`, () => {
       for (const file of codeFiles()) {
         expect(readFileSync(file, "utf8"), shortName(file)).not.toContain(word);
+      }
+    });
+  }
+
+  it("finds .tsx files to scan under app/boo-tique and components/boo-tique", () => {
+    expect(tsxFiles().length).toBeGreaterThan(0);
+  });
+
+  it("contains no $ followed by a digit in any .tsx file, comments removed", () => {
+    for (const file of tsxFiles()) {
+      expect(stripComments(readFileSync(file, "utf8")), shortName(file)).not.toMatch(/\$\d/);
+    }
+  });
+
+  it("contains no hex colour literal in any .tsx file, comments removed", () => {
+    for (const file of tsxFiles()) {
+      expect(stripComments(readFileSync(file, "utf8")), shortName(file)).not.toMatch(
+        /#[0-9a-fA-F]{3,8}\b/,
+      );
+    }
+  });
+
+  for (const name of NEW_COMPONENT_FILES) {
+    it(`keeps ${name} free of next navigation, link, image and font imports`, () => {
+      const file = join(ROOT, "components", "boo-tique", name);
+      expect(existsSync(file), name).toBe(true);
+      const source = readFileSync(file, "utf8");
+      for (const word of FORBIDDEN_NEXT_IMPORTS) {
+        expect(source, `${word} in ${name}`).not.toContain(word);
+      }
+    });
+
+    it(`gives every button in ${name} type="button"`, () => {
+      const source = stripComments(
+        readFileSync(join(ROOT, "components", "boo-tique", name), "utf8"),
+      );
+      for (const match of source.matchAll(/<button\b[^>]*>/g)) {
+        expect(match[0]).toMatch(/\btype="button"/);
       }
     });
   }
