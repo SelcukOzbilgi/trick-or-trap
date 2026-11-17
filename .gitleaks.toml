@@ -1,0 +1,5 @@
+# gitleaks config, used by the pre-commit hook and the CI secrets job.
+# Default rules only. No allowlist: a scan of the full history found nothing to
+# exclude (.env.example holds names with empty values).
+[extend]
+useDefault = true

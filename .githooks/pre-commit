@@ -1,0 +1,10 @@
+#!/bin/sh
+# Scan staged changes for secrets before every commit. Turned on by `npm install`
+# (the prepare script sets core.hooksPath, see scripts/enable-hooks.mjs).
+# Without gitleaks the commit goes ahead; CI scans every push to main and every
+# pull request anyway.
+if ! command -v gitleaks >/dev/null 2>&1; then
+  echo "pre-commit: gitleaks is not installed, so staged changes were not scanned for secrets (brew install gitleaks)." >&2
+  exit 0
+fi
+exec gitleaks git --pre-commit --staged --redact --no-banner
