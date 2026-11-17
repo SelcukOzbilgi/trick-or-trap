@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # Keeps the SHA pins in .github/workflows/ci.yml current. npm version updates
+  # are left out on purpose; Dependabot security updates still cover npm.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
