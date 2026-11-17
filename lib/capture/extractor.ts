@@ -7,7 +7,14 @@
  * evaluated, and never used to build selectors, URLs or shell input.
  */
 import type { BaseSnapshot, ElementSnapshot } from "@/lib/types";
-import { MAX_ELEMENTS, MAX_ELEMENTS_LIGHT, MAX_TEXT_CHARS, MAX_TEXT_CHARS_LIGHT, MAX_ATTR_CHARS } from "./constants";
+import {
+  FORBIDDEN_ATTRIBUTE_FRAGMENTS,
+  MAX_ELEMENTS,
+  MAX_ELEMENTS_LIGHT,
+  MAX_TEXT_CHARS,
+  MAX_TEXT_CHARS_LIGHT,
+  MAX_ATTR_CHARS,
+} from "./constants";
 import { isOutsideImages, toDocumentBox, type ImageBox, type ScreenshotMode } from "./geometry";
 import type { CollectOptions, RawElement, RawPageRead } from "./types";
 
@@ -20,7 +27,7 @@ import type { CollectOptions, RawElement, RawPageRead } from "./types";
 export function collectInPage(options: CollectOptions): RawPageRead {
   const full = options.attributeNames === "full";
   const names: readonly string[] = full
-    ? ["disabled", "data-testid", "type", "name", "href", "for", "placeholder", "value"]
+    ? ["disabled", "type", "name", "href", "for", "placeholder", "value"]
     : (options.attributeNames as readonly string[]);
   const valueTypes = ["checkbox", "radio", "submit", "button", "reset"];
   const skipTags = ["script", "style", "noscript", "template", "head"];
@@ -163,19 +170,16 @@ export type BuildSampleParams = {
   images?: SampleImages;
 };
 
-const FULL_ATTRIBUTES: readonly string[] = [
-  "disabled",
-  "data-testid",
-  "type",
-  "name",
-  "href",
-  "for",
-  "placeholder",
-  "value",
-];
-const LIGHT_ATTRIBUTES: readonly string[] = ["type", "name", "disabled", "data-testid"];
+const FULL_ATTRIBUTES: readonly string[] = ["disabled", "type", "name", "href", "for", "placeholder", "value"];
+const LIGHT_ATTRIBUTES: readonly string[] = ["type", "name", "disabled"];
 const VALUE_INPUT_TYPES: readonly string[] = ["checkbox", "radio", "submit", "button", "reset"];
 const ARIA_NAME = /^aria-[a-z0-9_-]+$/;
+
+/** True when an attribute name holds a fragment that names an outcome (any case). */
+export function isForbiddenAttributeName(name: string): boolean {
+  const lower = name.toLowerCase();
+  return FORBIDDEN_ATTRIBUTE_FRAGMENTS.some((fragment) => lower.includes(fragment));
+}
 
 /** Non-finite becomes 0; rounds to two decimals. */
 function round2(value: unknown): number {
@@ -215,6 +219,7 @@ function cleanAttributes(
     const name = key.toLowerCase();
     const value = raw[key];
     if (typeof value !== "string") continue;
+    if (isForbiddenAttributeName(name)) continue;
     if (!(allowed.includes(name) || (allowAria && ARIA_NAME.test(name)))) continue;
     if (name === "value" && !(tag === "button" || tag === "option" || (tag === "input" && VALUE_INPUT_TYPES.includes(type)))) {
       continue;

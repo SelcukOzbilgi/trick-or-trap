@@ -41,10 +41,6 @@ describe.skipIf(!enabled)("remote capture of the Boo-tique (live)", () => {
       const base64Sum = result.images.reduce((sum, image) => sum + image.base64Length, 0);
       expect(base64Sum).toBeLessThanOrEqual(MAX_BASE64_LENGTH);
 
-      expect(
-        result.snapshot.elements.some((element) => element.attributes?.["data-testid"] !== undefined),
-      ).toBe(true);
-
       const warningCodes = result.warnings.map((warning) => warning.code);
       const reloadOutcomeKnown =
         result.snapshot.afterReload !== undefined ||

@@ -11,6 +11,7 @@ import type { Resolver } from "@/lib/capture/url-check";
 import { BaseSnapshotSchema, PageSnapshotSchema } from "@/lib/types";
 import { createFakeBrowser, createRawPageRead, type FakeBrowser, type FakeScript } from "./helpers/fake-browser";
 import { createManualClock, type ManualClock } from "./helpers/manual-clock";
+import { TEST_ID_ATTRIBUTE } from "./helpers/forbidden-attribute";
 
 const URL_OK = "https://shop.example.com/";
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
@@ -50,7 +51,7 @@ function element(path: number[], text: string): RawElement {
     },
     checked: false,
     selected: false,
-    attrs: { "data-testid": "t", href: "/x", type: "text" },
+    attrs: { [TEST_ID_ATTRIBUTE]: "t", href: "/x", type: "text" },
   };
 }
 
@@ -135,7 +136,7 @@ describe("capturePage: reload sample", () => {
     ]);
     expect(fake.collectOptions).toEqual([
       { maxElements: 1_500, maxTextChars: 300, maxAttrChars: 200, attributeNames: "full" },
-      { maxElements: 750, maxTextChars: 120, maxAttrChars: 200, attributeNames: ["type", "name", "disabled", "data-testid"] },
+      { maxElements: 750, maxTextChars: 120, maxAttrChars: 200, attributeNames: ["type", "name", "disabled"] },
     ]);
     expect(fake.screenshotRequests).toHaveLength(1);
     expect(fake.scrollRequests).toEqual([]);
@@ -160,8 +161,9 @@ describe("capturePage: reload sample", () => {
     expect(after.elements.map((item) => item.id)).toEqual(["el-1-0-3", "el-1-2"]);
     expect(after.elements.every((item) => item.outsideImage === undefined)).toBe(true);
     // Light attributes only.
-    expect(after.elements[0].attributes).toEqual({ "data-testid": "t", type: "text" });
+    expect(after.elements[0].attributes).toEqual({ type: "text" });
     expect(result.snapshot.elements[0].attributes).toMatchObject({ href: "/x" });
+    expect(result.snapshot.elements[0].attributes).not.toHaveProperty(TEST_ID_ATTRIBUTE);
     expect(result.snapshot.capture?.light).toBe(false);
     expect(result.snapshot.secondSample).toBeUndefined();
     expect(result.snapshot.capture?.images).toBeDefined();

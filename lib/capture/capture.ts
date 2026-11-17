@@ -67,7 +67,7 @@ type CaptureContext = {
 type CaptureSuccess = { snapshot: PageSnapshot; images: CaptureImage[] };
 
 /** Attributes of the light reload sample. */
-const LIGHT_ATTRIBUTE_NAMES: readonly string[] = ["type", "name", "disabled", "data-testid"];
+const LIGHT_ATTRIBUTE_NAMES: readonly string[] = ["type", "name", "disabled"];
 
 function sleep(clock: Clock, ms: number): Promise<void> {
   return new Promise<void>((resolve) => {

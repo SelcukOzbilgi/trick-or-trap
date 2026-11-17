@@ -9,6 +9,7 @@ import {
 } from "@/lib/capture/constants";
 import type { RawElement, RawPageRead } from "@/lib/capture/types";
 import { BaseSnapshotSchema } from "@/lib/types";
+import { FORBIDDEN_NAME_SAMPLES, TEST_ID_ATTRIBUTE } from "./helpers/forbidden-attribute";
 
 const CAPTURED_AT = "2025-10-31T12:00:00.000Z";
 const URL_ = "https://shop.example.com/page";
@@ -161,7 +162,6 @@ describe("buildSample: attributes", () => {
             disabled: "",
             "aria-label": "Sign up",
             "aria-checked": "true",
-            "data-testid": "nl",
             href: "/x",
             for: "nl",
             placeholder: "Email",
@@ -179,7 +179,6 @@ describe("buildSample: attributes", () => {
       [
         "aria-checked",
         "aria-label",
-        "data-testid",
         "disabled",
         "for",
         "href",
@@ -191,7 +190,7 @@ describe("buildSample: attributes", () => {
     );
   });
 
-  it("keeps only type, name, disabled and data-testid in a light sample", () => {
+  it("keeps only type, name and disabled in a light sample", () => {
     const snap = buildSample(
       rawPage([
         rawEl({
@@ -200,7 +199,7 @@ describe("buildSample: attributes", () => {
             type: "checkbox",
             name: "n",
             disabled: "",
-            "data-testid": "t",
+            [TEST_ID_ATTRIBUTE]: "t",
             "aria-label": "x",
             href: "/x",
             value: "v",
@@ -211,7 +210,36 @@ describe("buildSample: attributes", () => {
       ]),
       light
     );
-    expect(Object.keys(snap.elements[0]?.attributes ?? {}).sort()).toEqual(["data-testid", "disabled", "name", "type"]);
+    expect(Object.keys(snap.elements[0]?.attributes ?? {}).sort()).toEqual(["disabled", "name", "type"]);
+  });
+
+  it.each([
+    ["full", full],
+    ["light", light],
+  ] as const)("drops the test-id attribute and outcome names in a %s sample", (_label, params) => {
+    const attrs: Record<string, string> = {
+      [TEST_ID_ATTRIBUTE]: "cart-insurance-sneaked",
+      "aria-label": "Sign up",
+    };
+    for (const name of FORBIDDEN_NAME_SAMPLES) attrs[name] = "flag";
+    const snap = buildSample(rawPage([rawEl({ tag: "input", attrs })]), params);
+    const expected = params.light ? {} : { "aria-label": "Sign up" };
+    expect(snap.elements[0]?.attributes).toEqual(expected);
+  });
+
+  it("drops an aria name that holds an outcome fragment, in any case", () => {
+    const attrs = { "aria-label": "x", "ARIA-Verdict": "1", "aria-no-flag": "1", "aria-lookalike": "1" };
+    const snap = buildSample(rawPage([rawEl({ attrs })]), full);
+    expect(snap.elements[0]?.attributes).toEqual({ "aria-label": "x" });
+  });
+
+  it("never lets the test-id attribute through in the snapshot JSON", () => {
+    const attrs = { [TEST_ID_ATTRIBUTE]: "x", type: "text" };
+    const json = JSON.stringify([
+      buildSample(rawPage([rawEl({ tag: "input", attrs })]), full),
+      buildSample(rawPage([rawEl({ tag: "input", attrs })]), light),
+    ]);
+    expect(json.toLowerCase()).not.toContain(TEST_ID_ATTRIBUTE);
   });
 
   it("cuts attribute values at 200 characters", () => {

@@ -32,6 +32,19 @@ export const MAX_TEXT_CHARS_LIGHT = 120;
 /** Cap for each recorded attribute value. */
 export const MAX_ATTR_CHARS = 200;
 
+/**
+ * Attribute names that name an outcome. A name that holds one of these fragments is
+ * dropped from a snapshot, also when it starts with `aria-`.
+ */
+export const FORBIDDEN_ATTRIBUTE_FRAGMENTS: readonly string[] = [
+  "verdict",
+  "pattern",
+  "no-flag",
+  "lookalike",
+  "expected",
+  "ground-truth",
+];
+
 /** Height cap of the single clipped image, in CSS px. */
 export const SCREENSHOT_MAX_HEIGHT_PX = 8_000;
 /** Tiled mode starts when `fullHeight × devicePixelRatio` is above this value. */
