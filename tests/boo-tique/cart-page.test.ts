@@ -1,7 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { renderRoute } from "./helpers/render-route";
 import type { RouteTableEntry } from "./helpers/route-table";
-import { attr, countTestId, hasAttr, openTag, textOf, visibleText } from "./helpers/markup";
+import { attr, countTestId, hasAttr, openTag, visibleText } from "./helpers/markup";
+import {
+  CART,
+  CART_OPTIONS,
+  addOnLabel,
+  formatUsd,
+  plainLabel,
+  summaryRows,
+} from "@/lib/boo-tique/cart";
 
 /** Local one-entry table, so this test does not depend on ROUTE_TABLE. */
 const TABLE: readonly RouteTableEntry[] = [
@@ -9,8 +17,7 @@ const TABLE: readonly RouteTableEntry[] = [
 ];
 
 const ROUTE = "/boo-tique/cart";
-const PREVIEW_ID = "cart-insurance-sneaked";
-const PREVIEW_LABEL = "Static preview of a later flow";
+const INSURANCE_ID = "cart-insurance-sneaked";
 
 function render(): Promise<string> {
   return renderRoute(ROUTE, { table: TABLE });
@@ -36,19 +43,126 @@ function isChecked(markup: string, id: string): boolean {
   return hasAttr(openTag(markup, id), "checked");
 }
 
-describe("cart page lines and totals", () => {
-  it("lists the two product lines at their prices", async () => {
-    const text = visibleText(await render());
-    expect(text).toContain("Ghost Pepper Candle");
-    expect(text).toContain("$18.00");
-    expect(text).toContain("Moon-Phase Mug");
-    expect(text).toContain("$22.00");
+/** Attribute names of an opening tag, in order. */
+function attrNames(tag: string): string[] {
+  const nameEnd = /^<[a-zA-Z][a-zA-Z0-9-]*/.exec(tag);
+  const rest = nameEnd ? tag.slice(nameEnd[0].length) : tag;
+  return [...rest.matchAll(/\s([^\s=/>"']+)(?:="[^"]*")?/g)].map((m) => m[1]);
+}
+
+/** The `<li class="bt-line-row"...>` elements of the cart lines list, as raw markup. */
+function lineItems(markup: string): string[] {
+  return markup.match(/<li\b[^>]*class="bt-line-row"[^>]*>.*?<\/li>/g) ?? [];
+}
+
+/** Rows of the summary `<dl>`: label and price text. */
+function summaryRowTexts(markup: string): { label: string; price: string }[] {
+  const start = markup.indexOf('<dl class="bt-list" data-testid="bt-cart-summary">');
+  expect(start, "summary dl").toBeGreaterThan(-1);
+  const end = markup.indexOf("</dl>", start);
+  const dl = markup.slice(start, end);
+  return [...dl.matchAll(/<dt>([^<]*)<\/dt><dd class="bt-price">([^<]*)<\/dd>/g)].map((m) => ({
+    label: m[1],
+    price: m[2],
+  }));
+}
+
+describe("cart page lines", () => {
+  it("lists three bt-line-row items: candle, mug, insurance, with their prices", async () => {
+    const items = lineItems(await render());
+    expect(items).toHaveLength(3);
+    const expected = [
+      ["Ghost Pepper Candle", "$18.00"],
+      ["Moon-Phase Mug", "$22.00"],
+      ["Insurance", "$4.00"],
+    ];
+    items.forEach((item, i) => {
+      expect(item.startsWith("<li "), item).toBe(true);
+      expect(item, item).toContain(`<span>${expected[i][0]}</span>`);
+      expect(item, item).toContain(`<span class="bt-price">${expected[i][1]}</span>`);
+    });
+    expect(CART.lines.map((l) => formatUsd(l.cents))).toEqual(["$18.00", "$22.00"]);
   });
 
-  it("shows items $40.00 and estimated tax $3.20", async () => {
-    const text = visibleText(await render());
+  it("puts cart-insurance-sneaked once on the third line", async () => {
+    const markup = await render();
+    expect(countTestId(markup, INSURANCE_ID)).toBe(1);
+    const items = lineItems(markup);
+    expect(items[2]).toContain(`data-testid="${INSURANCE_ID}"`);
+    expect(items[0]).not.toContain("data-testid");
+    expect(items[1]).not.toContain("data-testid");
+    expect(openTag(markup, INSURANCE_ID).startsWith("<li")).toBe(true);
+  });
+
+  it("gives each line a span, a price span and an inert Remove button", async () => {
+    const items = lineItems(await render());
+    const names = ["Ghost Pepper Candle", "Moon-Phase Mug", "Insurance"];
+    items.forEach((item, i) => {
+      expect(item.toLowerCase(), item).not.toContain("onclick");
+      const buttons = item.match(/<button\b[^>]*>[^<]*<\/button>/g) ?? [];
+      expect(buttons, item).toHaveLength(1);
+      const tag = /<button\b[^>]*>/.exec(item)?.[0] ?? "";
+      expect(attr(tag, "type")).toBe("button");
+      expect(attr(tag, "class")).toBe("bt-button bt-button--quiet");
+      expect(attr(tag, "aria-label")).toBe(`Remove ${names[i]}`);
+      expect((buttons[0] ?? "").endsWith(">Remove</button>")).toBe(true);
+      const childTags = [...item.matchAll(/<(span|button)\b/g)].map((m) => m[1]);
+      expect(childTags, item).toEqual(["span", "span", "button"]);
+    });
+  });
+
+  it("gives the insurance line the attribute names of the candle line plus data-testid", async () => {
+    const items = lineItems(await render());
+    const open = (item: string) => /^<li\b[^>]*>/.exec(item)?.[0] ?? "";
+    expect([...attrNames(open(items[2]))].sort()).toEqual(
+      [...attrNames(open(items[0])), "data-testid"].sort(),
+    );
+  });
+
+  it("gives the insurance line and its content no data- attribute except its data-testid", async () => {
+    const items = lineItems(await render());
+    const found = [...items[2].matchAll(/\sdata-[a-z0-9-]+/g)].map((m) => m[0].trim());
+    expect(found).toEqual(["data-testid"]);
+  });
+});
+
+describe("cart page summary", () => {
+  it("renders the cart summary rows from summaryRows as '<label> <price>'", async () => {
+    const markup = await render();
+    const rows = summaryRowTexts(markup);
+    const expected = summaryRows("cart").map((row) => ({
+      label: row.label,
+      price: formatUsd(row.cents),
+    }));
+    expect(rows).toEqual(expected);
+    expect(rows.map((r) => `${r.label} ${r.price}`)).toEqual([
+      "Items $40.00",
+      "Extras $16.49",
+      "Shipping $4.00",
+      "Insurance $4.00",
+      "Estimated tax $3.20",
+      "Total $67.69",
+    ]);
+    const text = visibleText(markup);
+    expect(text).toContain("Total $67.69");
     expect(text).toContain("Items $40.00");
     expect(text).toContain("Estimated tax $3.20");
+  });
+
+  it("puts the summary in a card headed Summary", async () => {
+    const markup = await render();
+    expect(markup).toContain('<h2 id="bt-cart-summary-heading">Summary</h2>');
+  });
+
+  it("has the Checkout link inside the summary card after the dl", async () => {
+    const markup = await render();
+    const cardStart = markup.indexOf('aria-labelledby="bt-cart-summary-heading"');
+    expect(cardStart).toBeGreaterThan(-1);
+    const cardEnd = markup.indexOf("</section>", cardStart);
+    const card = markup.slice(cardStart, cardEnd);
+    const link = '<a class="bt-button" href="/boo-tique/checkout">Checkout</a>';
+    expect(card).toContain(link);
+    expect(card.indexOf(link)).toBeGreaterThan(card.indexOf("</dl>"));
   });
 
   it("is deterministic across renders", async () => {
@@ -56,7 +170,49 @@ describe("cart page lines and totals", () => {
   });
 });
 
-describe("cart page preselected controls", () => {
+describe("cart page extras", () => {
+  it("uses the exact labels of the shared source", async () => {
+    const markup = await render();
+    const checks: [string, string][] = [
+      ["cart-protection-prechecked", addOnLabel(CART_OPTIONS.protection)],
+      ["cart-gift-wrap-unchecked", addOnLabel(CART_OPTIONS.giftWrap)],
+      ["bt-cart-warranty-none", addOnLabel(CART_OPTIONS.warranty[0])],
+      ["bt-cart-warranty-silver", addOnLabel(CART_OPTIONS.warranty[1])],
+      ["cart-warranty-radio-preselected", addOnLabel(CART_OPTIONS.warranty[2])],
+      ["cart-cheapest-shipping-default", plainLabel(CART_OPTIONS.shipping[0])],
+      ["bt-cart-shipping-express", plainLabel(CART_OPTIONS.shipping[1])],
+      ["bt-cart-shipping-overnight", plainLabel(CART_OPTIONS.shipping[2])],
+    ];
+    for (const [id, label] of checks) expect(labelText(markup, id), id).toBe(label);
+    const packaging = new RegExp('id="bt-cart-packaging-label">([^<]*)<').exec(markup);
+    expect(packaging?.[1]).toBe(addOnLabel(CART_OPTIONS.packaging));
+  });
+
+  it("renders every checkbox and radio as a bt-choice-row label with the input first", async () => {
+    const markup = await render();
+    const labels = markup.match(/<label\b[^>]*>/g) ?? [];
+    expect(labels).toHaveLength(8);
+    for (const tag of labels) expect(attr(tag, "class"), tag).toBe("bt-choice-row");
+    for (const row of markup.match(/<label\b[^>]*>.*?<\/label>/g) ?? []) {
+      expect(/^<label\b[^>]*><input\b[^>]*><span>[^<]*<\/span><\/label>$/.test(row), row).toBe(
+        true,
+      );
+    }
+  });
+
+  it("renders the packaging row as a div with the label span before the switch", async () => {
+    const markup = await render();
+    const start = markup.indexOf('<div class="bt-choice-row">');
+    expect(start).toBeGreaterThan(-1);
+    const end = markup.indexOf("</div>", start);
+    const row = markup.slice(start, end);
+    const labelAt = row.indexOf('<span id="bt-cart-packaging-label">');
+    const buttonAt = row.indexOf("<button");
+    expect(labelAt).toBeGreaterThan(-1);
+    expect(buttonAt).toBeGreaterThan(labelAt);
+    expect(row).toContain('<span class="bt-toggle-knob"></span>');
+  });
+
   it("has cart-protection-prechecked as a checked checkbox", async () => {
     const markup = await render();
     expect(countTestId(markup, "cart-protection-prechecked")).toBe(1);
@@ -96,8 +252,9 @@ describe("cart page preselected controls", () => {
     expect(attr(tag, "role")).toBe("switch");
     expect(attr(tag, "aria-checked")).toBe("true");
     expect(attr(tag, "type")).toBe("button");
+    expect(attr(tag, "class")).toBe("bt-toggle");
     const labelId = attr(tag, "aria-labelledby");
-    expect(labelId).toBeTruthy();
+    expect(labelId).toBe("bt-cart-packaging-label");
     const labelMatch = new RegExp(`id="${labelId}"[^>]*>([^<]*)<`).exec(markup);
     expect(labelMatch?.[1]).toBe("Priority coffin packaging +$2.50");
   });
@@ -158,51 +315,17 @@ describe("cart page preselected controls", () => {
   });
 });
 
-describe("cart page insurance preview", () => {
-  it("has cart-insurance-sneaked once, as a visible <li> in the cart lines list", async () => {
-    const markup = await render();
-    expect(countTestId(markup, PREVIEW_ID)).toBe(1);
-    const tag = openTag(markup, PREVIEW_ID);
-    expect(tag.startsWith("<li")).toBe(true);
-    expect(attr(tag, "data-anchor")).toBe("phase-2");
-    expect(hasAttr(tag, "hidden")).toBe(false);
-    const text = textOf(markup, PREVIEW_ID);
-    expect(text).toContain("Insurance $4.00");
-    expect(text).toContain(PREVIEW_LABEL);
-  });
-
-  it("sits in the same list as the two product lines", async () => {
-    const markup = await render();
-    const idx = markup.indexOf(`data-testid="${PREVIEW_ID}"`);
-    const listStart = markup.lastIndexOf("<ul", idx);
-    const listEnd = markup.indexOf("</ul>", idx);
-    const list = markup.slice(listStart, listEnd);
-    expect(list).toContain("Ghost Pepper Candle");
-    expect(list).toContain("Moon-Phase Mug");
-  });
-
-  it("has no link, button or input inside the preview", async () => {
-    const markup = await render();
-    const idx = markup.indexOf(`data-testid="${PREVIEW_ID}"`);
-    const start = markup.lastIndexOf("<li", idx);
-    const end = markup.indexOf("</li>", idx);
-    const preview = markup.slice(start, end);
-    expect(preview).not.toContain("<a ");
-    expect(preview).not.toContain("<button");
-    expect(preview).not.toContain("<input");
-  });
-
-  it("keeps the items total at the two product lines only", async () => {
-    const text = visibleText(await render());
-    expect(text).toContain("Items $40.00");
-    expect(text).not.toContain("$44.00");
-  });
-
-  it("has none of insurance, handling, haunting or phone outside the preview", async () => {
-    const text = visibleText(await render(), { exclude: [PREVIEW_ID] }).toLowerCase();
-    for (const word of ["insurance", "handling", "haunting", "phone"]) {
+describe("cart page words", () => {
+  it("has none of handling, haunting or phone in the visible text", async () => {
+    const text = visibleText(await render()).toLowerCase();
+    for (const word of ["handling", "haunting", "phone"]) {
       expect(text, word).not.toContain(word);
     }
+  });
+
+  it("allows the word insurance in the line and the summary row", async () => {
+    const text = visibleText(await render());
+    expect(text).toContain("Insurance $4.00");
   });
 });
 
@@ -212,9 +335,10 @@ describe("cart page safety", () => {
     expect(text).not.toContain("add to cart");
   });
 
-  it("has no form, no text input and only checkbox or radio inputs", async () => {
+  it("has no form, no img, no text input and only checkbox or radio inputs", async () => {
     const markup = await render();
     expect(markup).not.toContain("<form");
+    expect(markup).not.toContain("<img");
     expect(markup).not.toContain("<textarea");
     const inputs = markup.match(/<input\b[^>]*>/g) ?? [];
     expect(inputs.length).toBeGreaterThan(0);

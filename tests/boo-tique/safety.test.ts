@@ -22,6 +22,7 @@ const ALLOWED_USE_CLIENT = [
   "hero-countdown.tsx",
   "overlay-dialog.tsx",
   "sold-toast.tsx",
+  "toggle-switch.tsx",
 ];
 
 const PAYMENT_WORDS = /card|cvc|cvv|iban|expir|payment/i;
@@ -190,7 +191,7 @@ describe("source scans", () => {
     }
   });
 
-  it("has use client in exactly the five allowed files", () => {
+  it("has use client in exactly the six allowed files", () => {
     const found = codeFiles()
       .filter((file) => /^\s*["']use client["']/.test(readFileSync(file, "utf8")))
       .map((file) => file.split(sep).pop())
