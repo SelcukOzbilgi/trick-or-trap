@@ -43,10 +43,10 @@ Rules for every task:
   - [x] 4.5 Run `npx vitest run tests/capture/config.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 4.1, 4.5, 6.6, 18.1, 18.2, 18.3, 18.4, 18.5, 18.6, 18.7, 18.8, 18.9, 18.10, 18.11, 20.8, 20.9_
 
-- [ ] 5. Backward-compatible `lib/types` extension
-  - [ ] 5.1 Create `tests/types/capture-meta.test.ts` first, using the same shapes as `tests/types/schemas.test.ts`: an old-shape snapshot (no new field) parses with `PageSnapshotSchema` and `BaseSnapshotSchema`; an element with `attributes`, `textTruncated`, `outsideImage` parses and keeps them; a snapshot with `capture` (with and without `images`) parses at the top level and inside `afterReload`; rejected: `devicePixelRatio` 0, `eligibleElementCount` -1 or 1.5, `attributes` with a number value, `images.items[0].width` 0, `images.mode` `"other"`, empty `images.items`, negative `offsetY`, `textTruncated: "yes"`; the existing test file is not edited.
-  - [ ] 5.2 Edit `lib/types/index.ts`: add `attributes`, `textTruncated`, `outsideImage` to `ElementSnapshotSchema`; add and export `CaptureMetaSchema` and the type `CaptureMeta`; add `capture: CaptureMetaSchema.optional()` to `BaseSnapshotSchema`. Change no existing line.
-  - [ ] 5.3 Run `npx vitest run tests/types/capture-meta.test.ts --maxWorkers=2`, then `npx vitest run tests/types/schemas.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+- [x] 5. Backward-compatible `lib/types` extension
+  - [x] 5.1 Create `tests/types/capture-meta.test.ts` first, using the same shapes as `tests/types/schemas.test.ts`: an old-shape snapshot (no new field) parses with `PageSnapshotSchema` and `BaseSnapshotSchema`; an element with `attributes`, `textTruncated`, `outsideImage` parses and keeps them; a snapshot with `capture` (with and without `images`) parses at the top level and inside `afterReload`; rejected: `devicePixelRatio` 0, `eligibleElementCount` -1 or 1.5, `attributes` with a number value, `images.items[0].width` 0, `images.mode` `"other"`, empty `images.items`, negative `offsetY`, `textTruncated: "yes"`; the existing test file is not edited.
+  - [x] 5.2 Edit `lib/types/index.ts`: add `attributes`, `textTruncated`, `outsideImage` to `ElementSnapshotSchema`; add and export `CaptureMetaSchema` and the type `CaptureMeta`; add `capture: CaptureMetaSchema.optional()` to `BaseSnapshotSchema`. Change no existing line.
+  - [x] 5.3 Run `npx vitest run tests/types/capture-meta.test.ts --maxWorkers=2`, then `npx vitest run tests/types/schemas.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6_
 
 - [ ] 6. IP-range classification and URL syntax checks

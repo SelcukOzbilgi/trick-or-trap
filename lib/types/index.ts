@@ -54,9 +54,47 @@ export const ElementSnapshotSchema = z.object({
   // Form state
   checked: z.boolean(),
   selected: z.boolean(),
+  // Capture extensions (page-capture spec). All optional: old snapshots stay valid.
+  /** Allow-listed HTML attributes, each value length-capped by the extractor. Untrusted page data. */
+  attributes: z.record(z.string(), z.string()).optional(),
+  /** True when `text` was cut at the extractor's text cap. */
+  textTruncated: z.boolean().optional(),
+  /** True when no screenshot image covers any part of the element's box. */
+  outsideImage: z.boolean().optional(),
 });
 
 export type ElementSnapshot = z.infer<typeof ElementSnapshotSchema>;
+
+// ── CaptureMeta ────────────────────────────────────────────────────────────
+// Page-capture metadata: how the sample and its screenshot images were read.
+
+export const CaptureMetaSchema = z.object({
+  devicePixelRatio: z.number().positive(),
+  scrollX: z.number(),
+  scrollY: z.number(),
+  eligibleElementCount: z.number().int().nonnegative(),
+  elementsTruncated: z.boolean(),
+  /** True for the lighter sample read after a reload. */
+  light: z.boolean(),
+  /** Absent on samples without a screenshot (the reload sample). */
+  images: z
+    .object({
+      mode: z.enum(["single", "tiled"]),
+      truncated: z.boolean(),
+      items: z
+        .array(
+          z.object({
+            offsetY: z.number().nonnegative(),
+            width: z.number().int().positive(),
+            height: z.number().int().positive(),
+          })
+        )
+        .min(1),
+    })
+    .optional(),
+});
+
+export type CaptureMeta = z.infer<typeof CaptureMetaSchema>;
 
 // ── BaseSnapshot ───────────────────────────────────────────────────────────
 // Flat, non-recursive single-load capture record.
@@ -70,6 +108,7 @@ export const BaseSnapshotSchema = z.object({
   fullHeight: z.number(),
   elements: z.array(ElementSnapshotSchema),
   screenshotRef: z.string().optional(),
+  capture: CaptureMetaSchema.optional(),
 });
 
 export type BaseSnapshot = z.infer<typeof BaseSnapshotSchema>;
