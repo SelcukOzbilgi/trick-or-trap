@@ -209,6 +209,21 @@ describe("upsell dialog", () => {
     expect(style).toContain("color:#cfc6bc");
   });
 
+  it("gives the bundle button and the tiny close no data-bt-close or data-bt-confirm", async () => {
+    const markup = await render();
+    const buttons = markup.match(/<button\b[^>]*>[^<]*<\/button>/g) ?? [];
+    const bundle = buttons.filter((button) => button.includes("Add crypt keeper bundle"));
+    const closes = buttons.filter((button) => attr(button, "aria-label") === "Close");
+    expect(bundle).toHaveLength(1);
+    expect(closes).toHaveLength(1);
+    for (const button of [...bundle, ...closes]) {
+      expect(hasAttr(button, "data-bt-close"), button).toBe(false);
+      expect(hasAttr(button, "data-bt-confirm"), button).toBe(false);
+    }
+    expect(markup).not.toContain("data-bt-close");
+    expect(markup).not.toContain("data-bt-confirm");
+  });
+
   it("sits inside the dialog, after the backdrop", async () => {
     const markup = await render();
     const backdrop = markup.indexOf('data-testid="bt-backdrop"');

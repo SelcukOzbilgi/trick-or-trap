@@ -6,9 +6,16 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type MouseEvent,
   type ReactNode,
 } from "react";
-import { nextFocusIndex, shouldCloseOnKey } from "@/lib/boo-tique/overlay";
+import {
+  EXIT_CONFIRM_DELAY_MS,
+  dialogClickAction,
+  nextFocusIndex,
+  shouldCloseOnKey,
+} from "@/lib/boo-tique/overlay";
+import { PALETTE } from "@/lib/boo-tique/styles";
 
 const FOCUSABLE_SELECTOR = [
   "a[href]",
@@ -22,7 +29,7 @@ const FOCUSABLE_SELECTOR = [
 const DEFAULT_CLOSE_STYLE: CSSProperties = {
   fontSize: "20px",
   lineHeight: 1,
-  color: "#2a1512",
+  color: PALETTE.ink,
   background: "transparent",
   border: 0,
   padding: "4px 8px",
@@ -38,30 +45,58 @@ type OverlayDialogProps = {
   closeText?: string;
   /** Inline style of the close button. */
   closeStyle?: CSSProperties;
+  /**
+   * Text shown in place of the children after a click on an element marked `data-bt-confirm`.
+   * The dialog closes `EXIT_CONFIRM_DELAY_MS` later. Without it, a confirm click closes at once.
+   */
+  confirmText?: string;
   children: ReactNode;
 };
 
 /**
  * Modal dialog with a backdrop. It renders open on the server and on the first client render.
- * After mount it takes focus, keeps Tab inside the dialog, and closes on Escape or on the
- * close button. Closing removes the dialog and the backdrop and returns focus to the element
- * that had it before. Nothing is stored.
+ * After mount it takes focus, keeps Tab inside the dialog, and closes on Escape, on the
+ * close button, or on a click inside a `data-bt-close` element. A click inside a
+ * `data-bt-confirm` element first shows `confirmText`, then closes. Closing removes the dialog
+ * and the backdrop and returns focus to the element that had it before. Nothing is stored or sent.
  */
 export function OverlayDialog({
   testId,
   label,
   closeText = "×",
   closeStyle = DEFAULT_CLOSE_STYLE,
+  confirmText,
   children,
 }: OverlayDialogProps) {
   const [open, setOpen] = useState(true);
+  const [confirming, setConfirming] = useState(false);
   const dialogRef = useRef<HTMLElement | null>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
 
   const close = useCallback(() => {
+    setConfirming(false);
     setOpen(false);
     previousFocus.current?.focus();
   }, []);
+
+  useEffect(() => {
+    if (!confirming) return undefined;
+    const id = setTimeout(close, EXIT_CONFIRM_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [confirming, close]);
+
+  function onDialogClick(event: MouseEvent<HTMLElement>) {
+    const origin = event.nativeEvent.composedPath()[0];
+    const clicked = origin instanceof Element ? origin : null;
+    const action = dialogClickAction(clicked);
+    if (action === "ignore") return;
+    if (action === "close" || confirmText === undefined) {
+      close();
+      return;
+    }
+    setConfirming(true);
+    dialogRef.current?.focus();
+  }
 
   useEffect(() => {
     if (!open) return undefined;
@@ -107,6 +142,7 @@ export function OverlayDialog({
         aria-label={label}
         tabIndex={-1}
         data-testid={testId}
+        onClick={onDialogClick}
       >
         <button
           type="button"
@@ -117,7 +153,13 @@ export function OverlayDialog({
         >
           {closeText}
         </button>
-        {children}
+        {confirming ? (
+          <p role="status" data-testid="bt-dialog-confirm">
+            {confirmText}
+          </p>
+        ) : (
+          children
+        )}
       </section>
     </>
   );

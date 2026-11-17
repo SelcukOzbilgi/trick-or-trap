@@ -35,36 +35,38 @@ export function CookieBanner({ variant }: { variant: CookieBannerVariant }) {
       data-testid={TEST_IDS[variant]}
     >
       <p>We use cookies to remember your basket and to count visits.</p>
-      {variant === "default" ? (
-        <>
-          <a href="#cookie-options" style={OPTIONS_LINK_STYLE}>
-            options
-          </a>
-          <button type="button" style={ACCEPT_ALL_STYLE} onClick={close}>
-            Accept all
-          </button>
-        </>
-      ) : null}
-      {variant === "ghost" ? (
-        <>
-          <button type="button" style={GHOST_ACCEPT_STYLE} onClick={close}>
-            Accept all
-          </button>
-          <button type="button" style={GHOST_REJECT_STYLE} onClick={close}>
-            Reject
-          </button>
-        </>
-      ) : null}
-      {variant === "equal" ? (
-        <>
-          <button type="button" style={EQUAL_BUTTON_STYLE} onClick={close}>
-            Accept all
-          </button>
-          <button type="button" style={EQUAL_BUTTON_STYLE} onClick={close}>
-            Reject all
-          </button>
-        </>
-      ) : null}
+      <div className="bt-banner-actions">
+        {variant === "default" ? (
+          <>
+            <a href="#cookie-options" style={OPTIONS_LINK_STYLE}>
+              options
+            </a>
+            <button type="button" style={ACCEPT_ALL_STYLE} onClick={close}>
+              Accept all
+            </button>
+          </>
+        ) : null}
+        {variant === "ghost" ? (
+          <>
+            <button type="button" style={GHOST_ACCEPT_STYLE} onClick={close}>
+              Accept all
+            </button>
+            <button type="button" style={GHOST_REJECT_STYLE} onClick={close}>
+              Reject
+            </button>
+          </>
+        ) : null}
+        {variant === "equal" ? (
+          <>
+            <button type="button" style={EQUAL_BUTTON_STYLE} onClick={close}>
+              Accept all
+            </button>
+            <button type="button" style={EQUAL_BUTTON_STYLE} onClick={close}>
+              Reject all
+            </button>
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }

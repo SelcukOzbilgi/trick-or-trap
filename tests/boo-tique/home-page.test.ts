@@ -269,6 +269,63 @@ const URGENCY_IDS = [
   "home-fixed-date-sale",
 ];
 
+const BANNER_TEXT = "We use cookies to remember your basket and to count visits.";
+
+/** Splits a banner into its first paragraph, its actions div and what follows (2.1 to 2.4). */
+function bannerParts(markup: string, id: string) {
+  const tag = openTag(markup, id);
+  const rest = markup.slice(markup.indexOf(tag) + tag.length);
+  const head = `<p>${BANNER_TEXT}</p><div class="bt-banner-actions">`;
+  expect(rest.startsWith(head), "paragraph then actions div").toBe(true);
+  const afterHead = rest.slice(head.length);
+  const actionsEnd = afterHead.indexOf("</div>");
+  expect(actionsEnd).toBeGreaterThan(-1);
+  const actions = afterHead.slice(0, actionsEnd);
+  expect(actions).not.toContain("<div");
+  // The actions div is the last child: the banner root closes right after it.
+  expect(afterHead.slice(actionsEnd + "</div>".length).startsWith("</div>")).toBe(true);
+  const controls = [...actions.matchAll(/<(a|button)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(
+    (match) => ({ tag: match[1], text: match[2].replace(/<[^>]*>/g, "").trim() }),
+  );
+  const leftover = actions.replace(/<(a|button)\b[^>]*>[\s\S]*?<\/\1>/g, "").trim();
+  expect(leftover).toBe("");
+  return { controls, actionsCount: markup.split('class="bt-banner-actions"').length - 1 };
+}
+
+describe("cookie banner structure", () => {
+  it.each([
+    [
+      "/boo-tique",
+      "home-cookie-accept-dominant",
+      [
+        { tag: "a", text: "options" },
+        { tag: "button", text: "Accept all" },
+      ],
+    ],
+    [
+      "/boo-tique?banner=ghost",
+      "home-cookie-ghost-reject",
+      [
+        { tag: "button", text: "Accept all" },
+        { tag: "button", text: "Reject" },
+      ],
+    ],
+    [
+      "/boo-tique?banner=equal",
+      "home-cookie-equal-buttons",
+      [
+        { tag: "button", text: "Accept all" },
+        { tag: "button", text: "Reject all" },
+      ],
+    ],
+  ])("wraps the controls of %s in one actions div", async (route, id, expected) => {
+    const markup = await renderRoute(route);
+    const parts = bannerParts(markup, id);
+    expect(parts.actionsCount).toBe(1);
+    expect(parts.controls).toEqual(expected);
+  });
+});
+
 describe("default cookie banner", () => {
   it("has the entry id once on a bt-banner region", async () => {
     const markup = await renderRoute("/boo-tique");
@@ -443,6 +500,21 @@ describe("exit-intent newsletter modal", () => {
     const subscribe = style(controlTag(markup, "button", "Subscribe"));
     const decline = style(controlTag(markup, "button", "Not now"));
     expect(decline).toBe(subscribe);
+  });
+
+  it("marks Not now as close only and Subscribe as confirm and close", async () => {
+    const markup = await renderRoute(ROUTE);
+    const decline = controlTag(markup, "button", "Not now");
+    expect(hasAttr(decline, "data-bt-close")).toBe(true);
+    expect(hasAttr(decline, "data-bt-confirm")).toBe(false);
+    const subscribe = controlTag(markup, "button", "Subscribe");
+    expect(hasAttr(subscribe, "data-bt-close")).toBe(true);
+    expect(hasAttr(subscribe, "data-bt-confirm")).toBe(true);
+  });
+
+  it("does not contain the confirmation text before a click", async () => {
+    const markup = await renderRoute(ROUTE);
+    expect(markup).not.toContain("Demo shop: nothing was sent");
   });
 
   it("has a close button", async () => {
