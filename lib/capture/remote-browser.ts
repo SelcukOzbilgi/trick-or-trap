@@ -12,7 +12,12 @@
 import "server-only";
 import type { Clock } from "./clock";
 import type { CaptureConfig } from "./config";
-import { createSession as createApiSession, stopSession, type CreatedSession } from "./browser-use-api";
+import {
+  createSession as createApiSession,
+  reclaimSession,
+  stopSession,
+  type CreatedSession,
+} from "./browser-use-api";
 import { collectInPage } from "./extractor";
 import { toDetail } from "./redact";
 import type {
@@ -248,6 +253,10 @@ export function createRemoteBrowser(config: CaptureConfig, deps: RemoteBrowserDe
       if (config.apiKey === null) throw new CaptureFailure("config-invalid");
       const session = await createApiSession({ fetch: deps.fetch, clock: deps.clock, apiKey: config.apiKey }, request);
       return createHandle(session, config, deps);
+    },
+    async reclaim(captureId: string): Promise<void> {
+      if (config.apiKey === null) return;
+      await reclaimSession({ fetch: deps.fetch, clock: deps.clock, apiKey: config.apiKey }, captureId);
     },
   };
 }

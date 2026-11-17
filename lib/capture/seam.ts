@@ -9,12 +9,19 @@ export type SessionRequest = {
   timeoutMinutes: number;
   proxy: "on" | "off";
   viewport: { width: number; height: number };
+  /** Random id of this capture. Sent as session metadata so a leftover session can be found. */
+  captureId: string;
 };
 
 export interface BrowserProvider {
   readonly mode: string;
   /** Creates a billed session. Throws `CaptureFailure`. Nothing to stop if it throws. */
   createSession(request: SessionRequest): Promise<BrowserSessionHandle>;
+  /**
+   * Optional. One best-effort clean-up after a create call that may have left a session
+   * behind. Never rejects.
+   */
+  reclaim?(captureId: string): Promise<void>;
 }
 
 export interface BrowserSessionHandle {

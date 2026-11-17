@@ -234,6 +234,7 @@ describe("capturePage: stop is called exactly once on every path", () => {
       timeoutMinutes: 2,
       proxy: "off",
       viewport: { width: 1280, height: 800 },
+      captureId: "capture-id-sentinel",
     });
     let release: (value: BrowserSessionHandle) => void = () => {};
     const late = new Promise<BrowserSessionHandle>((resolve) => {
@@ -290,6 +291,7 @@ describe("capturePage: stop is called exactly once on every path", () => {
       timeoutMinutes: 2,
       proxy: "off",
       viewport: { width: 1280, height: 800 },
+      captureId: "capture-id-sentinel",
     });
     let release: (value: BrowserSessionHandle) => void = () => {};
     const late = new Promise<BrowserSessionHandle>((resolve) => {

@@ -19,6 +19,7 @@ async function setup(script: FakeScript = {}) {
     timeoutMinutes: 2,
     proxy: "off",
     viewport: { width: 1280, height: 800 },
+    captureId: "capture-id-sentinel",
   });
   const page: CapturePage = await handle.connect({ timeoutMs: 1_000 });
   return { clock, deadline, fake, page };
@@ -283,6 +284,7 @@ describe("captureImages: tiled mode", () => {
       timeoutMinutes: 2,
       proxy: "off",
       viewport: { width: 1280, height: 800 },
+      captureId: "capture-id-sentinel",
     });
     const page = await handle.connect({ timeoutMs: 1_000 });
 

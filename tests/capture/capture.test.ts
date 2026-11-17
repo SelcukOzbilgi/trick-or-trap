@@ -11,6 +11,7 @@ vi.mock("@/lib/capture/config", async (importOriginal) => ({
 import { capturePage, type CaptureDeps } from "@/lib/capture/capture";
 import type { CaptureConfig } from "@/lib/capture/config";
 import { COLLECT_LIMITS } from "@/lib/capture/constants";
+import { createRemoteBrowser } from "@/lib/capture/remote-browser";
 import type { GetBrowserResult } from "@/lib/capture/seam";
 import type { CaptureResult, RawElement } from "@/lib/capture/types";
 import type { Resolver } from "@/lib/capture/url-check";
@@ -154,7 +155,12 @@ describe("capturePage: success", () => {
     ]);
     expect(fake.createCalls).toBe(1);
     expect(fake.stopCalls).toBe(1);
-    expect(fake.sessionRequests[0]).toEqual({ timeoutMinutes: 2, proxy: "off", viewport: { width: 1280, height: 800 } });
+    expect(fake.sessionRequests[0]).toEqual({
+      timeoutMinutes: 2,
+      proxy: "off",
+      viewport: { width: 1280, height: 800 },
+      captureId: expect.any(String),
+    });
     expect(fake.gotoUrls).toEqual([URL_OK]);
     expect(fake.collectOptions[0]).toEqual({
       maxElements: 1_500,
@@ -520,5 +526,81 @@ describe("capturePage: logging", () => {
     await drive(capturePage("http://10.0.0.1/", refused.deps), refused.clock);
 
     for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe("capturePage: capture id", () => {
+  it("gives two captures different ids", async () => {
+    const first = setup();
+    const second = setup();
+
+    await drive(capturePage(URL_OK, first.deps), first.clock);
+    await drive(capturePage(URL_OK, second.deps), second.clock);
+
+    const a = first.fake.sessionRequests[0].captureId;
+    const b = second.fake.sessionRequests[0].captureId;
+    expect(typeof a).toBe("string");
+    expect(a.length).toBeGreaterThan(0);
+    expect(a).not.toBe(b);
+  });
+
+  it("does not derive the id from the URL or the API key", async () => {
+    const { clock, fake, deps } = setup();
+
+    await drive(capturePage(URL_OK, deps), clock);
+
+    const id = fake.sessionRequests[0].captureId;
+    expect(id).not.toContain(SECRET_KEY);
+    expect(id).not.toContain("shop.example.com");
+    expect(id).not.toContain("https");
+  });
+
+  it("uses the id of deps.newCaptureId when given", async () => {
+    const { clock, fake, deps } = setup({}, { newCaptureId: () => "fixed-capture-id" });
+
+    await drive(capturePage(URL_OK, deps), clock);
+
+    expect(fake.sessionRequests[0].captureId).toBe("fixed-capture-id");
+  });
+
+  it("sends the id in the create body and never calls the list endpoint", async () => {
+    const clock = createManualClock();
+    const calls: { url: string; method: string; body: string }[] = [];
+    const fakeFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      calls.push({ url: String(input), method, body: String(init?.body ?? "") });
+      if (method === "POST") {
+        return new Response(
+          JSON.stringify({ id: "sess-sentinel-1234", cdpUrl: "wss://abc.cdp.browser-use.com/x", liveUrl: null }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response("{}", { status: 200 });
+    });
+    const provider = createRemoteBrowser(configFor(), {
+      fetch: fakeFetch as unknown as typeof fetch,
+      clock,
+      loadPlaywright: async () => {
+        throw new Error("no browser in unit tests");
+      },
+    });
+    const { resolver } = createResolver();
+    const deps: Partial<CaptureDeps> = {
+      config: configFor(),
+      getBrowser: () => ({ ok: true, browser: provider }),
+      resolver,
+      clock,
+    };
+
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(false);
+    expect(calls.map((call) => call.method)).toEqual(["POST", "PATCH"]);
+    expect(calls.some((call) => call.url.includes("status="))).toBe(false);
+    const body = JSON.parse(calls[0].body) as { metadata: { app: string; captureId: string } };
+    expect(body.metadata.app).toBe("trick-or-trap");
+    expect(typeof body.metadata.captureId).toBe("string");
+    expect(body.metadata.captureId).not.toContain(SECRET_KEY);
+    expect(body.metadata.captureId).not.toContain("shop.example.com");
   });
 });

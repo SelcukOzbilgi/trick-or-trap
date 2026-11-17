@@ -54,6 +54,8 @@ export interface CaptureDeps {
   getBrowser: (config: CaptureConfig) => GetBrowserResult;
   resolver: Resolver;
   clock: Clock;
+  /** Makes the random id of one capture. Default: `crypto.randomUUID()`. Never derived from the URL or the key. */
+  newCaptureId: () => string;
 }
 
 /** What one capture shares between its steps and the cleanup after them. */
@@ -183,6 +185,7 @@ async function runCapture(
       timeoutMinutes: config.sessionTimeoutMinutes,
       proxy: config.proxy,
       viewport: { width: BROWSER_VIEWPORT.width, height: BROWSER_VIEWPORT.height },
+      captureId: (deps.newCaptureId ?? (() => globalThis.crypto.randomUUID()))(),
     }))();
   try {
     ctx.handle = await step(() => creation, "session-create-failed", {

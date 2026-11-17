@@ -7,7 +7,12 @@ import { CaptureFailure } from "@/lib/capture/types";
 import type { PageGuards, SessionRequest } from "@/lib/capture/seam";
 import { createFakeBrowser, createRawPageRead } from "./helpers/fake-browser";
 
-const request: SessionRequest = { timeoutMinutes: 2, proxy: "off", viewport: { width: 1280, height: 800 } };
+const request: SessionRequest = {
+  timeoutMinutes: 2,
+  proxy: "off",
+  viewport: { width: 1280, height: 800 },
+  captureId: "capture-id-sentinel",
+};
 const collectOptions: CollectOptions = {
   maxElements: 10,
   maxTextChars: 30,

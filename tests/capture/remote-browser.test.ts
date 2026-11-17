@@ -25,7 +25,12 @@ const CONFIG: CaptureConfig = {
   allowOrigin: null,
 };
 
-const SESSION_REQUEST = { timeoutMinutes: 2, proxy: "off" as const, viewport: { width: 1280, height: 800 } };
+const SESSION_REQUEST = {
+  timeoutMinutes: 2,
+  proxy: "off" as const,
+  viewport: { width: 1280, height: 800 },
+  captureId: "capture-id-sentinel",
+};
 
 const COLLECT_OPTIONS: CollectOptions = {
   maxElements: 1500,
@@ -271,6 +276,7 @@ describe("createRemoteBrowser", () => {
       browserScreenWidth: 1280,
       browserScreenHeight: 800,
       proxyCountryCode: null,
+      metadata: { app: "trick-or-trap", captureId: SESSION_REQUEST.captureId },
     });
   });
 
@@ -686,5 +692,57 @@ describe("secrets", () => {
     const { handle, page } = await connectedPage();
     expectNoSecrets(JSON.stringify(handle));
     expectNoSecrets(JSON.stringify(page));
+  });
+});
+
+describe("capture id and reclaim", () => {
+  it("sends the capture id of the session request in the create body", async () => {
+    const { fetchFake } = await openSession();
+    const body = JSON.parse(fetchFake.calls[0].body) as { metadata: unknown };
+    expect(body.metadata).toEqual({ app: "trick-or-trap", captureId: SESSION_REQUEST.captureId });
+  });
+
+  it("reclaims by listing the active sessions and stopping the one with the capture id", async () => {
+    const calls: FetchCall[] = [];
+    const fakeFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const method = init?.method ?? "GET";
+      calls.push({ url: String(input), method, body: String(init?.body ?? "") });
+      if (method === "GET") {
+        return new Response(
+          JSON.stringify({
+            items: [
+              { id: "mine", metadata: { app: "trick-or-trap", captureId: "capture-id-sentinel" } },
+              { id: "other", metadata: { app: "trick-or-trap", captureId: "someone-else" } },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response("{}", { status: 200 });
+    });
+    const provider = createRemoteBrowser(CONFIG, {
+      fetch: fakeFetch as unknown as typeof fetch,
+      clock: createManualClock(),
+      loadPlaywright: async () => ({}),
+    });
+
+    await provider.reclaim?.("capture-id-sentinel");
+
+    expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
+      "GET https://api.browser-use.com/api/v4/browsers?status=active",
+      "PATCH https://api.browser-use.com/api/v4/browsers/mine",
+    ]);
+  });
+
+  it("does nothing when there is no API key", async () => {
+    const fetchFake = createFakeFetch();
+    const provider = createRemoteBrowser(
+      { ...CONFIG, apiKey: null },
+      { fetch: fetchFake.fetch, clock: createManualClock(), loadPlaywright: async () => ({}) },
+    );
+
+    await expect(provider.reclaim?.("capture-id-sentinel")).resolves.toBeUndefined();
+
+    expect(fetchFake.calls).toEqual([]);
   });
 });
