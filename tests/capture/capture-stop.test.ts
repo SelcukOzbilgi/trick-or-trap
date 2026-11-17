@@ -8,7 +8,7 @@ import type { BrowserProvider, BrowserSessionHandle, GetBrowserResult } from "@/
 import { CaptureFailure, ERROR_MESSAGES, type CaptureErrorCode, type CaptureResult } from "@/lib/capture/types";
 import type { Resolver } from "@/lib/capture/url-check";
 import { PageSnapshotSchema } from "@/lib/types";
-import { createFakeBrowser, createRawPageRead, type FakeScript } from "./helpers/fake-browser";
+import { createFakeBrowser, type FakeScript } from "./helpers/fake-browser";
 import { createManualClock, type ManualClock } from "./helpers/manual-clock";
 
 const SECRET_KEY = "sk-test-sentinel";
@@ -128,10 +128,18 @@ describe("capturePage: stop is called exactly once on every path", () => {
   });
 
   it("validation fails", async () => {
-    const { clock, fake, deps } = setup({ collect: createRawPageRead({ devicePixelRatio: 0 }) });
-    const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
-    expect(result.error.code).toBe("snapshot-invalid");
-    expect(fake.stopCalls).toBe(1);
+    // An implausible page metric is replaced and no longer invalid, so the failure is forced.
+    const spy = vi
+      .spyOn(PageSnapshotSchema, "safeParse")
+      .mockReturnValueOnce({ success: false, error: { issues: [{ path: ["capture", "light"] }] } } as never);
+    try {
+      const { clock, fake, deps } = setup();
+      const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
+      expect(result.error.code).toBe("snapshot-invalid");
+      expect(fake.stopCalls).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("the whole-capture deadline is hit", async () => {

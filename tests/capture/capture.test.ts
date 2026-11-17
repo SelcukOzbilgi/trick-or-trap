@@ -477,15 +477,23 @@ describe("capturePage: guards and final URL", () => {
 });
 
 describe("capturePage: validation", () => {
-  it("returns snapshot-invalid when the page reports a device pixel ratio of 0", async () => {
-    const { clock, fake, deps } = setup({ collect: createRawPageRead({ devicePixelRatio: 0 }) });
-    const result = await drive(capturePage(URL_OK, deps), clock);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.code).toBe("snapshot-invalid");
-    expect(result.error.message).toBe("The captured page data is invalid.");
-    expect(fake.stopCalls).toBe(1);
-    expect("images" in result).toBe(false);
+  it("returns snapshot-invalid when the assembled snapshot fails validation", async () => {
+    // An implausible page metric is replaced and no longer invalid, so the failure is forced.
+    const spy = vi
+      .spyOn(PageSnapshotSchema, "safeParse")
+      .mockReturnValueOnce({ success: false, error: { issues: [{ path: ["capture", "light"] }] } } as never);
+    try {
+      const { clock, fake, deps } = setup();
+      const result = await drive(capturePage(URL_OK, deps), clock);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("snapshot-invalid");
+      expect(result.error.message).toBe("The captured page data is invalid.");
+      expect(fake.stopCalls).toBe(1);
+      expect("images" in result).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("returns screenshot-too-large and no images", async () => {

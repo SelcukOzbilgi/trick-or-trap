@@ -360,10 +360,15 @@ describe("capturePage: a failing reload is only a warning", () => {
   });
 
   it("when the sample fails BaseSnapshotSchema", async () => {
-    // devicePixelRatio 0 is not positive, so the light sample is invalid.
-    await expectReloadFailed({
-      collect: (n) => (n === 1 ? rawWithElements() : rawWithElements({ devicePixelRatio: 0 })),
-    });
+    // An implausible page metric is replaced and no longer invalid, so the failure is forced.
+    const spy = vi
+      .spyOn(BaseSnapshotSchema, "safeParse")
+      .mockReturnValueOnce({ success: false, error: { issues: [{ path: ["capture", "light"] }] } } as never);
+    try {
+      await expectReloadFailed({ collect: () => rawWithElements() });
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("never lets a reload failure change the first capture", async () => {

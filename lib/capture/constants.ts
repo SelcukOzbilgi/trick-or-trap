@@ -91,8 +91,6 @@ export const FORBIDDEN_ATTRIBUTE_FRAGMENTS: readonly string[] = [
 
 /** Height cap of the single clipped image, in CSS px. */
 export const SCREENSHOT_MAX_HEIGHT_PX = 8_000;
-/** Tiled mode starts when `fullHeight × devicePixelRatio` is above this value. */
-export const TILE_MODE_THRESHOLD_PX = 30_000;
 /** Tiled mode starts when `fullHeight`, in CSS px, is above this value. */
 export const TILE_MODE_THRESHOLD_CSS_PX = 20_000;
 /** Most tiles taken in tiled mode, counted from the top. */

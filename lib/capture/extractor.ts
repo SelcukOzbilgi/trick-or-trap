@@ -8,14 +8,25 @@
  */
 import type { BaseSnapshot, ElementSnapshot } from "@/lib/types";
 import {
+  BROWSER_VIEWPORT,
   FORBIDDEN_ATTRIBUTE_FRAGMENTS,
+  MAX_ATTR_CHARS,
+  MAX_ATTR_NAME_CHARS,
+  MAX_ATTRS_PER_ELEMENT,
+  MAX_ELEMENT_ID_CHARS,
   MAX_ELEMENTS,
   MAX_ELEMENTS_LIGHT,
+  MAX_PATH_DEPTH,
+  MAX_PATH_INDEX,
+  MAX_ROLE_CHARS,
+  MAX_STYLE_CHARS,
+  MAX_TAG_CHARS,
   MAX_TEXT_CHARS,
   MAX_TEXT_CHARS_LIGHT,
-  MAX_ATTR_CHARS,
+  RAW_SCAN_FACTOR,
 } from "./constants";
-import { isOutsideImages, toDocumentBox, type ImageBox, type ScreenshotMode } from "./geometry";
+import { isOutsideImages, sanitiseMetrics, toDocumentBox, type ImageBox, type ScreenshotMode } from "./geometry";
+import { CaptureFailure } from "./types";
 import type { CollectOptions, RawCollection, RawElement, RawPageRead } from "./types";
 
 /**
@@ -226,15 +237,35 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function isValidElement(value: unknown): value is RawElement {
-  if (!isRecord(value)) return false;
+/** Why a raw entry was not used: its shape is wrong, or it is beyond a size bound. */
+type ElementCheck = "ok" | "invalid" | "out-of-bounds";
+
+/**
+ * Checks the shape of one raw entry and its path bounds. A path deeper than
+ * `MAX_PATH_DEPTH` or with an index above `MAX_PATH_INDEX` is out of bounds; the length
+ * is checked before the entries, so a path of a million entries costs one comparison.
+ */
+function checkElement(value: unknown): ElementCheck {
+  if (!isRecord(value)) return "invalid";
   const path = value.path;
-  if (!Array.isArray(path) || !path.every((n) => Number.isInteger(n) && n >= 0)) return false;
-  return typeof value.tag === "string" && isRecord(value.rect);
+  if (!Array.isArray(path)) return "invalid";
+  if (path.length > MAX_PATH_DEPTH) return "out-of-bounds";
+  let tooLarge = false;
+  for (const n of path) {
+    if (!Number.isInteger(n) || n < 0) return "invalid";
+    if (n > MAX_PATH_INDEX) tooLarge = true;
+  }
+  if (typeof value.tag !== "string" || !isRecord(value.rect)) return "invalid";
+  return tooLarge ? "out-of-bounds" : "ok";
 }
 
 function str(value: unknown): string {
   return typeof value === "string" ? value : "";
+}
+
+/** Cuts a string at `max` characters. */
+function cut(value: string, max: number): string {
+  return value.length > max ? value.slice(0, max) : value;
 }
 
 function cleanAttributes(
@@ -246,7 +277,10 @@ function cleanAttributes(
   const out: Record<string, string> = {};
   if (!isRecord(raw)) return out;
   const type = str(raw.type).toLowerCase();
+  let count = 0;
   for (const key of Object.keys(raw)) {
+    if (count >= MAX_ATTRS_PER_ELEMENT) break;
+    if (key.length > MAX_ATTR_NAME_CHARS) continue;
     const name = key.toLowerCase();
     const value = raw[key];
     if (typeof value !== "string") continue;
@@ -255,72 +289,111 @@ function cleanAttributes(
     if (name === "value" && !(tag === "button" || tag === "option" || (tag === "input" && VALUE_INPUT_TYPES.includes(type)))) {
       continue;
     }
-    out[name] = value.length > MAX_ATTR_CHARS ? value.slice(0, MAX_ATTR_CHARS) : value;
+    out[name] = cut(value, MAX_ATTR_CHARS);
+    count++;
   }
   return out;
 }
 
+/** Size of the JSON text of `value` in UTF-8 bytes. */
+export function snapshotBytes(value: unknown): number {
+  const text = JSON.stringify(value);
+  return typeof text === "string" ? new TextEncoder().encode(text).length : 0;
+}
+
+/** Rounds to two decimals; a result of 0 or less becomes `fallback`. */
+function positive2(value: number, fallback: number): number {
+  const rounded = round2(value);
+  return rounded > 0 ? rounded : fallback;
+}
+
 /**
- * Turns a raw page read into a `BaseSnapshot`. The raw data is not trusted: malformed
- * elements are dropped, caps and the attribute allowlist are applied again, numbers
- * are made finite and rounded, and boxes are converted to document CSS px.
+ * Turns a raw page read into a `BaseSnapshot`. The raw data is not trusted. In order:
+ * at most `RAW_SCAN_FACTOR` times the element cap of raw entries are examined; an entry
+ * with a wrong shape, a path beyond the bounds or an id that is too long is dropped
+ * (a bounds drop still counts as an eligible element); tag, role and the style strings
+ * are cut; text is cut; attributes go through the allowlist and the name and count
+ * limits. Page metrics are made plausible, numbers are rounded, and boxes are
+ * converted to document CSS px.
+ *
+ * Throws `CaptureFailure("page-read-failed")` when `raw` is not an object or its
+ * `elements` is not an array.
  */
 export function buildSample(raw: RawPageRead, params: BuildSampleParams): BaseSnapshot {
+  if (!isRecord(raw) || !Array.isArray(raw.elements)) throw new CaptureFailure("page-read-failed");
+
   const elementCap = params.light ? MAX_ELEMENTS_LIGHT : MAX_ELEMENTS;
   const textCap = params.light ? MAX_TEXT_CHARS_LIGHT : MAX_TEXT_CHARS;
   const allowedAttributes = params.light ? LIGHT_ATTRIBUTES : FULL_ATTRIBUTES;
-  const scroll = { x: round2(raw.scrollX), y: round2(raw.scrollY) };
+  const metrics = sanitiseMetrics(raw);
+  const scroll = { x: round2(metrics.scrollX), y: round2(metrics.scrollY) };
   const images = params.images;
   const imageBoxes: ImageBox[] = images ? images.items.map((i) => ({ ...i })) : [];
 
-  const rawElements: unknown[] = Array.isArray(raw.elements) ? raw.elements : [];
+  const rawElements: unknown[] = raw.elements;
+  const scanLimit = Math.min(rawElements.length, RAW_SCAN_FACTOR * elementCap);
   const elements: ElementSnapshot[] = [];
-  for (const item of rawElements) {
-    if (elements.length >= elementCap) break;
-    if (!isValidElement(item)) continue;
+  let droppedByBounds = 0;
+  for (let index = 0; index < scanLimit && elements.length < elementCap; index++) {
+    const item = rawElements[index];
+    const check = checkElement(item);
+    if (check === "invalid") continue;
+    if (check === "out-of-bounds") {
+      droppedByBounds++;
+      continue;
+    }
+    const entry = item as RawElement;
+    const id = `el-${entry.path.join("-")}`;
+    if (id.length > MAX_ELEMENT_ID_CHARS) {
+      droppedByBounds++;
+      continue;
+    }
 
-    const style: Record<string, unknown> = isRecord(item.style) ? item.style : {};
-    const collapsed = str(item.text).replace(/\s+/g, " ").trim();
-    const cut = collapsed.length > textCap;
-    const text = cut ? collapsed.slice(0, textCap) : collapsed;
+    const tag = cut(entry.tag, MAX_TAG_CHARS);
+    const style: Record<string, unknown> = isRecord(entry.style) ? entry.style : {};
+    const collapsed = str(entry.text).replace(/\s+/g, " ").trim();
+    const textCut = collapsed.length > textCap;
+    const text = cut(collapsed, textCap);
     const boundingBox = toDocumentBox(
       {
-        left: item.rect.left,
-        top: item.rect.top,
-        width: item.rect.width,
-        height: item.rect.height,
+        left: entry.rect.left,
+        top: entry.rect.top,
+        width: entry.rect.width,
+        height: entry.rect.height,
       },
       scroll
     );
 
     const element: ElementSnapshot = {
-      id: `el-${item.path.join("-")}`,
-      tag: item.tag,
+      id,
+      tag,
       boundingBox,
-      color: str(style.color),
-      backgroundColor: str(style.backgroundColor),
-      fontSize: str(style.fontSize),
-      opacity: str(style.opacity),
-      display: str(style.display),
-      visibility: str(style.visibility),
-      position: str(style.position),
-      checked: item.checked === true,
-      selected: item.selected === true,
-      attributes: cleanAttributes(item.attrs, item.tag, allowedAttributes, !params.light),
+      color: cut(str(style.color), MAX_STYLE_CHARS),
+      backgroundColor: cut(str(style.backgroundColor), MAX_STYLE_CHARS),
+      fontSize: cut(str(style.fontSize), MAX_STYLE_CHARS),
+      opacity: cut(str(style.opacity), MAX_STYLE_CHARS),
+      display: cut(str(style.display), MAX_STYLE_CHARS),
+      visibility: cut(str(style.visibility), MAX_STYLE_CHARS),
+      position: cut(str(style.position), MAX_STYLE_CHARS),
+      checked: entry.checked === true,
+      selected: entry.selected === true,
+      attributes: cleanAttributes(entry.attrs, entry.tag, allowedAttributes, !params.light),
     };
-    if (typeof item.role === "string" && item.role !== "") element.role = item.role;
+    if (typeof entry.role === "string" && entry.role !== "") element.role = cut(entry.role, MAX_ROLE_CHARS);
     if (text !== "") element.text = text;
-    if (cut || item.textTruncated === true) element.textTruncated = true;
+    if (textCut || entry.textTruncated === true) element.textTruncated = true;
     if (images) element.outsideImage = isOutsideImages(boundingBox, imageBoxes);
     elements.push(element);
   }
 
   const reportedEligible = Math.max(0, Math.floor(round2(raw.eligibleCount)));
-  const eligibleElementCount = Math.max(reportedEligible, elements.length);
-  const elementsTruncated = reportedEligible > elementCap || reportedEligible > rawElements.length;
+  const eligibleElementCount = Math.max(reportedEligible, elements.length + droppedByBounds);
+  const elementsTruncated =
+    reportedEligible > elementCap || reportedEligible > rawElements.length || droppedByBounds > 0;
 
   const capture: NonNullable<BaseSnapshot["capture"]> = {
-    devicePixelRatio: round2(raw.devicePixelRatio),
+    devicePixelRatio: positive2(metrics.devicePixelRatio, 1),
+    layoutWidth: positive2(metrics.layoutWidth, BROWSER_VIEWPORT.width),
     scrollX: scroll.x,
     scrollY: scroll.y,
     eligibleElementCount,
@@ -338,10 +411,10 @@ export function buildSample(raw: RawPageRead, params: BuildSampleParams): BaseSn
   return {
     url: params.url,
     capturedAt: params.capturedAt,
-    viewportWidth: size(raw.innerWidth),
-    viewportHeight: size(raw.innerHeight),
-    fullWidth: size(raw.scrollWidth),
-    fullHeight: size(raw.scrollHeight),
+    viewportWidth: size(metrics.innerWidth),
+    viewportHeight: size(metrics.innerHeight),
+    fullWidth: size(metrics.scrollWidth),
+    fullHeight: size(metrics.scrollHeight),
     elements,
     capture,
   };

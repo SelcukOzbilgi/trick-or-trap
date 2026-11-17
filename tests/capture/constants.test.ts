@@ -28,7 +28,7 @@ describe("capture constants", () => {
     expect(constants.SCREENSHOT_MAX_HEIGHT_PX).toBe(8_000);
     expect(constants.SCREENSHOT_JPEG_QUALITY).toBe(70);
     expect(constants.MAX_BASE64_LENGTH).toBe(4_194_304);
-    expect(constants.TILE_MODE_THRESHOLD_PX).toBe(30_000);
+    expect(constants).not.toHaveProperty("TILE_MODE_THRESHOLD_PX");
     expect(constants.MAX_TILES).toBe(10);
     expect(constants.TILE_MIN_REMAINING_MS).toBe(3_000);
   });
