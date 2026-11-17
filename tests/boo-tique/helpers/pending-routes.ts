@@ -8,7 +8,6 @@ export const PENDING_ROUTES: readonly string[] = [
   "/boo-tique/cart",
   "/boo-tique/checkout",
   "/boo-tique/checkout?flow=honest",
-  "/boo-tique/club",
   "/boo-tique/account/subscription",
   "/boo-tique/account/subscription?plan=honest",
 ];

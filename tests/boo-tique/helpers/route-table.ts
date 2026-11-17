@@ -26,4 +26,5 @@ export type RouteTableEntry = {
  */
 export const ROUTE_TABLE: readonly RouteTableEntry[] = [
   { pattern: "/boo-tique", load: () => import("@/app/boo-tique/page") },
+  { pattern: "/boo-tique/club", load: () => import("@/app/boo-tique/club/page") },
 ];
