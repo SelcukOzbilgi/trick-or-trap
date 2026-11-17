@@ -21,10 +21,10 @@ Rules for every task:
   - [x] 1.3 Run `npx vitest run tests/capture/dependencies.test.ts --maxWorkers=2` again, then `npx tsc --noEmit`.
   _Requirements: 19.1, 19.2, 19.3_
 
-- [ ] 2. Vercel file tracing in `next.config.ts`
-  - [ ] 2.1 Create `tests/capture/tracing-config.test.ts` first: import the default export of `next.config.ts`; `outputFileTracingIncludes["/api/scan"]` equals `["./node_modules/playwright-core/**/*"]`; the file text, read with `readFileSync`, contains a comment with `lib/capture`; every setting that `next.config.ts` had before this task is still there (today the config object is empty, so the test asserts that the only key is `outputFileTracingIncludes`). Run it; it fails.
-  - [ ] 2.2 Edit `next.config.ts`: add `outputFileTracingIncludes: { "/api/scan": ["./node_modules/playwright-core/**/*"] }` with a comment: every route that imports `lib/capture` must be listed here, and the scan-route spec keeps this key in sync. Leave every other setting as it is.
-  - [ ] 2.3 Run `npx vitest run tests/capture/tracing-config.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+- [x] 2. Vercel file tracing in `next.config.ts`
+  - [x] 2.1 Create `tests/capture/tracing-config.test.ts` first: import the default export of `next.config.ts`; `outputFileTracingIncludes["/api/scan"]` equals `["./node_modules/playwright-core/**/*"]`; the file text, read with `readFileSync`, contains a comment with `lib/capture`; every setting that `next.config.ts` had before this task is still there (today the config object is empty, so the test asserts that the only key is `outputFileTracingIncludes`). Run it; it fails.
+  - [x] 2.2 Edit `next.config.ts`: add `outputFileTracingIncludes: { "/api/scan": ["./node_modules/playwright-core/**/*"] }` with a comment: every route that imports `lib/capture` must be listed here, and the scan-route spec keeps this key in sync. Leave every other setting as it is.
+  - [x] 2.3 Run `npx vitest run tests/capture/tracing-config.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 19.4, 19.5, 19.6_
 
 - [ ] 3. Shared types, constants and redaction
