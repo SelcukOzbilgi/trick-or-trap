@@ -17,6 +17,8 @@
   font-family: var(--font-jost), system-ui, sans-serif;
   font-size: 16px;
   line-height: 1.5;
+  accent-color: var(--bt-blood);
+  overflow-wrap: break-word;
 }
 
 .bt-root *,
@@ -32,6 +34,26 @@
   color: var(--bt-ink);
   line-height: 1.15;
   margin: 0 0 12px;
+}
+
+/* Type scale. After the combined heading rule, which keeps family, colour and margin. */
+
+.bt-root h1 {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.bt-root h2 {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.bt-root h3 {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .bt-root a {
@@ -84,9 +106,45 @@
   font-size: 14px;
 }
 
+/* Hero band. Descendant selectors win over the page paragraph and heading rules. */
+
+.bt-hero {
+  width: 100%;
+  padding: 32px;
+  border-radius: 12px;
+  background: var(--bt-blood);
+  color: #ffffff;
+}
+
+.bt-hero h1 {
+  margin: 0 0 8px;
+  color: #ffffff;
+}
+
+.bt-hero .bt-hero-tagline {
+  margin: 0;
+  font-size: 18px;
+  color: var(--bt-paper);
+}
+
+.bt-hero .bt-promo {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.bt-hero .bt-promo p {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
 /* Cards and product tiles */
 
 .bt-card {
+  min-width: 0;
   background: var(--bt-paper);
   border: 1px solid var(--bt-line);
   border-radius: 12px;
@@ -95,7 +153,7 @@
 
 .bt-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   list-style: none;
   margin: 0;
@@ -110,6 +168,28 @@
   border-radius: 8px;
   background: var(--bt-line);
   color: var(--bt-blood);
+}
+
+/* Five tile gradients, made from palette tokens only */
+
+.bt-tile--candle {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bt-blood) 14%, var(--bt-paper)), var(--bt-line));
+}
+
+.bt-tile--hoodie {
+  background: linear-gradient(135deg, var(--bt-line), color-mix(in srgb, var(--bt-blood) 22%, var(--bt-paper)));
+}
+
+.bt-tile--mug {
+  background: linear-gradient(135deg, var(--bt-paper), var(--bt-line));
+}
+
+.bt-tile--tote {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--bt-ink) 10%, var(--bt-paper)), var(--bt-line));
+}
+
+.bt-tile--quill {
+  background: linear-gradient(135deg, var(--bt-line), var(--bt-paper));
 }
 
 .bt-price {
@@ -146,6 +226,93 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+/* Rows */
+
+.bt-choice-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--bt-line);
+  border-radius: 8px;
+}
+
+.bt-choice-row input {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+}
+
+.bt-line-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--bt-line);
+  border-radius: 8px;
+}
+
+/* Buttons. The .bt-root prefix beats the page link rule. Modifiers come after the base rule. */
+
+.bt-root .bt-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  min-height: 44px;
+  border: 2px solid var(--bt-blood);
+  border-radius: 8px;
+  background: var(--bt-blood);
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.bt-root .bt-button:hover {
+  background: var(--bt-blood-dark);
+  border-color: var(--bt-blood-dark);
+}
+
+.bt-root .bt-button:focus-visible {
+  outline: 3px solid var(--bt-ink);
+  outline-offset: 2px;
+}
+
+.bt-root .bt-button:disabled {
+  background: var(--bt-paper);
+  border-color: var(--bt-muted);
+  color: var(--bt-muted);
+  cursor: not-allowed;
+}
+
+.bt-root .bt-button--secondary {
+  background: transparent;
+  color: var(--bt-blood);
+  border-color: var(--bt-blood);
+}
+
+.bt-root .bt-button--secondary:hover {
+  background: var(--bt-paper);
+}
+
+.bt-root .bt-button--quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--bt-blood);
+  padding: 8px 12px;
+  font-weight: 500;
+}
+
+.bt-root .bt-button--quiet:hover {
+  background: transparent;
+  border-color: transparent;
+  text-decoration: underline;
 }
 
 /* Toggle switch. The knob is aligned with flex. */
@@ -194,6 +361,13 @@
   border-top: 1px solid var(--bt-line);
 }
 
+.bt-banner-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex: none;
+}
+
 .bt-backdrop {
   position: fixed;
   inset: 0;
@@ -234,4 +408,31 @@
   background: var(--bt-paper);
   border: 1px solid var(--bt-line);
   border-radius: 8px;
+}
+
+/* Phone layout. The only media block. The banner wraps and the grid has two columns. */
+
+@media (max-width: 640px) {
+  .bt-root {
+    padding-bottom: 176px;
+  }
+
+  .bt-banner {
+    flex-wrap: wrap;
+    max-height: none;
+  }
+
+  .bt-banner p {
+    flex-basis: 100%;
+    font-size: 14px;
+    margin: 0;
+  }
+
+  .bt-banner-actions {
+    flex-wrap: wrap;
+  }
+
+  .bt-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }

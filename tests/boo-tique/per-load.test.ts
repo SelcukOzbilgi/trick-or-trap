@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { perLoadValues } from "@/lib/boo-tique/per-load";
+import { perLoadValues, STOCK_VALUES } from "@/lib/boo-tique/per-load";
+import { INVENTORY } from "@/lib/boo-tique/content";
 import {
   SOLD_TOAST_INTERVAL_MS,
   SOLD_TOAST_MESSAGES,
@@ -12,7 +13,31 @@ function sequence(...values: number[]): () => number {
   return () => values[Math.min(index++, values.length - 1)];
 }
 
+describe("STOCK_VALUES", () => {
+  it("is the integers 2 to 9 without the real inventory of the Travel tin", () => {
+    const expected: number[] = [];
+    for (let n = 2; n <= 9; n += 1) {
+      if (n !== INVENTORY["travel-tin"]) expected.push(n);
+    }
+    expect([...STOCK_VALUES]).toEqual(expected);
+    expect([...STOCK_VALUES]).toEqual([2, 4, 5, 6, 7, 8, 9]);
+  });
+});
+
 describe("perLoadValues", () => {
+  it("never returns the real inventory and returns every stock value over a grid of draws", () => {
+    const seen = new Set<number>();
+    const draws: number[] = [];
+    for (let i = 0; i < 10000; i += 1) draws.push(i / 10000);
+    draws.push(0.999999);
+    for (const draw of draws) {
+      const { stockLeft } = perLoadValues(() => draw);
+      expect(stockLeft).not.toBe(INVENTORY["travel-tin"]);
+      seen.add(stockLeft);
+    }
+    expect([...seen].sort((a, b) => a - b)).toEqual([...STOCK_VALUES]);
+  });
+
   it("gives the lowest stock and viewers for a random source of 0", () => {
     expect(perLoadValues(() => 0)).toEqual({ stockLeft: 2, viewers: 8 });
   });
@@ -35,7 +60,11 @@ describe("perLoadValues", () => {
     const first = perLoadValues(sequence(0.5, 0.25));
     const again = perLoadValues(sequence(0.5, 0.25));
     expect(again).toEqual(first);
-    expect(first).toEqual({ stockLeft: 2 + Math.floor(0.5 * 8), viewers: 8 + Math.floor(0.25 * 41) });
+    expect(first).toEqual({
+      stockLeft: STOCK_VALUES[Math.floor(0.5 * 7)],
+      viewers: 8 + Math.floor(0.25 * 41),
+    });
+    expect(first).toEqual({ stockLeft: 6, viewers: 18 });
   });
 
   it("uses the first draw for stock and the second for viewers", () => {

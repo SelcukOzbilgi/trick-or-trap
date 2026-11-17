@@ -12,6 +12,7 @@ import {
   UPSELL_ADD_STYLE,
   UPSELL_CLOSE_STYLE,
 } from "@/lib/boo-tique/styles";
+import { contrastRatio } from "@/lib/boo-tique/contrast";
 
 const ROOT = process.cwd();
 const CSS_PATH = join(ROOT, "app", "boo-tique", "boo-tique.css");
@@ -47,8 +48,44 @@ function declsFor(rules: Rule[], selector: string): Map<string, string> {
   return merged;
 }
 
+type MediaBlock = { query: string; css: string };
+
+/**
+ * Walks the comment-stripped text with a brace counter. Returns the text with every
+ * @media block removed, and the blocks with their whitespace-normalised query.
+ */
+function splitMedia(source: string): { base: string; media: MediaBlock[] } {
+  const text = stripComments(source);
+  const media: MediaBlock[] = [];
+  let base = "";
+  let i = 0;
+  while (i < text.length) {
+    if (text.startsWith("@media", i)) {
+      const open = text.indexOf("{", i);
+      if (open === -1) throw new Error("@media without a block");
+      const query = text.slice(i + "@media".length, open).replace(/\s+/g, " ").trim();
+      let depth = 1;
+      let j = open + 1;
+      while (j < text.length && depth > 0) {
+        if (text[j] === "{") depth += 1;
+        else if (text[j] === "}") depth -= 1;
+        j += 1;
+      }
+      if (depth !== 0) throw new Error("unbalanced @media block");
+      media.push({ query, css: text.slice(open + 1, j - 1) });
+      i = j;
+    } else {
+      base += text[i];
+      i += 1;
+    }
+  }
+  return { base, media };
+}
+
 const css = readFileSync(CSS_PATH, "utf8");
-const rules = parseRules(css);
+const { base: baseCss, media: mediaBlocks } = splitMedia(css);
+const rules = parseRules(baseCss);
+const mediaRules = mediaBlocks.flatMap((block) => parseRules(block.css));
 const cssNoComments = stripComments(css);
 
 describe("palette constants", () => {
@@ -208,11 +245,13 @@ describe("boo-tique.css tokens", () => {
     expect(cssNoComments).not.toContain("--color-");
     expect(cssNoComments).not.toContain(":root");
     expect(cssNoComments).not.toMatch(/\bbody\b/);
+    expect(cssNoComments).not.toMatch(/\bhtml\b/);
+    expect(cssNoComments).not.toContain(":has(");
   });
 
   it("scopes every selector to a bt- class", () => {
     expect(rules.length).toBeGreaterThan(0);
-    for (const rule of rules) {
+    for (const rule of [...rules, ...mediaRules]) {
       for (const sel of rule.selector.split(",")) {
         expect(sel.trim().startsWith(".bt-")).toBe(true);
       }
@@ -289,6 +328,305 @@ describe("boo-tique.css overlay placement", () => {
     expect(declsFor(rules, ".bt-toggle").get("display")).toBe("inline-flex");
     expect(declsFor(rules, '.bt-toggle[aria-checked="true"]').get("justify-content")).toBe(
       "flex-end",
+    );
+  });
+});
+
+describe("boo-tique.css phone layout (media block)", () => {
+  it("has exactly one @media block, for max-width 640px", () => {
+    expect(mediaBlocks).toHaveLength(1);
+    expect(mediaBlocks[0].query).toBe("(max-width: 640px)");
+    expect((cssNoComments.match(/@media/g) ?? []).length).toBe(1);
+  });
+
+  it("wraps the banner and lifts its height limit", () => {
+    const d = declsFor(mediaRules, ".bt-banner");
+    expect(d.get("flex-wrap")).toBe("wrap");
+    expect(d.get("max-height")).toBe("none");
+  });
+
+  it("gives the banner paragraph the full row at 14px", () => {
+    const d = declsFor(mediaRules, ".bt-banner p");
+    expect(d.get("flex-basis")).toBe("100%");
+    expect(d.get("font-size")).toBe("14px");
+    expect(d.get("margin")).toBe("0");
+  });
+
+  it("lets the banner actions wrap", () => {
+    expect(declsFor(mediaRules, ".bt-banner-actions").get("flex-wrap")).toBe("wrap");
+  });
+
+  it("grows the bottom padding to 176px", () => {
+    expect(declsFor(mediaRules, ".bt-root").get("padding-bottom")).toBe("176px");
+  });
+
+  it("uses two grid columns", () => {
+    expect(declsFor(mediaRules, ".bt-grid").get("grid-template-columns")).toBe(
+      "repeat(2, minmax(0, 1fr))",
+    );
+  });
+
+  it("keeps the media rules after the base banner and root rules", () => {
+    const bannerBase = cssNoComments.indexOf(".bt-banner {");
+    const rootBase = cssNoComments.indexOf(".bt-root {");
+    const media = cssNoComments.indexOf("@media");
+    expect(bannerBase).toBeGreaterThan(-1);
+    expect(rootBase).toBeGreaterThan(-1);
+    expect(media).toBeGreaterThan(bannerBase);
+    expect(media).toBeGreaterThan(rootBase);
+  });
+
+  it("keeps the base values above 640px", () => {
+    expect(declsFor(rules, ".bt-grid").get("grid-template-columns")).toBe(
+      "repeat(3, minmax(0, 1fr))",
+    );
+    expect(declsFor(rules, ".bt-banner").get("max-height")).toBe("96px");
+    expect(declsFor(rules, ".bt-root").get("padding-bottom")).toBe("112px");
+    expect(declsFor(rules, ".bt-card").get("min-width")).toBe("0");
+    expect(declsFor(rules, ".bt-root").get("overflow-wrap")).toBe("break-word");
+  });
+
+  it("declares the banner actions group", () => {
+    const d = declsFor(rules, ".bt-banner-actions");
+    expect(d.get("display")).toBe("flex");
+    expect(d.get("gap")).toBe("8px");
+    expect(d.get("align-items")).toBe("center");
+    expect(d.get("flex")).toBe("none");
+  });
+
+  it("fits both equal buttons into a 390px phone", () => {
+    const minWidth = Number.parseInt(String(EQUAL_BUTTON_STYLE.minWidth), 10);
+    const gap = Number.parseInt(declsFor(rules, ".bt-banner-actions").get("gap") ?? "", 10);
+    const sidePadding = Number.parseInt(
+      (declsFor(rules, ".bt-banner").get("padding") ?? "").split(/\s+/)[1] ?? "",
+      10,
+    );
+    expect(minWidth).toBe(160);
+    expect(gap).toBe(8);
+    expect(sidePadding).toBe(16);
+    expect(2 * minWidth + gap).toBe(328);
+    expect(2 * minWidth + gap).toBeLessThanOrEqual(390 - 2 * sidePadding);
+  });
+});
+
+describe("boo-tique.css type scale and accent", () => {
+  it("sets the heading sizes", () => {
+    const h1 = declsFor(rules, ".bt-root h1");
+    expect([h1.get("font-size"), h1.get("font-weight"), h1.get("line-height")]).toEqual([
+      "40px",
+      "700",
+      "1.1",
+    ]);
+    const h2 = declsFor(rules, ".bt-root h2");
+    expect([h2.get("font-size"), h2.get("font-weight"), h2.get("line-height")]).toEqual([
+      "28px",
+      "600",
+      "1.2",
+    ]);
+    const h3 = declsFor(rules, ".bt-root h3");
+    expect([h3.get("font-size"), h3.get("font-weight"), h3.get("line-height")]).toEqual([
+      "20px",
+      "600",
+      "1.25",
+    ]);
+  });
+
+  it("keeps the Cormorant family on the combined heading rule", () => {
+    const combined = rules.find((r) => {
+      const parts = r.selector.split(",").map((s) => s.trim());
+      return parts.join("|") === ".bt-root h1|.bt-root h2|.bt-root h3";
+    });
+    expect(combined).toBeDefined();
+    expect(combined?.decls.get("font-family")).toContain("var(--font-cormorant)");
+  });
+
+  it("puts the size rules after the combined heading rule", () => {
+    const combined = cssNoComments.indexOf(".bt-root h1,");
+    expect(combined).toBeGreaterThan(-1);
+    for (const tag of ["h1", "h2", "h3"]) {
+      const match = new RegExp(`^\\.bt-root ${tag} \\{`, "m").exec(cssNoComments);
+      expect(match, tag).not.toBeNull();
+      expect(match?.index ?? -1).toBeGreaterThan(combined);
+    }
+  });
+
+  it("uses the blood colour as the accent colour", () => {
+    expect(declsFor(rules, ".bt-root").get("accent-color")).toBe("var(--bt-blood)");
+  });
+});
+
+describe("boo-tique.css hero", () => {
+  it("styles the hero band", () => {
+    const d = declsFor(rules, ".bt-hero");
+    expect(d.get("width")).toBe("100%");
+    expect(d.get("padding")).toBe("32px");
+    expect(d.get("border-radius")).toBe("12px");
+    expect(d.get("background")).toBe("var(--bt-blood)");
+    expect(d.get("color")).toBe("#ffffff");
+  });
+
+  it("styles the hero heading and tagline", () => {
+    expect(declsFor(rules, ".bt-hero h1").get("color")).toBe("#ffffff");
+    const tagline = declsFor(rules, ".bt-hero .bt-hero-tagline");
+    expect(tagline.get("font-size")).toBe("18px");
+    expect(tagline.get("color")).toBe("var(--bt-paper)");
+    expect(tagline.get("margin")).toBe("0");
+  });
+
+  it("gives the three promo lines one size, one weight and one margin", () => {
+    const d = declsFor(rules, ".bt-hero .bt-promo p");
+    expect(d.get("font-size")).toBe("28px");
+    expect(d.get("font-weight")).toBe("600");
+    expect(d.get("line-height")).toBe("1.2");
+    expect(d.get("margin")).toBe("0");
+  });
+});
+
+describe("boo-tique.css product tiles", () => {
+  const classes = [".bt-tile--candle", ".bt-tile--hoodie", ".bt-tile--mug", ".bt-tile--tote", ".bt-tile--quill"];
+
+  it("declares five different gradients made from palette tokens", () => {
+    const backgrounds = classes.map((sel) => declsFor(rules, sel).get("background") ?? "");
+    for (const background of backgrounds) {
+      expect(background.startsWith("linear-gradient(")).toBe(true);
+      expect(background).not.toContain("#");
+      const vars = background.match(/var\(([^)]*)\)/g) ?? [];
+      expect(vars.length).toBeGreaterThan(0);
+      for (const v of vars) expect(v.startsWith("var(--bt-")).toBe(true);
+    }
+    expect(new Set(backgrounds).size).toBe(5);
+  });
+});
+
+describe("boo-tique.css buttons", () => {
+  it("styles the base button", () => {
+    const d = declsFor(rules, ".bt-root .bt-button");
+    expect(d.get("display")).toBe("inline-flex");
+    expect(d.get("align-items")).toBe("center");
+    expect(d.get("justify-content")).toBe("center");
+    expect(d.get("padding")).toBe("12px 24px");
+    expect(d.get("min-height")).toBe("44px");
+    expect(d.get("border")).toBe("2px solid var(--bt-blood)");
+    expect(d.get("border-radius")).toBe("8px");
+    expect(d.get("background")).toBe("var(--bt-blood)");
+    expect(d.get("color")).toBe("#ffffff");
+    expect(d.get("font-weight")).toBe("600");
+    expect(d.get("text-decoration")).toBe("none");
+    expect(d.get("cursor")).toBe("pointer");
+  });
+
+  it("styles hover, focus and disabled", () => {
+    const hover = declsFor(rules, ".bt-root .bt-button:hover");
+    expect(hover.get("background")).toBe("var(--bt-blood-dark)");
+    expect(hover.get("border-color")).toBe("var(--bt-blood-dark)");
+    const focus = declsFor(rules, ".bt-root .bt-button:focus-visible");
+    expect(focus.get("outline")).toBe("3px solid var(--bt-ink)");
+    expect(focus.get("outline-offset")).toBe("2px");
+    const disabled = declsFor(rules, ".bt-root .bt-button:disabled");
+    expect(disabled.get("background")).toBe("var(--bt-paper)");
+    expect(disabled.get("border-color")).toBe("var(--bt-muted)");
+    expect(disabled.get("color")).toBe("var(--bt-muted)");
+    expect(disabled.get("cursor")).toBe("not-allowed");
+  });
+
+  it("styles the secondary and quiet modifiers", () => {
+    const secondary = declsFor(rules, ".bt-root .bt-button--secondary");
+    expect(secondary.get("background")).toBe("transparent");
+    expect(secondary.get("color")).toBe("var(--bt-blood)");
+    expect(secondary.get("border-color")).toBe("var(--bt-blood)");
+    expect(declsFor(rules, ".bt-root .bt-button--secondary:hover").get("background")).toBe(
+      "var(--bt-paper)",
+    );
+    const quiet = declsFor(rules, ".bt-root .bt-button--quiet");
+    expect(quiet.get("background")).toBe("transparent");
+    expect(quiet.get("border-color")).toBe("transparent");
+    expect(quiet.get("color")).toBe("var(--bt-blood)");
+    expect(quiet.get("padding")).toBe("8px 12px");
+    expect(quiet.get("font-weight")).toBe("500");
+    const quietHover = declsFor(rules, ".bt-root .bt-button--quiet:hover");
+    expect(quietHover.get("text-decoration")).toBe("underline");
+    expect(quietHover.get("background")).toBe("transparent");
+    expect(quietHover.get("border-color")).toBe("transparent");
+  });
+
+  it("keeps the file order of the button rules", () => {
+    const at = (selector: string) => {
+      const index = cssNoComments.indexOf(`${selector} {`);
+      expect(index, selector).toBeGreaterThan(-1);
+      return index;
+    };
+    const base = at(".bt-root .bt-button");
+    const hover = at(".bt-root .bt-button:hover");
+    expect(at(".bt-root .bt-button--secondary")).toBeGreaterThan(base);
+    expect(at(".bt-root .bt-button--quiet")).toBeGreaterThan(base);
+    expect(at(".bt-root .bt-button:disabled")).toBeGreaterThan(hover);
+    expect(at(".bt-root .bt-button--secondary:hover")).toBeGreaterThan(hover);
+    expect(at(".bt-root .bt-button--quiet:hover")).toBeGreaterThan(hover);
+  });
+
+  it("writes every button selector with the .bt-root prefix", () => {
+    for (const rule of [...rules, ...mediaRules]) {
+      for (const sel of rule.selector.split(",")) {
+        if (sel.includes("bt-button")) expect(sel.trim().startsWith(".bt-root ")).toBe(true);
+      }
+    }
+  });
+});
+
+describe("boo-tique.css rows", () => {
+  it("styles the choice row and its input", () => {
+    const row = declsFor(rules, ".bt-choice-row");
+    expect(row.get("display")).toBe("flex");
+    expect(row.get("align-items")).toBe("center");
+    expect(row.get("justify-content")).toBe("flex-start");
+    expect(row.get("gap")).toBe("12px");
+    expect(row.get("padding")).toBe("8px 12px");
+    expect(row.get("border")).toBe("1px solid var(--bt-line)");
+    expect(row.get("border-radius")).toBe("8px");
+    const input = declsFor(rules, ".bt-choice-row input");
+    expect(input.get("flex")).toBe("none");
+    expect(input.get("width")).toBe("20px");
+    expect(input.get("height")).toBe("20px");
+    expect(input.get("margin")).toBe("0");
+  });
+
+  it("styles the line row", () => {
+    const d = declsFor(rules, ".bt-line-row");
+    expect(d.get("display")).toBe("grid");
+    expect(d.get("grid-template-columns")).toBe("minmax(0, 1fr) auto auto");
+    expect(d.get("align-items")).toBe("center");
+    expect(d.get("gap")).toBe("12px");
+    expect(d.get("padding")).toBe("8px 12px");
+    expect(d.get("border")).toBe("1px solid var(--bt-line)");
+    expect(d.get("border-radius")).toBe("8px");
+  });
+});
+
+describe("boo-tique.css colours and vocabulary", () => {
+  it("has no hex literal outside the seven tokens except lower case #ffffff", () => {
+    for (const rule of [...rules, ...mediaRules]) {
+      for (const [property, value] of rule.decls) {
+        if (property.startsWith("--bt-")) continue;
+        for (const hex of value.match(/#[0-9a-fA-F]{3,8}\b/g) ?? []) {
+          expect(hex).toBe("#ffffff");
+        }
+      }
+    }
+  });
+
+  it("meets the contrast pairs", () => {
+    const white = "#ffffff";
+    expect(contrastRatio(white, PALETTE.blood)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(PALETTE.paper, PALETTE.blood)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(PALETTE.blood, PALETTE.paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(PALETTE.blood, PALETTE.bg)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(PALETTE.muted, PALETTE.paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(PALETTE.ink, PALETTE.bg)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("names no pattern in any selector or declaration", () => {
+    expect(cssNoComments).not.toMatch(
+      /urgency|scarcity|activity|shaming|preselect|interference|sneak|drip/i,
     );
   });
 });
