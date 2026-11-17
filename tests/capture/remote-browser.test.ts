@@ -3,14 +3,15 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
+import { scrollInPage } from "@/lib/capture/cdp";
 import { collectInPage } from "@/lib/capture/extractor";
-import { COLLECT_LIMITS, STOP_TIMEOUT_MS } from "@/lib/capture/constants";
+import { BROWSER_VIEWPORT, COLLECT_LIMITS, MAX_PLAUSIBLE_PX, STOP_TIMEOUT_MS } from "@/lib/capture/constants";
 import { createRemoteBrowser, DISCONNECT_TIMEOUT_MS } from "@/lib/capture/remote-browser";
 import type { CaptureConfig } from "@/lib/capture/config";
 import type { BrowserSessionHandle, CapturePage, GuardEvent, GuardVerdict, PageGuards } from "@/lib/capture/seam";
 import { CaptureFailure } from "@/lib/capture/types";
-import type { CollectOptions, RawPageRead } from "@/lib/capture/types";
-import { createFakeCdp, type CdpScript } from "./helpers/fake-cdp";
+import type { CollectOptions, RawCollection, RawPageRead } from "@/lib/capture/types";
+import { createFakeCdp, type CdpCall, type CdpScript } from "./helpers/fake-cdp";
 import { createManualClock } from "./helpers/manual-clock";
 
 const API_KEY = "sk-test-sentinel";
@@ -41,14 +42,25 @@ const COLLECT_OPTIONS: CollectOptions = {
   limits: COLLECT_LIMITS,
 };
 
+/** What the collector returns from the isolated world: the ratio, the count and the elements. */
+const RAW_COLLECTION: RawCollection = { devicePixelRatio: 1, eligibleCount: 0, elements: [] };
+
+/** A canned answer of `Page.getLayoutMetrics`. The layout width is narrower than the window: scrollbars are hidden. */
+const LAYOUT_METRICS = {
+  cssLayoutViewport: { pageX: 0, pageY: 0, clientWidth: 1265, clientHeight: 588 },
+  cssContentSize: { x: 0, y: 0, width: 1265, height: 2000 },
+};
+
+/** The read that `LAYOUT_METRICS` and `RAW_COLLECTION` must give. */
 const RAW_READ: RawPageRead = {
-  innerWidth: 1280,
-  innerHeight: 800,
+  innerWidth: 1265,
+  innerHeight: 588,
   devicePixelRatio: 1,
   scrollX: 0,
   scrollY: 0,
-  scrollWidth: 1280,
+  scrollWidth: 1265,
   scrollHeight: 2000,
+  layoutWidth: 1265,
   eligibleCount: 0,
   elements: [],
 };
@@ -72,16 +84,33 @@ type FakePlaywrightOptions = {
   gotoError?: Error;
   reloadError?: Error;
   screenshotError?: Error;
-  evaluateError?: Error;
-  scrollY?: number;
+  /** `Runtime.callFunctionOn` rejects. */
+  callError?: Error;
+  /** What the collector returns from the isolated world. */
+  collection?: unknown;
+  /** The answer of `Page.getLayoutMetrics`. */
+  layoutMetrics?: unknown;
+  /** The `scrollY` the scroll function reports back. */
+  scrollY?: unknown;
   finalUrl?: string;
   events?: string[];
 };
 
 function createFakePlaywright(options: FakePlaywrightOptions = {}) {
   const events = options.events ?? [];
+  let nextContext = 1;
   const cdp = createFakeCdp({
     "Page.getFrameTree": { frameTree: { frame: { id: MAIN_FRAME_ID } } },
+    "Page.getLayoutMetrics": "layoutMetrics" in options ? options.layoutMetrics : LAYOUT_METRICS,
+    "Page.createIsolatedWorld": () => ({ executionContextId: nextContext++ }),
+    "Runtime.callFunctionOn": (call: CdpCall) => {
+      if (options.callError) return options.callError;
+      const declaration = (call.params as { functionDeclaration?: string }).functionDeclaration;
+      if (declaration === String(collectInPage)) {
+        return { result: { value: "collection" in options ? options.collection : RAW_COLLECTION } };
+      }
+      return { result: { value: "scrollY" in options ? options.scrollY : 0 } };
+    },
     ...options.cdpScript,
   });
   // The shape of a Playwright CDPSession: `send` and `on` by event name.
@@ -107,11 +136,7 @@ function createFakePlaywright(options: FakePlaywrightOptions = {}) {
       if (options.reloadError) throw options.reloadError;
       return null;
     }),
-    evaluate: vi.fn(async (fn: unknown, _arg: unknown) => {
-      if (options.evaluateError) throw options.evaluateError;
-      if (fn === collectInPage) return RAW_READ;
-      return options.scrollY ?? 0;
-    }),
+    // There is deliberately no `evaluate` here: the adapter must read the page through CDP.
     screenshot: vi.fn(async (_options: unknown) => {
       if (options.screenshotError) throw options.screenshotError;
       return new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
@@ -341,6 +366,35 @@ describe("connect", () => {
     expect(fake.context.newPage).not.toHaveBeenCalled();
   });
 
+  it("opens one CDP session for the page and hides the scrollbars before connect returns", async () => {
+    const { fake } = await connectedPage();
+    expect(fake.context.newCDPSession).toHaveBeenCalledTimes(1);
+    expect(fake.context.newCDPSession).toHaveBeenCalledWith(fake.firstPage);
+    expect(fake.cdp.calls).toEqual([
+      { method: "Emulation.setScrollbarsHidden", params: { hidden: true }, targetSessionId: undefined },
+    ]);
+  });
+
+  it("hides the scrollbars on the page that was created when the context had none", async () => {
+    const { fake } = await connectedPage({ pages: "none" });
+    expect(fake.context.newCDPSession).toHaveBeenCalledWith(fake.createdPage);
+    expect(fake.cdp.callsOf("Emulation.setScrollbarsHidden")).toHaveLength(1);
+  });
+
+  it("maps a failing scrollbar call to connect-failed with a redacted detail, before any navigation", async () => {
+    const harness = await openSession({
+      cdpScript: {
+        "Emulation.setScrollbarsHidden": new Error(`refused: key=${API_KEY} id=${SESSION_ID} cdp=${CDP_URL} live=${LIVE_URL}`),
+      },
+    });
+    const failure = await failureOf(harness.handle.connect({ timeoutMs: 15_000 }));
+    expect(failure.code).toBe("connect-failed");
+    expect(failure.detail ?? "").toContain("refused");
+    expectNoSecrets(failure.message);
+    expectNoSecrets(failure.detail ?? "");
+    expect(harness.fake.firstPage.goto).not.toHaveBeenCalled();
+  });
+
   it("creates a page when the context has none", async () => {
     const { fake, page } = await connectedPage({ pages: "none" });
     expect(fake.context.newPage).toHaveBeenCalledTimes(1);
@@ -388,14 +442,16 @@ describe("connect", () => {
 });
 
 describe("guards", () => {
-  it("runs the request guard through the CDP session of the page, in order", async () => {
+  it("runs the request guard through the CDP session opened at connect, in order", async () => {
     const { fake, page } = await connectedPage();
     const { guards } = createGuards({ allowed: true });
     await page.installGuards(guards);
 
+    // One session for the whole page: opened in connect, shared by the guard and the reads.
     expect(fake.context.newCDPSession).toHaveBeenCalledTimes(1);
     expect(fake.context.newCDPSession).toHaveBeenCalledWith(fake.firstPage);
     expect(fake.cdp.calls.map((call) => call.method)).toEqual([
+      "Emulation.setScrollbarsHidden",
       "Network.setBypassServiceWorker",
       "Page.getFrameTree",
       "Fetch.enable",
@@ -406,10 +462,15 @@ describe("guards", () => {
     });
   });
 
-  it("registers the event handlers before the first command", async () => {
+  it("registers the event handlers before the first command of the guard", async () => {
     const { fake, page } = await connectedPage();
+    let handlersSeen: number | undefined;
+    fake.cdp.script("Network.setBypassServiceWorker", () => {
+      handlersSeen = fake.cdp.handlerCount;
+      return {};
+    });
     await page.installGuards(createGuards({ allowed: true }).guards);
-    expect(fake.cdp.handlersAtFirstSend).toBeGreaterThan(0);
+    expect(handlersSeen).toBeGreaterThan(0);
   });
 
   it("never calls route on the context or the page", async () => {
@@ -497,9 +558,9 @@ describe("guards", () => {
   );
 
   it("maps a failing newCDPSession to connect-failed with a redacted detail", async () => {
-    const { fake, page } = await connectedPage();
-    fake.context.newCDPSession.mockRejectedValueOnce(new Error(`no session for ${API_KEY} ${LIVE_URL}`));
-    const failure = await failureOf(page.installGuards(createGuards({ allowed: true }).guards));
+    const harness = await openSession();
+    harness.fake.context.newCDPSession.mockRejectedValueOnce(new Error(`no session for ${API_KEY} ${LIVE_URL}`));
+    const failure = await failureOf(harness.handle.connect({ timeoutMs: 15_000 }));
     expect(failure.code).toBe("connect-failed");
     expectNoSecrets(failure.detail ?? "");
   });
@@ -600,23 +661,147 @@ describe("navigation", () => {
 });
 
 describe("reading and screenshots", () => {
-  it("collects everything with exactly one evaluate call", async () => {
+  it("has a fake page without evaluate, and the adapter source never calls it or route", () => {
+    const fake = createFakePlaywright();
+    expect("evaluate" in fake.firstPage).toBe(false);
+    expect("evaluate" in fake.createdPage).toBe(false);
+    const source = readFileSync("lib/capture/remote-browser.ts", "utf8");
+    expect(source).not.toMatch(/\.evaluate\s*\(/);
+    expect(source).not.toMatch(/\.route\s*\(/);
+  });
+
+  it("collects in an isolated world: frame tree, new world, then the collector in that world", async () => {
     const { fake, page } = await connectedPage();
+    fake.cdp.calls.length = 0;
     const read = await page.collect(COLLECT_OPTIONS);
 
-    expect(fake.firstPage.evaluate).toHaveBeenCalledTimes(1);
-    expect(fake.firstPage.evaluate).toHaveBeenCalledWith(collectInPage, COLLECT_OPTIONS);
+    expect(fake.cdp.calls.map((call) => call.method)).toEqual([
+      "Page.getFrameTree",
+      "Page.createIsolatedWorld",
+      "Runtime.callFunctionOn",
+      "Page.getLayoutMetrics",
+    ]);
+    expect(fake.cdp.callsOf("Page.createIsolatedWorld")[0].params).toMatchObject({ frameId: MAIN_FRAME_ID });
+    expect(fake.cdp.callsOf("Runtime.callFunctionOn")[0].params).toEqual({
+      executionContextId: 1,
+      functionDeclaration: String(collectInPage),
+      arguments: [{ value: COLLECT_OPTIONS }],
+      returnByValue: true,
+      awaitPromise: true,
+    });
     expect(read).toEqual(RAW_READ);
   });
 
-  it("maps an evaluate error to page-read-failed with a redacted detail", async () => {
-    const { page } = await connectedPage({ evaluateError: new Error(`Execution context was destroyed ${API_KEY}`) });
+  it("creates a new isolated world for every read", async () => {
+    const { fake, page } = await connectedPage();
+    await page.collect(COLLECT_OPTIONS);
+    await page.collect(COLLECT_OPTIONS);
+    expect(fake.cdp.callsOf("Page.createIsolatedWorld")).toHaveLength(2);
+    expect(
+      fake.cdp.callsOf("Runtime.callFunctionOn").map((call) => (call.params as { executionContextId: number }).executionContextId),
+    ).toEqual([1, 2]);
+  });
+
+  it("takes sizes, scroll position and the layout width from the layout metrics and the ratio from the collector", async () => {
+    const { page } = await connectedPage({
+      layoutMetrics: {
+        cssLayoutViewport: { pageX: 5, pageY: 300, clientWidth: 1200, clientHeight: 560 },
+        cssContentSize: { x: 0, y: 0, width: 1210, height: 7000 },
+      },
+      collection: { devicePixelRatio: 2, eligibleCount: 3, elements: [] },
+    });
+    const read = await page.collect(COLLECT_OPTIONS);
+    expect(read).toEqual({
+      innerWidth: 1200,
+      innerHeight: 560,
+      devicePixelRatio: 2,
+      scrollX: 5,
+      scrollY: 300,
+      scrollWidth: 1210,
+      scrollHeight: 7000,
+      layoutWidth: 1200,
+      eligibleCount: 3,
+      elements: [],
+    });
+  });
+
+  it.each([0, NaN, 1e9, -1, Infinity, "2"])("gives a ratio of 1 when the collector reports %s", async (ratio) => {
+    const { page } = await connectedPage({ collection: { ...RAW_COLLECTION, devicePixelRatio: ratio } });
+    const read = await page.collect(COLLECT_OPTIONS);
+    expect(read.devicePixelRatio).toBe(1);
+  });
+
+  it.each([NaN, 0, -3, Infinity, 1e9, "wide", null])(
+    "gives the browser viewport sizes when the layout metrics hold %s",
+    async (bad) => {
+      const { page } = await connectedPage({
+        layoutMetrics: {
+          cssLayoutViewport: { pageX: bad, pageY: bad, clientWidth: bad, clientHeight: bad },
+          cssContentSize: { x: 0, y: 0, width: bad, height: bad },
+        },
+      });
+      const read = await page.collect(COLLECT_OPTIONS);
+      expect(read.innerWidth).toBe(BROWSER_VIEWPORT.width);
+      expect(read.innerHeight).toBe(BROWSER_VIEWPORT.height);
+      expect(read.layoutWidth).toBe(BROWSER_VIEWPORT.width);
+      // A scroll offset is clamped, not replaced, so 1e9 gives the limit and the rest give 0.
+      for (const offset of [read.scrollX, read.scrollY]) {
+        expect(Number.isFinite(offset) && offset >= 0 && offset <= MAX_PLAUSIBLE_PX).toBe(true);
+      }
+      expect(Number.isFinite(read.scrollWidth) && read.scrollWidth > 0).toBe(true);
+      expect(Number.isFinite(read.scrollHeight) && read.scrollHeight > 0).toBe(true);
+    },
+  );
+
+  it("uses the browser viewport sizes when the layout metrics answer is not an object", async () => {
+    const { page } = await connectedPage({ layoutMetrics: null });
+    const read = await page.collect(COLLECT_OPTIONS);
+    expect(read.innerWidth).toBe(BROWSER_VIEWPORT.width);
+    expect(read.innerHeight).toBe(BROWSER_VIEWPORT.height);
+    expect(read.devicePixelRatio).toBe(1);
+  });
+
+  it("maps a collector result that is not an object to page-read-failed", async () => {
+    const { page } = await connectedPage({ collection: "not an object" });
+    const failure = await failureOf(page.collect(COLLECT_OPTIONS));
+    expect(failure.code).toBe("page-read-failed");
+  });
+
+  it("maps a collector result without an element list to page-read-failed", async () => {
+    const { page } = await connectedPage({ collection: { devicePixelRatio: 1, eligibleCount: 0 } });
+    const failure = await failureOf(page.collect(COLLECT_OPTIONS));
+    expect(failure.code).toBe("page-read-failed");
+  });
+
+  it.each(["Page.getFrameTree", "Page.createIsolatedWorld", "Runtime.callFunctionOn", "Page.getLayoutMetrics"])(
+    "maps a failing %s during collect to page-read-failed with a redacted detail",
+    async (method) => {
+      const { page } = await connectedPage({
+        cdpScript: { [method]: new Error(`${method} failed: ${API_KEY} ${SESSION_ID} ${CDP_URL} ${LIVE_URL}`) },
+      });
+      const failure = await failureOf(page.collect(COLLECT_OPTIONS));
+      expect(failure.code).toBe("page-read-failed");
+      expect(failure.detail ?? "").toContain(method);
+      expectNoSecrets(failure.message);
+      expectNoSecrets(failure.detail ?? "");
+    },
+  );
+
+  it("maps an exception of the collector to page-read-failed with a redacted detail", async () => {
+    const { page } = await connectedPage({
+      cdpScript: {
+        "Runtime.callFunctionOn": {
+          result: {},
+          exceptionDetails: { text: "Uncaught", exception: { description: `Error: ${API_KEY} ${LIVE_URL}` } },
+        },
+      },
+    });
     const failure = await failureOf(page.collect(COLLECT_OPTIONS));
     expect(failure.code).toBe("page-read-failed");
     expectNoSecrets(failure.detail ?? "");
   });
 
-  it("takes a clipped JPEG screenshot with css scale and fullPage", async () => {
+  it("takes a clipped JPEG screenshot with css scale, disabled animations and fullPage", async () => {
     const { fake, page } = await connectedPage();
     const bytes = await page.screenshot({
       kind: "clip",
@@ -629,6 +814,7 @@ describe("reading and screenshots", () => {
       type: "jpeg",
       quality: 70,
       scale: "css",
+      animations: "disabled",
       fullPage: true,
       clip: { x: 0, y: 0, width: 1280, height: 5000 },
     });
@@ -644,6 +830,7 @@ describe("reading and screenshots", () => {
       type: "jpeg",
       quality: 70,
       scale: "css",
+      animations: "disabled",
       fullPage: false,
     });
     const options = fake.firstPage.screenshot.mock.calls[0][0] as Record<string, unknown>;
@@ -657,19 +844,36 @@ describe("reading and screenshots", () => {
     expectNoSecrets(failure.detail ?? "");
   });
 
-  it("scrolls with one evaluate call and returns the scrollY read back from the page", async () => {
+  it("scrolls in an isolated world and returns the scrollY read back from the page", async () => {
     const { fake, page } = await connectedPage({ scrollY: 2200 });
+    fake.cdp.calls.length = 0;
     const real = await page.scrollTo(2400);
 
-    expect(fake.firstPage.evaluate).toHaveBeenCalledTimes(1);
-    expect(fake.firstPage.evaluate.mock.calls[0][1]).toBe(2400);
+    expect(fake.cdp.calls.map((call) => call.method)).toEqual([
+      "Page.getFrameTree",
+      "Page.createIsolatedWorld",
+      "Runtime.callFunctionOn",
+    ]);
+    expect(fake.cdp.callsOf("Runtime.callFunctionOn")[0].params).toEqual({
+      executionContextId: 1,
+      functionDeclaration: String(scrollInPage),
+      arguments: [{ value: 2400 }],
+      returnByValue: true,
+      awaitPromise: true,
+    });
     expect(real).toBe(2200);
   });
 
-  it("maps a scroll error to screenshot-failed", async () => {
-    const { page } = await connectedPage({ evaluateError: new Error("gone") });
+  it.each([NaN, Infinity, "2200", null, undefined])("returns 0 when the scroll reports %s", async (reported) => {
+    const { page } = await connectedPage({ scrollY: reported });
+    await expect(page.scrollTo(100)).resolves.toBe(0);
+  });
+
+  it("maps a scroll error to screenshot-failed with a redacted detail", async () => {
+    const { page } = await connectedPage({ callError: new Error(`gone ${API_KEY} ${LIVE_URL}`) });
     const failure = await failureOf(page.scrollTo(100));
     expect(failure.code).toBe("screenshot-failed");
+    expectNoSecrets(failure.detail ?? "");
   });
 
   it("never reads viewportSize", async () => {

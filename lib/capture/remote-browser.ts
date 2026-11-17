@@ -11,7 +11,7 @@
  */
 import "server-only";
 import type { Clock } from "./clock";
-import type { CdpSession } from "./cdp";
+import { hideScrollbars, readPageMetrics, runInIsolatedWorld, scrollInPage, type CdpSession } from "./cdp";
 import type { CaptureConfig } from "./config";
 import {
   createSession as createApiSession,
@@ -21,6 +21,7 @@ import {
 } from "./browser-use-api";
 import { STOP_TIMEOUT_MS } from "./constants";
 import { collectInPage } from "./extractor";
+import { sanitiseMetrics } from "./geometry";
 import { toDetail } from "./redact";
 import { installRequestGuard } from "./request-guard";
 import type {
@@ -33,7 +34,7 @@ import type {
   SessionRequest,
 } from "./seam";
 import { CaptureFailure } from "./types";
-import type { CaptureErrorCode, CollectOptions, RawPageRead } from "./types";
+import type { CaptureErrorCode, CollectOptions, RawCollection, RawPageRead } from "./types";
 
 /** Longest wait for the best-effort CDP disconnect after the stop request was sent. */
 export const DISCONNECT_TIMEOUT_MS = 3_000;
@@ -62,7 +63,6 @@ type PwCdpSession = {
 type PwPage = {
   goto(url: string, options: { timeout: number; waitUntil: "load" }): Promise<unknown>;
   reload(options: { timeout: number; waitUntil: "load" }): Promise<unknown>;
-  evaluate(fn: unknown, arg?: unknown): Promise<unknown>;
   screenshot(options: Record<string, unknown>): Promise<Uint8Array>;
   url(): string;
   on(event: "download", handler: (download: PwDownload) => unknown): unknown;
@@ -117,6 +117,7 @@ async function quietly(action: () => Promise<unknown>): Promise<void> {
 function createCapturePage(
   page: PwPage,
   context: PwContext,
+  cdp: CdpSession,
   secrets: readonly string[],
   clock: Clock,
 ): CapturePage {
@@ -137,10 +138,9 @@ function createCapturePage(
   return {
     async installGuards(guards: PageGuards): Promise<void> {
       try {
-        // The session is opened here for now. Interception goes through CDP `Fetch`, so
-        // redirect hops, sub-frames and sub-resources are all seen.
-        const session = toCdpSession(await context.newCDPSession(page));
-        await installRequestGuard(session, guards, { clock });
+        // The CDP session was opened in `connect` and is shared with the reads. Interception
+        // goes through CDP `Fetch`, so redirect hops, sub-frames and sub-resources are all seen.
+        await installRequestGuard(cdp, guards, { clock });
       } catch (error) {
         throw fail("connect-failed", error);
       }
@@ -167,8 +167,30 @@ function createCapturePage(
 
     async collect(options: CollectOptions): Promise<RawPageRead> {
       try {
-        // One evaluation reads every element and the page metrics.
-        return (await page.evaluate(collectInPage, options)) as RawPageRead;
+        // Elements and the pixel ratio come from the collector in an isolated world. Sizes,
+        // scroll position and layout width come from CDP, so a page script cannot set them.
+        const collected: unknown = await runInIsolatedWorld(cdp, collectInPage, options);
+        if (
+          typeof collected !== "object" ||
+          collected === null ||
+          !Array.isArray((collected as { elements?: unknown }).elements)
+        ) {
+          throw new Error("The collector returned no element list.");
+        }
+        const { devicePixelRatio, eligibleCount, elements } = collected as RawCollection;
+        const metrics = sanitiseMetrics({ ...(await readPageMetrics(cdp)), devicePixelRatio });
+        return {
+          innerWidth: metrics.innerWidth,
+          innerHeight: metrics.innerHeight,
+          devicePixelRatio: metrics.devicePixelRatio,
+          scrollX: metrics.scrollX,
+          scrollY: metrics.scrollY,
+          scrollWidth: metrics.scrollWidth,
+          scrollHeight: metrics.scrollHeight,
+          layoutWidth: metrics.layoutWidth,
+          eligibleCount,
+          elements,
+        };
       } catch (error) {
         throw fail("page-read-failed", error);
       }
@@ -176,18 +198,7 @@ function createCapturePage(
 
     async scrollTo(y: number): Promise<number> {
       try {
-        const real = await page.evaluate(
-          (target: number) =>
-            new Promise<number>((resolve) => {
-              window.scrollTo(0, target);
-              // One animation frame lets the scroll settle; the timer is the fallback
-              // for a page that does not paint. The second resolve call has no effect.
-              // No named inner function: this code is serialised into the page.
-              requestAnimationFrame(() => resolve(window.scrollY));
-              setTimeout(() => resolve(window.scrollY), 250);
-            }),
-          y,
-        );
+        const real: unknown = await runInIsolatedWorld(cdp, scrollInPage, y);
         return typeof real === "number" && Number.isFinite(real) ? real : 0;
       } catch (error) {
         throw fail("screenshot-failed", error);
@@ -195,7 +206,7 @@ function createCapturePage(
     },
 
     async screenshot(request: ScreenshotRequest): Promise<Uint8Array> {
-      const base = { type: "jpeg", quality: request.quality, scale: "css" } as const;
+      const base = { type: "jpeg", quality: request.quality, scale: "css", animations: "disabled" } as const;
       try {
         return request.kind === "clip"
           ? await page.screenshot({ ...base, fullPage: true, clip: request.clip })
@@ -244,7 +255,11 @@ function createHandle(session: CreatedSession, config: CaptureConfig, deps: Remo
         const context = browser.contexts()[0];
         if (!context) throw new CaptureFailure("connect-failed");
         const page = context.pages()[0] ?? (await context.newPage());
-        return createCapturePage(page, context, secrets, deps.clock);
+        // One CDP session serves the scrollbar setting, the request guard and every read.
+        // The scrollbars are hidden before the page is returned, so before any read.
+        const cdp = toCdpSession(await context.newCDPSession(page));
+        await hideScrollbars(cdp);
+        return createCapturePage(page, context, cdp, secrets, deps.clock);
       } catch (error) {
         if (error instanceof CaptureFailure) throw error;
         throw new CaptureFailure("connect-failed", toDetail(error, secrets));
