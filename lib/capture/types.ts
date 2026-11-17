@@ -32,6 +32,7 @@ export type CaptureErrorCode =
   | "screenshot-failed"
   | "screenshot-too-large"
   | "snapshot-invalid"
+  | "snapshot-too-large"
   | "capture-timeout"
   | "internal-error";
 
@@ -45,7 +46,9 @@ export type CaptureWarningCode =
   | "tall-page-tiled"
   | "download-refused"
   | "popup-closed"
-  | "request-blocked";
+  | "request-blocked"
+  | "request-host-limit"
+  | "layout-shifted";
 
 /** Fixed text per error code. The only source of `CaptureError.message`. */
 export const ERROR_MESSAGES: Record<CaptureErrorCode, string> = {
@@ -70,6 +73,7 @@ export const ERROR_MESSAGES: Record<CaptureErrorCode, string> = {
   "screenshot-failed": "The screenshot could not be taken.",
   "screenshot-too-large": "The screenshots are too large.",
   "snapshot-invalid": "The captured page data is invalid.",
+  "snapshot-too-large": "The captured page data is too large.",
   "capture-timeout": "The capture took too long.",
   "internal-error": "An internal error occurred during the capture.",
 };
@@ -86,10 +90,22 @@ export const WARNING_MESSAGES: Record<CaptureWarningCode, string> = {
   "download-refused": "A download started and was cancelled.",
   "popup-closed": "A pop-up page opened and was closed.",
   "request-blocked": "A navigation request was blocked by a safety check.",
+  "request-host-limit": "The page contacted more hosts than the limit, so further requests to new hosts were blocked.",
+  "layout-shifted": "The page layout moved while it was captured, so markers may be off.",
 };
 
+/**
+ * `detail` may contain text controlled by the page or by target URLs. It is for
+ * server logs only and must never be shown to a user.
+ */
 export type CaptureError = { code: CaptureErrorCode; message: string; detail?: string };
-export type CaptureWarning = { code: CaptureWarningCode; message: string };
+/** `reason` and `count` are set on `request-blocked`. No warning field holds a URL or host. */
+export type CaptureWarning = {
+  code: CaptureWarningCode;
+  message: string;
+  reason?: UrlErrorCode;
+  count?: number;
+};
 
 /** One JPEG image. All sizes are CSS px (image px equal CSS px with `scale: "css"`). */
 export type CaptureImage = {
@@ -108,14 +124,27 @@ export type CaptureResult =
 export class CaptureFailure extends Error {
   readonly code: CaptureErrorCode;
   readonly detail?: string; // already redacted
+  /** True only for an aborted create or a fetch failure with no HTTP response. Default false. */
+  readonly reclaim: boolean;
 
-  constructor(code: CaptureErrorCode, detail?: string) {
+  constructor(code: CaptureErrorCode, detail?: string, options?: { reclaim?: boolean }) {
     super(ERROR_MESSAGES[code]);
     this.name = "CaptureFailure";
     this.code = code;
     if (detail !== undefined) this.detail = detail;
+    this.reclaim = options?.reclaim === true;
   }
 }
+
+/** Limits the in-page collector applies to what it returns. */
+export type CollectLimits = {
+  maxTagChars: number;
+  maxRoleChars: number;
+  maxStyleChars: number;
+  maxAttrsPerElement: number;
+  maxAttrNameChars: number;
+  maxPathDepth: number;
+};
 
 export type CollectOptions = {
   maxElements: number;
@@ -153,6 +182,15 @@ export type RawPageRead = {
   scrollY: number;
   scrollWidth: number;
   scrollHeight: number;
+  /** Optional so old fixtures and fakes stay valid; absent means `innerWidth`. */
+  layoutWidth?: number;
+  eligibleCount: number;
+  elements: RawElement[];
+};
+
+/** What the in-page collector returns. Metrics come from CDP, not from the page. */
+export type RawCollection = {
+  devicePixelRatio: number;
   eligibleCount: number;
   elements: RawElement[];
 };

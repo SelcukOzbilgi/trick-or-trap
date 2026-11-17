@@ -33,6 +33,54 @@ describe("capture constants", () => {
     expect(constants.TILE_MIN_REMAINING_MS).toBe(3_000);
   });
 
+  it("has the request guard limits", () => {
+    expect(constants.GUARD_DECISION_TIMEOUT_MS).toBe(5_000);
+    expect(constants.MAX_REQUEST_HOSTS).toBe(100);
+    expect(constants.MAX_HOP_URL_LENGTH).toBe(8_192);
+  });
+
+  it("has the stop and sweep values", () => {
+    expect(constants.STOP_TIMEOUT_MS).toBe(10_000);
+    expect(constants.STALE_SESSION_AGE_MS).toBe(120_000);
+  });
+
+  it("has the size bounds for page data", () => {
+    expect(constants.MAX_TAG_CHARS).toBe(64);
+    expect(constants.MAX_ROLE_CHARS).toBe(64);
+    expect(constants.MAX_STYLE_CHARS).toBe(64);
+    expect(constants.MAX_ATTR_NAME_CHARS).toBe(64);
+    expect(constants.MAX_ATTRS_PER_ELEMENT).toBe(32);
+    expect(constants.MAX_PATH_DEPTH).toBe(256);
+    expect(constants.MAX_PATH_INDEX).toBe(100_000);
+    expect(constants.MAX_ELEMENT_ID_CHARS).toBe(2_048);
+    expect(constants.RAW_SCAN_FACTOR).toBe(2);
+    expect(constants.MAX_SNAPSHOT_BYTES).toBe(1_500_000);
+  });
+
+  it("has the layout and plausibility values", () => {
+    expect(constants.LAYOUT_DRIFT_PX).toBe(4);
+    expect(constants.MAX_PLAUSIBLE_DPR).toBe(8);
+    expect(constants.MAX_PLAUSIBLE_PX).toBe(1_000_000);
+    expect(constants.TILE_MODE_THRESHOLD_CSS_PX).toBe(20_000);
+  });
+
+  it("builds COLLECT_LIMITS from the named constants", () => {
+    expect(constants.COLLECT_LIMITS).toEqual({
+      maxTagChars: constants.MAX_TAG_CHARS,
+      maxRoleChars: constants.MAX_ROLE_CHARS,
+      maxStyleChars: constants.MAX_STYLE_CHARS,
+      maxAttrsPerElement: constants.MAX_ATTRS_PER_ELEMENT,
+      maxAttrNameChars: constants.MAX_ATTR_NAME_CHARS,
+      maxPathDepth: constants.MAX_PATH_DEPTH,
+    });
+  });
+
+  it("keeps the id cap above the longest id a path can build", () => {
+    // "el-" plus MAX_PATH_DEPTH indices of at most 6 digits, each followed by a dash.
+    const longest = 3 + constants.MAX_PATH_DEPTH * (String(constants.MAX_PATH_INDEX).length + 1);
+    expect(longest).toBeLessThanOrEqual(constants.MAX_ELEMENT_ID_CHARS);
+  });
+
   it("has the viewport and session values", () => {
     expect(constants.BROWSER_VIEWPORT).toEqual({ width: 1280, height: 800 });
     expect(constants.SESSION_TIMEOUT_DEFAULT_MINUTES).toBe(2);
