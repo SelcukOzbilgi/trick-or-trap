@@ -80,7 +80,7 @@ describe("home page urgency block", () => {
       "Black Friday of the Dead ends at midnight",
     );
     expect(textOf(markup, "home-fixed-date-sale")).toBe(
-      "Halloween sale ends 31 Oct 2026, 23:59 UTC",
+      "Winter sale ends 28 Feb 2027, 23:59 UTC",
     );
   });
 

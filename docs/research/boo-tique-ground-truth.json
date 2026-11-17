@@ -1,7 +1,7 @@
 [
   {"id": "home-hero-countdown-restart", "page": "home", "route": "/", "element": "Hero banner 'Boo-nanza ends in 04:59:59' restarting on reload", "pattern": "urgency", "phase": 1, "difficulty": "easy", "expectedVerdict": "flag"},
   {"id": "home-rolling-midnight-text", "page": "home", "route": "/", "element": "'Black Friday of the Dead ends at midnight' text, rolling to the next midnight daily", "pattern": "urgency", "phase": 1, "difficulty": "subtle", "expectedVerdict": "flag"},
-  {"id": "home-fixed-date-sale", "page": "home", "route": "/", "element": "'Halloween sale ends 31 Oct 2026, 23:59 UTC' fixed date, same on reload", "pattern": "none", "phase": 1, "difficulty": "lookalike", "expectedVerdict": "no-flag"},
+  {"id": "home-fixed-date-sale", "page": "home", "route": "/", "element": "'Winter sale ends 28 Feb 2027, 23:59 UTC' fixed date, same on reload", "pattern": "none", "phase": 1, "difficulty": "lookalike", "expectedVerdict": "no-flag"},
   {"id": "home-cookie-accept-dominant", "page": "home", "route": "/", "element": "Cookie banner: big filled 'Accept all', 11px grey link 'options', no reject on layer 1", "pattern": "visual-interference", "phase": 1, "difficulty": "easy", "expectedVerdict": "flag"},
   {"id": "home-cookie-ghost-reject", "page": "home", "route": "/?banner=ghost", "element": "Cookie banner: 'Reject' as ghost button, contrast about 2:1, 60% opacity", "pattern": "visual-interference", "phase": 1, "difficulty": "medium", "expectedVerdict": "flag"},
   {"id": "home-cookie-equal-buttons", "page": "home", "route": "/?banner=equal", "element": "Cookie banner: equal-size, equal-style Accept and Reject", "pattern": "none", "phase": 1, "difficulty": "lookalike", "expectedVerdict": "no-flag"},

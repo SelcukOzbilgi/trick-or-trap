@@ -33,7 +33,13 @@ export const PRODUCTS: readonly Product[] = [
 ];
 
 /** Text of `home-fixed-date-sale`. A fixed calendar date, so it is an honest look-alike. */
-export const FIXED_SALE_TEXT = "Halloween sale ends 31 Oct 2026, 23:59 UTC";
+export const FIXED_SALE_TEXT = "Winter sale ends 28 Feb 2027, 23:59 UTC";
+
+/**
+ * Last day the demo's honest fixed-date sale is guaranteed to lie in the future.
+ * A build-time constant that is never compared with the clock.
+ */
+export const DEMO_VALID_UNTIL = "2027-01-31";
 
 /** Text of `home-rolling-midnight-text`. */
 export const ROLLING_MIDNIGHT_TEXT = "Black Friday of the Dead ends at midnight";
