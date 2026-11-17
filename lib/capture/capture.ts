@@ -13,9 +13,10 @@
 import "server-only";
 import { PageSnapshotSchema, type PageSnapshot } from "@/lib/types";
 import { getBrowser } from "./browser";
-import { createDeadline, createSystemClock, type Clock } from "./clock";
+import { createDeadline, createSystemClock, withTimeout, type Clock, type StageLimit } from "./clock";
 import { getCaptureConfig, type CaptureConfig } from "./config";
 import {
+  API_FETCH_TIMEOUT_MS,
   BROWSER_VIEWPORT,
   CAPTURE_TIMEOUT_MS,
   MAX_ATTR_CHARS,
@@ -35,6 +36,7 @@ import {
   ERROR_MESSAGES,
   WARNING_MESSAGES,
   type CaptureError,
+  type CaptureErrorCode,
   type CaptureImage,
   type CaptureResult,
   type CaptureWarning,
@@ -55,6 +57,8 @@ type CaptureContext = {
   handle?: BrowserSessionHandle;
   secrets: string[];
   warnings: Set<CaptureWarningCode>;
+  /** Set when a guard refused a main-frame navigation request. */
+  navigationBlocked: boolean;
 };
 
 type CaptureSuccess = { snapshot: PageSnapshot; images: CaptureImage[] };
@@ -65,16 +69,43 @@ function sleep(clock: Clock, ms: number): Promise<void> {
   });
 }
 
+function ignore(): void {}
+
 function toCaptureError(error: unknown, secrets: readonly string[]): CaptureError {
   if (error instanceof CaptureFailure) {
     const result: CaptureError = { code: error.code, message: ERROR_MESSAGES[error.code] };
-    if (error.detail !== undefined) result.detail = error.detail;
+    // The detail is redacted where it is made; redacting again costs nothing.
+    const detail = toDetail(error.detail, secrets);
+    if (detail !== undefined) result.detail = detail;
     return result;
   }
   const result: CaptureError = { code: "internal-error", message: ERROR_MESSAGES["internal-error"] };
   const detail = toDetail(error, secrets);
   if (detail !== undefined) result.detail = detail;
   return result;
+}
+
+/**
+ * Gives an error from one stage the code of that stage. A `CaptureFailure` keeps its
+ * own code; anything else becomes `code` with a redacted `detail`. The raw text never
+ * reaches `message`.
+ */
+function asStageFailure(error: unknown, code: CaptureErrorCode, secrets: readonly string[]): CaptureFailure {
+  if (error instanceof CaptureFailure) return error;
+  return new CaptureFailure(code, toDetail(error, secrets));
+}
+
+/**
+ * Stops a session with its own deadline, apart from the whole-capture budget. A failure
+ * or a timeout becomes the warning `session-stop-failed`; it never throws.
+ */
+async function stopSafely(handle: BrowserSessionHandle, clock: Clock, warnings: Set<CaptureWarningCode>): Promise<void> {
+  try {
+    // The code of the rejection never leaves this function: every failure is the warning.
+    await withTimeout(clock, API_FETCH_TIMEOUT_MS, (async () => handle.stop())(), "capture-timeout");
+  } catch {
+    warnings.add("session-stop-failed");
+  }
 }
 
 async function runCapture(
@@ -84,8 +115,20 @@ async function runCapture(
   ctx: CaptureContext,
 ): Promise<CaptureSuccess> {
   const deadline = createDeadline(clock, CAPTURE_TIMEOUT_MS);
-  /** Runs one step inside the whole-capture budget. A synchronous throw becomes a rejection. */
-  const step = <T>(call: () => Promise<T>): Promise<T> => deadline.run((async () => call())());
+  /**
+   * Runs one step inside the whole-capture budget, or inside `limit` when that is
+   * shorter. A synchronous throw becomes a rejection. An error that is not a
+   * `CaptureFailure` gets `code`; without a `code` it stays as it is and ends up as
+   * `internal-error`.
+   */
+  const step = async <T>(call: () => Promise<T>, code?: CaptureErrorCode, limit?: StageLimit): Promise<T> => {
+    try {
+      return await deadline.run((async () => call())(), limit);
+    } catch (error) {
+      if (code === undefined) throw error;
+      throw asStageFailure(error, code, ctx.secrets);
+    }
+  };
 
   // 1. Configuration and URL.
   let config: CaptureConfig;
@@ -126,50 +169,84 @@ async function runCapture(
   const browserResult = getBrowserFor(config);
   if (!browserResult.ok) throw new CaptureFailure(browserResult.error.code);
 
-  // 3. Session.
-  ctx.handle = await step(() =>
+  // 3. Session. If the whole budget ends while the creation is still pending, the
+  // session that arrives later is stopped, because nobody else knows about it.
+  const creation = (async () =>
     browserResult.browser.createSession({
       timeoutMinutes: config.sessionTimeoutMinutes,
       proxy: config.proxy,
       viewport: { width: BROWSER_VIEWPORT.width, height: BROWSER_VIEWPORT.height },
-    }),
-  );
+    }))();
+  try {
+    ctx.handle = await step(() => creation, "session-create-failed", {
+      ms: API_FETCH_TIMEOUT_MS,
+      code: "session-create-timeout",
+    });
+  } catch (error) {
+    if (error instanceof CaptureFailure && error.code === "capture-timeout") {
+      // The result is already gone, so a failing stop has nobody to warn: its warnings
+      // go to a set that is thrown away.
+      creation.then((late) => stopSafely(late, clock, new Set<CaptureWarningCode>()), ignore);
+    }
+    throw error;
+  }
   const handle = ctx.handle;
 
   // 4. Connection and guards.
-  const page = await step(() => handle.connect({ timeoutMs: CDP_CONNECT_TIMEOUT_MS }));
+  const page = await step(() => handle.connect({ timeoutMs: CDP_CONNECT_TIMEOUT_MS }), "connect-failed", {
+    ms: CDP_CONNECT_TIMEOUT_MS,
+    code: "connect-timeout",
+  });
   const guards: PageGuards = {
     async allowNavigation(candidate) {
       const verdict = await inspect(candidate);
       return verdict.ok ? { allowed: true } : { allowed: false, reason: verdict.code };
     },
     report(event) {
+      if (event.kind === "request-blocked") ctx.navigationBlocked = true;
       ctx.warnings.add(event.kind);
     },
   };
-  await step(() => page.installGuards(guards));
+  await step(() => page.installGuards(guards), "connect-failed");
 
   // 5. Navigation, then the same checks on where the browser ended up.
-  const navigation = await step(() => page.goto(requested.url, { timeoutMs: NAVIGATION_TIMEOUT_MS }));
+  let navigation: { finalUrl: string };
+  try {
+    navigation = await step(() => page.goto(requested.url, { timeoutMs: NAVIGATION_TIMEOUT_MS }), "navigation-failed", {
+      ms: NAVIGATION_TIMEOUT_MS,
+      code: "navigation-timeout",
+    });
+  } catch (error) {
+    // A guard that aborted the request makes the browser fail the navigation.
+    if (ctx.navigationBlocked) throw new CaptureFailure("navigation-blocked");
+    throw error;
+  }
   const landed = await step(() => inspect(navigation.finalUrl));
   if (!landed.ok) throw new CaptureFailure("navigation-blocked");
   if (landed.url !== requested.url) ctx.warnings.add("redirected");
 
   // 6. Settle, 7. one read of the page.
   await step(() => sleep(clock, SETTLE_DELAY_MS));
-  const raw = await step(() =>
-    page.collect({
-      maxElements: MAX_ELEMENTS,
-      maxTextChars: MAX_TEXT_CHARS,
-      maxAttrChars: MAX_ATTR_CHARS,
-      attributeNames: "full",
-    }),
+  const raw = await step(
+    () =>
+      page.collect({
+        maxElements: MAX_ELEMENTS,
+        maxTextChars: MAX_TEXT_CHARS,
+        maxAttrChars: MAX_ATTR_CHARS,
+        attributeNames: "full",
+      }),
+    "page-read-failed",
   );
   const capturedAt = new Date(clock.now()).toISOString();
 
   // 8. Screenshots from the same load. The sample is built afterwards because it needs
   // the image boxes to flag elements outside every image.
-  const shots = await captureImages(page, raw, deadline);
+  let shots: Awaited<ReturnType<typeof captureImages>>;
+  try {
+    shots = await captureImages(page, raw, deadline);
+  } catch (error) {
+    throw asStageFailure(error, "screenshot-failed", ctx.secrets);
+  }
   for (const code of shots.warnings) ctx.warnings.add(code);
   const sample = buildSample(raw, { light: false, url: landed.url, capturedAt, images: shots.meta });
   if (sample.capture?.elementsTruncated) ctx.warnings.add("elements-truncated");
@@ -191,7 +268,7 @@ async function runCapture(
  */
 export async function capturePage(url: string, deps: Partial<CaptureDeps> = {}): Promise<CaptureResult> {
   const clock = deps.clock ?? createSystemClock();
-  const ctx: CaptureContext = { secrets: [], warnings: new Set<CaptureWarningCode>() };
+  const ctx: CaptureContext = { secrets: [], warnings: new Set<CaptureWarningCode>(), navigationBlocked: false };
 
   let outcome: { ok: true; success: CaptureSuccess } | { ok: false; error: CaptureError };
   try {
@@ -199,15 +276,8 @@ export async function capturePage(url: string, deps: Partial<CaptureDeps> = {}):
   } catch (error) {
     outcome = { ok: false, error: toCaptureError(error, ctx.secrets) };
   } finally {
-    // Stop the session exactly once on every path. Stop timeouts and error details are
-    // handled in the failure-path task.
-    if (ctx.handle) {
-      try {
-        await ctx.handle.stop();
-      } catch {
-        ctx.warnings.add("session-stop-failed");
-      }
-    }
+    // Stop the session exactly once on every path, with its own deadline.
+    if (ctx.handle) await stopSafely(ctx.handle, clock, ctx.warnings);
   }
 
   const warnings: CaptureWarning[] = Array.from(ctx.warnings, (code) => ({
