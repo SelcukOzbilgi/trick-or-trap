@@ -1,8 +1,8 @@
 /**
  * URL safety checks of the page capture.
  *
- * This part holds the syntax checks that need no DNS. The check for resolved
- * addresses is added next to it.
+ * This part holds the syntax checks that need no DNS (`checkUrlSyntax`) and the
+ * check of resolved addresses (`checkUrl`).
  */
 import { ALLOWED_PORTS, MAX_URL_LENGTH } from "@/lib/capture/constants";
 import { classifyAddress } from "@/lib/capture/ip-ranges";
@@ -75,4 +75,43 @@ export function checkUrlSyntax(input: string, allowOrigin: string | null): UrlCh
 
   url.hash = "";
   return { ok: true, url: url.href, hostname: url.hostname };
+}
+
+export interface Resolver {
+  /** All A and AAAA addresses as text. Rejects when the lookup fails. */
+  resolveAddresses(hostname: string): Promise<readonly string[]>;
+}
+
+export type UrlCheckOptions = { resolver: Resolver; allowOrigin: string | null };
+
+/**
+ * Runs `checkUrlSyntax`, then resolves a host name and checks every address it
+ * resolves to. An IP literal is never resolved: the syntax check has judged it.
+ *
+ * A URL with the allowed origin must still resolve, but its addresses are not
+ * classified. The resolver error text is never copied into the result.
+ */
+export async function checkUrl(input: string, options: UrlCheckOptions): Promise<UrlCheckResult> {
+  const { resolver, allowOrigin } = options;
+  const syntax = checkUrlSyntax(input, allowOrigin);
+  if (!syntax.ok) return syntax;
+  if (isIpLiteral(syntax.hostname)) return syntax;
+
+  let addresses: readonly string[];
+  try {
+    addresses = await resolver.resolveAddresses(syntax.hostname);
+  } catch {
+    return fail("dns-failed");
+  }
+  if (!Array.isArray(addresses) || addresses.length === 0) return fail("dns-failed");
+
+  const allowed = allowOrigin !== null && new URL(syntax.url).origin === allowOrigin;
+  if (!allowed) {
+    for (const address of addresses) {
+      if (typeof address !== "string" || classifyAddress(address).blocked) {
+        return fail("url-address-blocked");
+      }
+    }
+  }
+  return syntax;
 }
