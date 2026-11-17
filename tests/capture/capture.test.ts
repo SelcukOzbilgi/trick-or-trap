@@ -437,24 +437,39 @@ describe("capturePage: guards and final URL", () => {
     if (!guards) return;
     calls.length = 0;
 
-    expect(await guards.allowNavigation("https://shop.example.com/a")).toEqual({ allowed: true });
-    expect(await guards.allowNavigation("https://shop.example.com/b")).toEqual({ allowed: true });
+    expect(await guards.checkHost("https://shop.example.com/a")).toEqual({ allowed: true });
+    expect(await guards.checkHost("https://shop.example.com/b")).toEqual({ allowed: true });
     expect(calls.filter((host) => host === "shop.example.com").length).toBeLessThanOrEqual(1);
 
-    expect(await guards.allowNavigation("http://10.0.0.1/")).toEqual({ allowed: false, reason: "url-address-blocked" });
-    expect(await guards.allowNavigation("https://evil.example.net/")).toEqual({
+    expect(await guards.checkHost("http://10.0.0.1/")).toEqual({ allowed: false, reason: "url-address-blocked" });
+    expect(await guards.checkHost("https://evil.example.net/")).toEqual({
       allowed: false,
       reason: "url-address-blocked",
     });
     // A cached verdict for one origin never covers another scheme or port of the same host.
-    expect(await guards.allowNavigation("https://shop.example.com:8080/")).toEqual({
+    expect(await guards.checkHost("https://shop.example.com:8080/")).toEqual({
       allowed: false,
       reason: "url-port-blocked",
     });
-    expect(await guards.allowNavigation("ftp://shop.example.com/")).toEqual({
+    expect(await guards.checkHost("ftp://shop.example.com/")).toEqual({
       allowed: false,
       reason: "url-scheme-blocked",
     });
+  });
+
+  it("gives the browser a synchronous syntax check that does no DNS lookup", async () => {
+    const { resolver, calls } = createResolver();
+    const { clock, fake, deps } = setup({}, { resolver });
+    await drive(capturePage(URL_OK, deps), clock);
+    const guards = fake.guards;
+    expect(guards).toBeDefined();
+    if (!guards) return;
+    calls.length = 0;
+
+    expect(guards.checkSyntax("https://shop.example.com/a")).toEqual({ allowed: true });
+    expect(guards.checkSyntax("ftp://shop.example.com/")).toEqual({ allowed: false, reason: "url-scheme-blocked" });
+    expect(guards.checkSyntax("http://10.0.0.1/")).toEqual({ allowed: false, reason: "url-address-blocked" });
+    expect(calls).toEqual([]);
   });
 
   it("returns navigation-blocked when the final URL is a private address", async () => {

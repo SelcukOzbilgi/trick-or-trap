@@ -4,12 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { collectInPage } from "@/lib/capture/extractor";
-import { COLLECT_LIMITS } from "@/lib/capture/constants";
+import { COLLECT_LIMITS, STOP_TIMEOUT_MS } from "@/lib/capture/constants";
 import { createRemoteBrowser, DISCONNECT_TIMEOUT_MS } from "@/lib/capture/remote-browser";
 import type { CaptureConfig } from "@/lib/capture/config";
-import type { BrowserSessionHandle, CapturePage, GuardEvent, PageGuards } from "@/lib/capture/seam";
+import type { BrowserSessionHandle, CapturePage, GuardEvent, GuardVerdict, PageGuards } from "@/lib/capture/seam";
 import { CaptureFailure } from "@/lib/capture/types";
-import type { CollectOptions, RawPageRead, UrlErrorCode } from "@/lib/capture/types";
+import type { CollectOptions, RawPageRead } from "@/lib/capture/types";
+import { createFakeCdp, type CdpScript } from "./helpers/fake-cdp";
 import { createManualClock } from "./helpers/manual-clock";
 
 const API_KEY = "sk-test-sentinel";
@@ -53,27 +54,17 @@ const RAW_READ: RawPageRead = {
 };
 
 type AnyFn = (...args: never[]) => unknown;
-type RouteHandler = (route: FakeRoute, request: FakeRequest) => Promise<void> | void;
-type FakeRoute = { abort: ReturnType<typeof vi.fn>; continue: ReturnType<typeof vi.fn> };
-type FakeRequest = {
-  url: () => string;
-  isNavigationRequest: () => boolean;
-  frame: () => { parentFrame: () => unknown };
-};
 
-function fakeRequest(url: string, options: { navigation: boolean; mainFrame: boolean }): FakeRequest {
-  return {
-    url: () => url,
-    isNavigationRequest: () => options.navigation,
-    frame: () => ({ parentFrame: () => (options.mainFrame ? null : {}) }),
-  };
-}
+const MAIN_FRAME_ID = "main-frame-1";
 
-function fakeRoute(): FakeRoute {
-  return { abort: vi.fn(async () => {}), continue: vi.fn(async () => {}) };
+/** Lets every pending promise callback run. The tests use real timers for this only. */
+function flush(): Promise<void> {
+  return new Promise<void>((resolve) => setImmediate(resolve));
 }
 
 type FakePlaywrightOptions = {
+  /** Answers of the fake CDP session behind `context.newCDPSession(page)`. */
+  cdpScript?: CdpScript;
   contexts?: "none" | "one";
   pages?: "none" | "one";
   connectError?: Error;
@@ -89,7 +80,21 @@ type FakePlaywrightOptions = {
 
 function createFakePlaywright(options: FakePlaywrightOptions = {}) {
   const events = options.events ?? [];
-  let routeHandler: RouteHandler | undefined;
+  const cdp = createFakeCdp({
+    "Page.getFrameTree": { frameTree: { frame: { id: MAIN_FRAME_ID } } },
+    ...options.cdpScript,
+  });
+  // The shape of a Playwright CDPSession: `send` and `on` by event name.
+  const cdpSession = {
+    send: vi.fn((method: string, params?: Record<string, unknown>, targetSessionId?: string) =>
+      cdp.send(method, params, targetSessionId),
+    ),
+    on: vi.fn((name: string, handler: (params: unknown) => unknown) => {
+      cdp.onEvent(async (event) => {
+        if (event.method === name && event.targetSessionId === undefined) await handler(event.params);
+      });
+    }),
+  };
   const pageHandlers: Record<string, AnyFn> = {};
   const contextHandlers: Record<string, AnyFn> = {};
 
@@ -128,9 +133,8 @@ function createFakePlaywright(options: FakePlaywrightOptions = {}) {
   const context = {
     pages: vi.fn(() => pageList),
     newPage: vi.fn(async () => createdPage),
-    route: vi.fn(async (_pattern: string, handler: RouteHandler) => {
-      routeHandler = handler;
-    }),
+    // There is deliberately no `route` here: a call to it fails the test.
+    newCDPSession: vi.fn(async (_page: unknown) => cdpSession),
     on: vi.fn((event: string, handler: AnyFn) => {
       contextHandlers[event] = handler;
     }),
@@ -159,10 +163,8 @@ function createFakePlaywright(options: FakePlaywrightOptions = {}) {
     firstPage,
     createdPage,
     events,
-    get routeHandler(): RouteHandler {
-      if (!routeHandler) throw new Error("route handler not installed");
-      return routeHandler;
-    },
+    cdp,
+    cdpSession,
     pageHandler: (event: string) => pageHandlers[event] as unknown as (arg: unknown) => unknown,
     contextHandler: (event: string) => contextHandlers[event] as unknown as (arg: unknown) => unknown,
   };
@@ -170,7 +172,18 @@ function createFakePlaywright(options: FakePlaywrightOptions = {}) {
 
 type FetchCall = { url: string; method: string; body: string };
 
-function createFakeFetch(options: { stopStatus?: number; events?: string[]; stopError?: Error } = {}) {
+function createFakeFetch(
+  options: {
+    stopStatus?: number;
+    events?: string[];
+    stopError?: Error;
+    /** The stop request never answers (the abort signal is ignored, as a stuck network would). */
+    stopHangs?: boolean;
+    /** The stop request answers after this many ms of the manual clock. */
+    stopDelayMs?: number;
+    clock?: ReturnType<typeof createManualClock>;
+  } = {},
+) {
   const calls: FetchCall[] = [];
   const fakeFetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const method = init?.method ?? "GET";
@@ -179,6 +192,13 @@ function createFakeFetch(options: { stopStatus?: number; events?: string[]; stop
       return new Response(JSON.stringify({ id: SESSION_ID, cdpUrl: CDP_URL, liveUrl: LIVE_URL }), {
         status: 200,
         headers: { "content-type": "application/json" },
+      });
+    }
+    if (options.stopHangs) return new Promise<Response>(() => {});
+    if (options.stopDelayMs !== undefined && options.clock) {
+      const clock = options.clock;
+      await new Promise<void>((resolve) => {
+        clock.setTimer(options.stopDelayMs as number, resolve);
       });
     }
     options.events?.push("patch");
@@ -197,12 +217,12 @@ type Harness = {
 
 async function openSession(
   playwright: FakePlaywrightOptions = {},
-  fetchOptions: { stopStatus?: number; stopError?: Error } = {},
+  fetchOptions: { stopStatus?: number; stopError?: Error; stopHangs?: boolean; stopDelayMs?: number } = {},
 ): Promise<Harness> {
   const events: string[] = [];
   const fake = createFakePlaywright({ ...playwright, events });
-  const fetchFake = createFakeFetch({ ...fetchOptions, events });
   const clock = createManualClock();
+  const fetchFake = createFakeFetch({ ...fetchOptions, events, clock });
   const provider = createRemoteBrowser(CONFIG, {
     fetch: fetchFake.fetch,
     clock,
@@ -218,11 +238,12 @@ async function connectedPage(playwright: FakePlaywrightOptions = {}): Promise<Ha
   return { ...harness, page };
 }
 
-function createGuards(verdict: { allowed: true } | { allowed: false; reason: UrlErrorCode }) {
+function createGuards(verdict: GuardVerdict) {
   const events: GuardEvent[] = [];
-  const allowNavigation = vi.fn(async (_url: string) => verdict);
-  const guards: PageGuards = { allowNavigation, report: (event) => events.push(event) };
-  return { guards, events, allowNavigation };
+  const checkSyntax = vi.fn((_url: string): GuardVerdict => ({ allowed: true }));
+  const checkHost = vi.fn(async (_url: string) => verdict);
+  const guards: PageGuards = { checkSyntax, checkHost, report: (event) => events.push(event) };
+  return { guards, events, checkSyntax, checkHost };
 }
 
 async function failureOf(promise: Promise<unknown>): Promise<CaptureFailure> {
@@ -367,76 +388,120 @@ describe("connect", () => {
 });
 
 describe("guards", () => {
-  it("checks a main-frame navigation request and lets it continue when allowed", async () => {
+  it("runs the request guard through the CDP session of the page, in order", async () => {
     const { fake, page } = await connectedPage();
-    const { guards, allowNavigation, events } = createGuards({ allowed: true });
+    const { guards } = createGuards({ allowed: true });
     await page.installGuards(guards);
 
-    expect(fake.context.route).toHaveBeenCalledTimes(1);
-    expect(fake.context.route.mock.calls[0][0]).toBe("**/*");
+    expect(fake.context.newCDPSession).toHaveBeenCalledTimes(1);
+    expect(fake.context.newCDPSession).toHaveBeenCalledWith(fake.firstPage);
+    expect(fake.cdp.calls.map((call) => call.method)).toEqual([
+      "Network.setBypassServiceWorker",
+      "Page.getFrameTree",
+      "Fetch.enable",
+      "Target.setAutoAttach",
+    ]);
+    expect(fake.cdp.callsOf("Fetch.enable")[0].params).toEqual({
+      patterns: [{ urlPattern: "*", requestStage: "Request" }],
+    });
+  });
 
-    const route = fakeRoute();
-    await fake.routeHandler(route, fakeRequest("https://shop.example.com/a", { navigation: true, mainFrame: true }));
+  it("registers the event handlers before the first command", async () => {
+    const { fake, page } = await connectedPage();
+    await page.installGuards(createGuards({ allowed: true }).guards);
+    expect(fake.cdp.handlersAtFirstSend).toBeGreaterThan(0);
+  });
 
-    expect(allowNavigation).toHaveBeenCalledWith("https://shop.example.com/a");
-    expect(route.continue).toHaveBeenCalledTimes(1);
-    expect(route.abort).not.toHaveBeenCalled();
+  it("never calls route on the context or the page", async () => {
+    const { fake, page } = await connectedPage();
+    await page.installGuards(createGuards({ allowed: true }).guards);
+    expect("route" in fake.context).toBe(false);
+    expect("route" in fake.firstPage).toBe(false);
+    expect("routeWebSocket" in fake.context).toBe(false);
+  });
+
+  it("continues a paused request that the guards allow", async () => {
+    const { fake, page } = await connectedPage();
+    const { guards, checkHost, events } = createGuards({ allowed: true });
+    await page.installGuards(guards);
+
+    await fake.cdp.emit("Fetch.requestPaused", {
+      requestId: "req-1",
+      request: { url: "https://shop.example.com/a" },
+      resourceType: "Document",
+      frameId: MAIN_FRAME_ID,
+    });
+
+    expect(checkHost).toHaveBeenCalledWith("https://shop.example.com/a");
+    expect(fake.cdp.callsOf("Fetch.continueRequest").map((call) => call.params)).toEqual([{ requestId: "req-1" }]);
+    expect(fake.cdp.callsOf("Fetch.failRequest")).toEqual([]);
     expect(events).toEqual([]);
   });
 
-  it("aborts a main-frame navigation that is not allowed and reports it without a URL", async () => {
+  it("fails a paused main-frame request that the guards refuse and reports it without a URL", async () => {
     const { fake, page } = await connectedPage();
     const { guards, events } = createGuards({ allowed: false, reason: "url-address-blocked" });
     await page.installGuards(guards);
 
-    const route = fakeRoute();
-    await fake.routeHandler(route, fakeRequest("http://10.0.0.1/", { navigation: true, mainFrame: true }));
+    await fake.cdp.emit("Fetch.requestPaused", {
+      requestId: "req-2",
+      request: { url: "http://10.0.0.1/" },
+      resourceType: "Document",
+      frameId: MAIN_FRAME_ID,
+    });
 
-    expect(route.abort).toHaveBeenCalledWith("blockedbyclient");
-    expect(route.continue).not.toHaveBeenCalled();
-    expect(events).toEqual([{ kind: "request-blocked", reason: "url-address-blocked" }]);
+    expect(fake.cdp.callsOf("Fetch.failRequest").map((call) => call.params)).toEqual([
+      { requestId: "req-2", errorReason: "BlockedByClient" },
+    ]);
+    expect(fake.cdp.callsOf("Fetch.continueRequest")).toEqual([]);
+    expect(events).toEqual([{ kind: "request-blocked", reason: "url-address-blocked", mainFrame: true }]);
     expect(JSON.stringify(events)).not.toContain("10.0.0.1");
   });
 
-  it("aborts a navigation when the check itself throws", async () => {
+  it("fails a paused request when the check itself throws", async () => {
     const { fake, page } = await connectedPage();
     const events: GuardEvent[] = [];
     await page.installGuards({
-      allowNavigation: async () => {
+      checkSyntax: () => ({ allowed: true }),
+      checkHost: async () => {
         throw new Error("resolver exploded");
       },
       report: (event) => events.push(event),
     });
-    const route = fakeRoute();
-    await fake.routeHandler(route, fakeRequest("https://shop.example.com/", { navigation: true, mainFrame: true }));
-    expect(route.abort).toHaveBeenCalledWith("blockedbyclient");
-    expect(events).toHaveLength(1);
-    expect(events[0].kind).toBe("request-blocked");
+
+    await fake.cdp.emit("Fetch.requestPaused", {
+      requestId: "req-3",
+      request: { url: "https://shop.example.com/" },
+      resourceType: "Image",
+      frameId: MAIN_FRAME_ID,
+    });
+
+    expect(fake.cdp.callsOf("Fetch.failRequest")).toHaveLength(1);
+    expect(events).toEqual([{ kind: "request-blocked", reason: "url-invalid", mainFrame: false }]);
   });
 
-  it("continues sub-resource requests without calling the check", async () => {
+  it.each(["Network.setBypassServiceWorker", "Fetch.enable", "Target.setAutoAttach"])(
+    "maps a failing %s to connect-failed and keeps every secret out of the detail",
+    async (method) => {
+      const { page } = await connectedPage({
+        cdpScript: {
+          [method]: new Error(`${method} refused: key=${API_KEY} id=${SESSION_ID} cdp=${CDP_URL} live=${LIVE_URL}`),
+        },
+      });
+      const failure = await failureOf(page.installGuards(createGuards({ allowed: true }).guards));
+      expect(failure.code).toBe("connect-failed");
+      expectNoSecrets(failure.message);
+      expectNoSecrets(failure.detail ?? "");
+      expect(failure.detail ?? "").toContain(method);
+    },
+  );
+
+  it("maps a failing newCDPSession to connect-failed with a redacted detail", async () => {
     const { fake, page } = await connectedPage();
-    const { guards, allowNavigation } = createGuards({ allowed: false, reason: "url-host-blocked" });
-    await page.installGuards(guards);
-
-    const route = fakeRoute();
-    await fake.routeHandler(route, fakeRequest("https://cdn.example.com/a.js", { navigation: false, mainFrame: true }));
-
-    expect(allowNavigation).not.toHaveBeenCalled();
-    expect(route.continue).toHaveBeenCalledTimes(1);
-    expect(route.abort).not.toHaveBeenCalled();
-  });
-
-  it("continues sub-frame navigations without calling the check", async () => {
-    const { fake, page } = await connectedPage();
-    const { guards, allowNavigation } = createGuards({ allowed: false, reason: "url-host-blocked" });
-    await page.installGuards(guards);
-
-    const route = fakeRoute();
-    await fake.routeHandler(route, fakeRequest("https://ads.example.com/f", { navigation: true, mainFrame: false }));
-
-    expect(allowNavigation).not.toHaveBeenCalled();
-    expect(route.continue).toHaveBeenCalledTimes(1);
+    fake.context.newCDPSession.mockRejectedValueOnce(new Error(`no session for ${API_KEY} ${LIVE_URL}`));
+    const failure = await failureOf(page.installGuards(createGuards({ allowed: true }).guards));
+    expect(failure.code).toBe("connect-failed");
+    expectNoSecrets(failure.detail ?? "");
   });
 
   it("cancels a download and reports it", async () => {
@@ -620,13 +685,14 @@ describe("reading and screenshots", () => {
 });
 
 describe("stop", () => {
-  it("disconnects first and then sends the stop request", async () => {
+  it("sends the stop request first and then disconnects", async () => {
     const events: string[] = [];
     const fake = createFakePlaywright({ events });
-    const fetchFake = createFakeFetch({ events });
+    const clock = createManualClock();
+    const fetchFake = createFakeFetch({ events, clock });
     const provider = createRemoteBrowser(CONFIG, {
       fetch: fetchFake.fetch,
-      clock: createManualClock(),
+      clock,
       loadPlaywright: fake.loadPlaywright,
     });
     const handle = await provider.createSession(SESSION_REQUEST);
@@ -634,29 +700,104 @@ describe("stop", () => {
 
     await handle.stop();
 
-    expect(events).toEqual(["close", "patch"]);
+    expect(events).toEqual(["patch", "close"]);
     const patch = fetchFake.calls.find((call) => call.method === "PATCH");
     expect(patch?.url).toBe(`https://api.browser-use.com/api/v4/browsers/${SESSION_ID}`);
     expect(JSON.parse(patch?.body ?? "{}")).toEqual({ action: "stop" });
   });
 
-  it("still sends the stop request when the disconnect fails", async () => {
+  it("still closes the connection when the stop request fails, and then rejects without secrets", async () => {
+    const harness = await openSession({}, { stopError: new Error(`network down ${API_KEY} ${SESSION_ID}`) });
+    await harness.handle.connect({ timeoutMs: 15_000 });
+
+    const error = await harness.handle.stop().then(
+      () => undefined,
+      (e: unknown) => e as Error,
+    );
+
+    expect(error).toBeInstanceOf(Error);
+    expectNoSecrets(String((error as Error).message));
+    expect(harness.fake.browser.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("still closes the connection when the stop request answers with a non-2xx status, then rejects", async () => {
+    const harness = await openSession({}, { stopStatus: 500 });
+    await harness.handle.connect({ timeoutMs: 15_000 });
+
+    await expect(harness.handle.stop()).rejects.toBeInstanceOf(Error);
+
+    expect(harness.fake.browser.close).toHaveBeenCalledTimes(1);
+  });
+
+  it("resolves when the disconnect fails", async () => {
     const { handle, fetchFake } = await openSession({ closeError: new Error("socket already closed") });
     await handle.connect({ timeoutMs: 15_000 });
     await expect(handle.stop()).resolves.toBeUndefined();
     expect(fetchFake.calls.filter((call) => call.method === "PATCH")).toHaveLength(1);
   });
 
-  it("still sends the stop request when the disconnect hangs", async () => {
+  it("resolves after the stop request when the disconnect hangs", async () => {
     const harness = await openSession();
     await harness.handle.connect({ timeoutMs: 15_000 });
     harness.fake.browser.close.mockImplementation(() => new Promise<void>(() => {}));
 
-    const stopped = harness.handle.stop();
-    await Promise.resolve();
-    harness.clock.advance(DISCONNECT_TIMEOUT_MS);
-    await expect(stopped).resolves.toBeUndefined();
+    let settled = false;
+    const stopped = harness.handle.stop().then(() => {
+      settled = true;
+    });
+    await flush();
     expect(harness.fetchFake.calls.filter((call) => call.method === "PATCH")).toHaveLength(1);
+    expect(settled).toBe(false);
+
+    harness.clock.advance(DISCONNECT_TIMEOUT_MS);
+    await stopped;
+    expect(settled).toBe(true);
+  });
+
+  it("gives the disconnect only what is left of the stop budget", async () => {
+    const harness = await openSession({}, { stopDelayMs: 8_000 });
+    await harness.handle.connect({ timeoutMs: 15_000 });
+    harness.fake.browser.close.mockImplementation(() => new Promise<void>(() => {}));
+
+    let settled = false;
+    void harness.handle.stop().then(() => {
+      settled = true;
+    });
+    await flush();
+    harness.clock.advance(8_000);
+    await flush();
+    expect(settled).toBe(false);
+
+    // 10,000 ms of budget minus the 8,000 ms the request took is less than the 3,000 ms disconnect limit.
+    harness.clock.advance(1_999);
+    await flush();
+    expect(settled).toBe(false);
+    harness.clock.advance(1);
+    await flush();
+    expect(settled).toBe(true);
+  });
+
+  it("ends the whole call within the stop budget when the stop request hangs", async () => {
+    const harness = await openSession({}, { stopHangs: true });
+    await harness.handle.connect({ timeoutMs: 15_000 });
+    harness.fake.browser.close.mockImplementation(() => new Promise<void>(() => {}));
+
+    let outcome: "pending" | "resolved" | "rejected" = "pending";
+    void harness.handle.stop().then(
+      () => {
+        outcome = "resolved";
+      },
+      () => {
+        outcome = "rejected";
+      },
+    );
+    await flush();
+    harness.clock.advance(STOP_TIMEOUT_MS - 1);
+    await flush();
+    expect(outcome).toBe("pending");
+    harness.clock.advance(1);
+    await flush();
+    expect(outcome).toBe("rejected");
   });
 
   it("sends the stop request when it was never connected", async () => {
@@ -692,6 +833,29 @@ describe("secrets", () => {
     const { handle, page } = await connectedPage();
     expectNoSecrets(JSON.stringify(handle));
     expectNoSecrets(JSON.stringify(page));
+  });
+
+  it("lists the API key, the session id, the CDP address and the live address", async () => {
+    const { handle } = await openSession();
+    const secrets = handle.secrets();
+    expect(secrets).toHaveLength(4);
+    expect([...secrets].sort()).toEqual([API_KEY, SESSION_ID, CDP_URL, LIVE_URL].sort());
+  });
+
+  it("leaves out a live address the session did not report", async () => {
+    const fetchFake = {
+      fetch: (async (_input: string | URL | Request, init?: RequestInit) =>
+        new Response(init?.method === "POST" ? JSON.stringify({ id: SESSION_ID, cdpUrl: CDP_URL }) : "{}", {
+          status: 200,
+        })) as unknown as typeof fetch,
+    };
+    const provider = createRemoteBrowser(CONFIG, {
+      fetch: fetchFake.fetch,
+      clock: createManualClock(),
+      loadPlaywright: async () => ({}),
+    });
+    const handle = await provider.createSession(SESSION_REQUEST);
+    expect([...handle.secrets()].sort()).toEqual([API_KEY, SESSION_ID, CDP_URL].sort());
   });
 });
 

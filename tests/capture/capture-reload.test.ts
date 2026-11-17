@@ -312,7 +312,7 @@ describe("capturePage: a failing reload is only a warning", () => {
     const { fake, deps } = setup(
       {
         reload: () => {
-          holder.fake?.emit({ kind: "request-blocked", reason: "url-address-blocked" });
+          holder.fake?.emit({ kind: "request-blocked", reason: "url-address-blocked", mainFrame: true });
           return new CaptureFailure("navigation-failed");
         },
       },

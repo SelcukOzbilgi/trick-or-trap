@@ -177,6 +177,7 @@ describe("capturePage: stop is called exactly once on every path", () => {
       stop: () => {
         throw new Error("sync stop");
       },
+      secrets: () => [],
     }));
     const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
     expect(createSession).toHaveBeenCalledTimes(1);
@@ -399,7 +400,8 @@ describe("capturePage: error mapping", () => {
         return new Error("net::ERR_BLOCKED_BY_CLIENT");
       },
     });
-    holder.emit = () => fake.emit({ kind: "request-blocked", reason: "url-address-blocked" });
+    holder.emit = () =>
+      fake.emit({ kind: "request-blocked", reason: "url-address-blocked", mainFrame: true });
     const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
     expect(result.error.code).toBe("navigation-blocked");
     expect(fake.stopCalls).toBe(1);

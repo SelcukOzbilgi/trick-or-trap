@@ -47,6 +47,7 @@ function slowProvider(clock: ManualClock, fake: FakeBrowser, delays: { create?: 
           return handle.connect(options);
         },
         stop: () => handle.stop(),
+        secrets: () => handle.secrets(),
       };
     },
   };

@@ -11,6 +11,7 @@
  */
 import "server-only";
 import type { Clock } from "./clock";
+import type { CdpSession } from "./cdp";
 import type { CaptureConfig } from "./config";
 import {
   createSession as createApiSession,
@@ -18,8 +19,10 @@ import {
   stopSession,
   type CreatedSession,
 } from "./browser-use-api";
+import { STOP_TIMEOUT_MS } from "./constants";
 import { collectInPage } from "./extractor";
 import { toDetail } from "./redact";
+import { installRequestGuard } from "./request-guard";
 import type {
   BrowserProvider,
   BrowserSessionHandle,
@@ -32,8 +35,11 @@ import type {
 import { CaptureFailure } from "./types";
 import type { CaptureErrorCode, CollectOptions, RawPageRead } from "./types";
 
-/** Longest wait for the best-effort CDP disconnect before the stop request is sent. */
+/** Longest wait for the best-effort CDP disconnect after the stop request was sent. */
 export const DISCONNECT_TIMEOUT_MS = 3_000;
+
+/** The protocol events the request guard reads. Playwright subscribes by event name. */
+const GUARD_EVENT_NAMES: readonly string[] = ["Fetch.requestPaused", "Target.attachedToTarget"];
 
 export type RemoteBrowserDeps = {
   fetch: typeof fetch;
@@ -44,10 +50,15 @@ export type RemoteBrowserDeps = {
 
 // A small structural view of the Playwright objects used here. The one cast from the
 // real module into these types is in `loadChromium`.
-type PwFrame = { parentFrame(): unknown };
-type PwRequest = { url(): string; isNavigationRequest(): boolean; frame(): PwFrame };
-type PwRoute = { abort(errorCode?: string): Promise<void>; continue(): Promise<void> };
 type PwDownload = { cancel(): Promise<void> };
+type PwCdpSession = {
+  /**
+   * The public Playwright call takes two arguments. The third one addresses a child
+   * target; whether the real session honours it is unverified until the live test.
+   */
+  send(method: string, params?: Record<string, unknown>, targetSessionId?: string): Promise<unknown>;
+  on(event: string, handler: (params: unknown) => unknown): unknown;
+};
 type PwPage = {
   goto(url: string, options: { timeout: number; waitUntil: "load" }): Promise<unknown>;
   reload(options: { timeout: number; waitUntil: "load" }): Promise<unknown>;
@@ -60,13 +71,25 @@ type PwPage = {
 type PwContext = {
   pages(): PwPage[];
   newPage(): Promise<PwPage>;
-  route(pattern: string, handler: (route: PwRoute, request: PwRequest) => unknown): Promise<void>;
+  newCDPSession(page: PwPage): Promise<PwCdpSession>;
   on(event: "page", handler: (page: PwPage) => unknown): unknown;
 };
 type PwBrowser = { contexts(): PwContext[]; close(): Promise<void> };
 type PwChromium = { connectOverCDP(url: string, options: { timeout: number }): Promise<PwBrowser> };
 
 function noop(): void {}
+
+/** Views a Playwright CDP session as the structural `CdpSession` that `lib/capture` uses. */
+function toCdpSession(session: PwCdpSession): CdpSession {
+  return {
+    send: (method, params, targetSessionId) => session.send(method, params, targetSessionId),
+    onEvent(handler) {
+      for (const name of GUARD_EVENT_NAMES) {
+        session.on(name, (params) => handler({ method: name, params }));
+      }
+    },
+  };
+}
 
 async function loadChromium(deps: RemoteBrowserDeps): Promise<PwChromium> {
   const loaded = deps.loadPlaywright ? await deps.loadPlaywright() : await import("playwright-core");
@@ -91,7 +114,12 @@ async function quietly(action: () => Promise<unknown>): Promise<void> {
   }
 }
 
-function createCapturePage(page: PwPage, context: PwContext, secrets: readonly string[]): CapturePage {
+function createCapturePage(
+  page: PwPage,
+  context: PwContext,
+  secrets: readonly string[],
+  clock: Clock,
+): CapturePage {
   const fail = (code: CaptureErrorCode, error: unknown) => new CaptureFailure(code, toDetail(error, secrets));
 
   const finish = async (
@@ -108,26 +136,14 @@ function createCapturePage(page: PwPage, context: PwContext, secrets: readonly s
 
   return {
     async installGuards(guards: PageGuards): Promise<void> {
-      await context.route("**/*", async (route, request) => {
-        // Only main-frame navigations are checked, each redirect hop included.
-        // Sub-resource requests and sub-frame navigations pass through untouched.
-        if (!request.isNavigationRequest() || request.frame().parentFrame() !== null) {
-          await quietly(() => route.continue());
-          return;
-        }
-        let verdict: Awaited<ReturnType<PageGuards["allowNavigation"]>>;
-        try {
-          verdict = await guards.allowNavigation(request.url());
-        } catch {
-          verdict = { allowed: false, reason: "url-invalid" };
-        }
-        if (verdict.allowed) {
-          await quietly(() => route.continue());
-          return;
-        }
-        guards.report({ kind: "request-blocked", reason: verdict.reason });
-        await quietly(() => route.abort("blockedbyclient"));
-      });
+      try {
+        // The session is opened here for now. Interception goes through CDP `Fetch`, so
+        // redirect hops, sub-frames and sub-resources are all seen.
+        const session = toCdpSession(await context.newCDPSession(page));
+        await installRequestGuard(session, guards, { clock });
+      } catch (error) {
+        throw fail("connect-failed", error);
+      }
 
       page.on("download", async (download) => {
         guards.report({ kind: "download-refused" });
@@ -197,19 +213,22 @@ function createHandle(session: CreatedSession, config: CaptureConfig, deps: Remo
   const secrets = [apiKey, session.id, session.cdpUrl, session.liveUrl ?? ""];
   const state: { browser?: PwBrowser; stopped: boolean } = { stopped: false };
 
-  /** Best-effort CDP disconnect, bounded so it can never hold back the stop request. */
-  async function disconnect(browser: PwBrowser): Promise<void> {
-    let cancel: () => void = noop;
-    const timedOut = new Promise<void>((resolve) => {
-      cancel = deps.clock.setTimer(DISCONNECT_TIMEOUT_MS, resolve);
-    });
+  /**
+   * Best-effort CDP disconnect, bounded by `budgetMs`. A failure or a hang never
+   * propagates. With no budget left the close is started and not awaited.
+   */
+  async function disconnect(browser: PwBrowser, budgetMs: number): Promise<void> {
     let closing: Promise<void>;
     try {
       closing = Promise.resolve(browser.close()).then(noop, noop);
     } catch {
-      cancel();
       return;
     }
+    if (budgetMs <= 0) return;
+    let cancel: () => void = noop;
+    const timedOut = new Promise<void>((resolve) => {
+      cancel = deps.clock.setTimer(budgetMs, resolve);
+    });
     await Promise.race([closing, timedOut]);
     cancel();
   }
@@ -221,11 +240,11 @@ function createHandle(session: CreatedSession, config: CaptureConfig, deps: Remo
         const browser = await chromium.connectOverCDP(session.cdpUrl, { timeout: options.timeoutMs });
         state.browser = browser;
         // The connection can finish after the capture gave up and stopped the session.
-        if (state.stopped) await disconnect(browser);
+        if (state.stopped) await disconnect(browser, DISCONNECT_TIMEOUT_MS);
         const context = browser.contexts()[0];
         if (!context) throw new CaptureFailure("connect-failed");
         const page = context.pages()[0] ?? (await context.newPage());
-        return createCapturePage(page, context, secrets);
+        return createCapturePage(page, context, secrets, deps.clock);
       } catch (error) {
         if (error instanceof CaptureFailure) throw error;
         throw new CaptureFailure("connect-failed", toDetail(error, secrets));
@@ -234,13 +253,27 @@ function createHandle(session: CreatedSession, config: CaptureConfig, deps: Remo
 
     async stop(): Promise<void> {
       state.stopped = true;
-      if (state.browser) await disconnect(state.browser);
+      const startedAt = deps.clock.now();
+      // The stop request comes first: it ends the billing. The disconnect then gets what
+      // is left of the stop budget, and a failed request does not skip it.
+      let failure: unknown;
+      let failed = false;
       try {
         await stopSession({ fetch: deps.fetch, clock: deps.clock, apiKey }, session.id);
       } catch (error) {
-        // Re-redacted with the full secret list before it reaches the caller.
-        throw new Error(toDetail(error, secrets) ?? "Stopping the session failed.");
+        failed = true;
+        failure = error;
       }
+      if (state.browser) {
+        const left = STOP_TIMEOUT_MS - (deps.clock.now() - startedAt);
+        await disconnect(state.browser, Math.min(DISCONNECT_TIMEOUT_MS, left));
+      }
+      // Re-redacted with the full secret list before it reaches the caller.
+      if (failed) throw new Error(toDetail(failure, secrets) ?? "Stopping the session failed.");
+    },
+
+    secrets(): readonly string[] {
+      return secrets.filter((secret) => secret.length > 0);
     },
   };
 }

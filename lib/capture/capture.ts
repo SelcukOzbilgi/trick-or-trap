@@ -208,12 +208,17 @@ async function runCapture(
     code: "connect-timeout",
   });
   const guards: PageGuards = {
-    async allowNavigation(candidate) {
+    checkSyntax(candidate) {
+      const syntax = checkUrlSyntax(candidate);
+      return syntax.ok ? { allowed: true } : { allowed: false, reason: syntax.code };
+    },
+    async checkHost(candidate) {
       const verdict = await inspect(candidate);
       return verdict.ok ? { allowed: true } : { allowed: false, reason: verdict.code };
     },
     report(event) {
-      if (event.kind === "request-blocked") ctx.navigationBlocked = true;
+      // Only a refused main-frame request can fail the navigation as a block.
+      if (event.kind === "request-blocked" && event.mainFrame) ctx.navigationBlocked = true;
       ctx.warnings.add(event.kind);
     },
   };
