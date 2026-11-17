@@ -15,10 +15,10 @@ Rules for every task:
 - Never run `tests/capture/remote-capture.test.ts`. No test starts a dev server or opens a connection.
 - Use the file and function names of `design.md` exactly. Tests import with the `@/` alias.
 
-- [ ] 1. Dependencies
-  - [ ] 1.1 Create `tests/capture/dependencies.test.ts` first: read `package.json` with `readFileSync`; `dependencies["playwright-core"]` is exactly `"1.64.1"`, `dependencies["server-only"]` is exactly `"0.0.1"`, neither value starts with `^`, `~` or contains `latest`; `dependencies` has no `@sparticuz/chromium-min` and no key starting with `browser-use`.
-  - [ ] 1.2 Run `npx vitest run tests/capture/dependencies.test.ts --maxWorkers=2`; it fails. Run `npm install --save-exact playwright-core@1.64.1 server-only@0.0.1` (the only place this command is allowed). Read `package.json` and confirm only those two names were added to `dependencies`, with no range prefix.
-  - [ ] 1.3 Run `npx vitest run tests/capture/dependencies.test.ts --maxWorkers=2` again, then `npx tsc --noEmit`.
+- [x] 1. Dependencies
+  - [x] 1.1 Create `tests/capture/dependencies.test.ts` first: read `package.json` with `readFileSync`; `dependencies["playwright-core"]` is exactly `"1.64.1"`, `dependencies["server-only"]` is exactly `"0.0.1"`, neither value starts with `^`, `~` or contains `latest`; `dependencies` has no `@sparticuz/chromium-min` and no key starting with `browser-use`.
+  - [x] 1.2 Run `npx vitest run tests/capture/dependencies.test.ts --maxWorkers=2`; it fails. Run `npm install --save-exact playwright-core@1.64.1 server-only@0.0.1` (the only place this command is allowed). Read `package.json` and confirm only those two names were added to `dependencies`, with no range prefix.
+  - [x] 1.3 Run `npx vitest run tests/capture/dependencies.test.ts --maxWorkers=2` again, then `npx tsc --noEmit`.
   _Requirements: 19.1, 19.2, 19.3_
 
 - [ ] 2. Vercel file tracing in `next.config.ts`
