@@ -116,7 +116,7 @@ Seven pages. Verdict: **FLAG** or **NO FLAG** (honest look-alike). Difficulty: E
 |---|---|---|---|---|
 | 1 Home (/) | Hero banner "Boo-nanza ends in 04:59:59" restarting on reload | Urgency | E | FLAG |
 | 1 Home | "Black Friday of the Dead ends at midnight", rolling to the next midnight daily, text only | Urgency | S | FLAG |
-| 1 Home | "Halloween sale ends 31 Oct 2026, 23:59 UTC", fixed date, same on reload | none | look-alike | NO FLAG |
+| 1 Home | "Winter sale ends 28 Feb 2027, 23:59 UTC", fixed date, same on reload | none | look-alike | NO FLAG |
 | 1 Home | Cookie banner: big filled "Accept all", 11px grey link "options", no reject on layer 1 | Visual interference | E | FLAG |
 | 1 Home | Cookie banner variant (use a second route): "Reject" as a ghost button, contrast about 2:1, 60% opacity | Visual interference | M | FLAG |
 | 1 Home | Cookie banner variant: equal-size Accept and Reject, same style | none | look-alike | NO FLAG |

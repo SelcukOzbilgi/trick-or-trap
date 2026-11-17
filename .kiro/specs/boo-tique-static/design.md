@@ -253,7 +253,7 @@ The test id always goes on the carrying element named below. For controls (check
 |---|---|---|---|
 | home-hero-countdown-restart | `/boo-tique` | `<p>` "Boo-nanza ends in 04:59:59" | `HeroCountdown` in `PromoBlock` |
 | home-rolling-midnight-text | `/boo-tique` | `<p>` "Black Friday of the Dead ends at midnight" | `PromoBlock` |
-| home-fixed-date-sale | `/boo-tique` | `<p>` "Halloween sale ends 31 Oct 2026, 23:59 UTC" (constant `FIXED_SALE_TEXT`) | `PromoBlock` |
+| home-fixed-date-sale | `/boo-tique` | `<p>` "Winter sale ends 28 Feb 2027, 23:59 UTC" (constant `FIXED_SALE_TEXT`) | `PromoBlock` |
 | home-cookie-accept-dominant | `/boo-tique` | Banner root `<div role="region" aria-label="Cookie preferences">`, a fixed bottom bar | `CookieBanner variant="default"` |
 | home-cookie-ghost-reject | `/boo-tique?banner=ghost` | Banner root (fixed bottom bar) | `CookieBanner variant="ghost"` |
 | home-cookie-equal-buttons | `/boo-tique?banner=equal` | Banner root (fixed bottom bar) | `CookieBanner variant="equal"` |

@@ -30,13 +30,13 @@ Rules for every task:
   - [x] 1.6 Run `npx vitest run tests/boo-tique/content.test.ts --maxWorkers=2`, `npx vitest run tests/boo-tique/home-page.test.ts --maxWorkers=2`, `npx vitest run tests/boo-tique/ground-truth.test.ts --maxWorkers=2` (the derivation test must stay green), then `npx tsc --noEmit`.
   _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
 
-- [ ] 2. H1: the date in the research notes and the two old-spec lines
-  - [ ] 2.1 Files. Test file: `tests/boo-tique/spec-sync.test.ts` (new). Source files: `docs/research/dark-patterns.md` (one row), `.kiro/specs/boo-tique-static/requirements.md` (one line), `.kiro/specs/boo-tique-static/design.md` (one row). These two old-spec lines are the only edits to the old spec, authorised by the owner.
-  - [ ] 2.2 Create `tests/boo-tique/spec-sync.test.ts` first. It reads the three files with `readFileSync` and imports `FIXED_SALE_TEXT`. For each of the three files assert: it contains `FIXED_SALE_TEXT`; it contains neither "31 Oct 2026" nor "Halloween sale". For `dark-patterns.md` also assert the text `"Selling fast" badge on all products, no number` is still there (12.10). For the old `requirements.md` assert that the line starting with `8.4.` contains `FIXED_SALE_TEXT`. For the old `design.md` assert that the line starting with `| home-fixed-date-sale |` contains `FIXED_SALE_TEXT`. The test fails before step 2.3 to 2.5.
-  - [ ] 2.3 Edit the one row of `docs/research/dark-patterns.md` that quotes the old date, so it reads: `| 1 Home | "Winter sale ends 28 Feb 2027, 23:59 UTC", fixed date, same on reload | none | look-alike | NO FLAG |`. Change nothing else in the file.
-  - [ ] 2.4 Edit the one line of `.kiro/specs/boo-tique-static/requirements.md` that starts with `8.4.` so its quoted text is "Winter sale ends 28 Feb 2027, 23:59 UTC". Change nothing else in the file.
-  - [ ] 2.5 Edit the one row of `.kiro/specs/boo-tique-static/design.md` that starts with `| home-fixed-date-sale |` so its quoted text is "Winter sale ends 28 Feb 2027, 23:59 UTC". Change nothing else in the file.
-  - [ ] 2.6 Run `npx vitest run tests/boo-tique/spec-sync.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+- [x] 2. H1: the date in the research notes and the two old-spec lines
+  - [x] 2.1 Files. Test file: `tests/boo-tique/spec-sync.test.ts` (new). Source files: `docs/research/dark-patterns.md` (one row), `.kiro/specs/boo-tique-static/requirements.md` (one line), `.kiro/specs/boo-tique-static/design.md` (one row). These two old-spec lines are the only edits to the old spec, authorised by the owner.
+  - [x] 2.2 Create `tests/boo-tique/spec-sync.test.ts` first. It reads the three files with `readFileSync` and imports `FIXED_SALE_TEXT`. For each of the three files assert: it contains `FIXED_SALE_TEXT`; it contains neither "31 Oct 2026" nor "Halloween sale". For `dark-patterns.md` also assert the text `"Selling fast" badge on all products, no number` is still there (12.10). For the old `requirements.md` assert that the line starting with `8.4.` contains `FIXED_SALE_TEXT`. For the old `design.md` assert that the line starting with `| home-fixed-date-sale |` contains `FIXED_SALE_TEXT`. The test fails before step 2.3 to 2.5.
+  - [x] 2.3 Edit the one row of `docs/research/dark-patterns.md` that quotes the old date, so it reads: `| 1 Home | "Winter sale ends 28 Feb 2027, 23:59 UTC", fixed date, same on reload | none | look-alike | NO FLAG |`. Change nothing else in the file.
+  - [x] 2.4 Edit the one line of `.kiro/specs/boo-tique-static/requirements.md` that starts with `8.4.` so its quoted text is "Winter sale ends 28 Feb 2027, 23:59 UTC". Change nothing else in the file.
+  - [x] 2.5 Edit the one row of `.kiro/specs/boo-tique-static/design.md` that starts with `| home-fixed-date-sale |` so its quoted text is "Winter sale ends 28 Feb 2027, 23:59 UTC". Change nothing else in the file.
+  - [x] 2.6 Run `npx vitest run tests/boo-tique/spec-sync.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 1.7, 1.8, 12.10, 16.4_
 
 - [ ] 3. Fixture documentation fields, selling-fast text and the test-id guard
