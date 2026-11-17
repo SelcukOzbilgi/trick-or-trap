@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PatternIdSchema } from "@/lib/types";
 import {
+  DETECTION_SIGNALS,
+  DetectionSignalSchema,
   GROUND_TRUTH_ID_SHAPE,
   GroundTruthEntrySchema,
   GroundTruthSchema,
@@ -25,6 +27,8 @@ const flagEntry = {
   phase: 1,
   difficulty: "easy",
   expectedVerdict: "flag",
+  detectionSignals: ["text"],
+  detectionNote: "A note of more than twenty characters.",
 };
 
 const noneEntry = {
@@ -36,7 +40,11 @@ const noneEntry = {
   phase: 1,
   difficulty: "lookalike",
   expectedVerdict: "no-flag",
+  detectionSignals: ["text"],
+  detectionNote: "A note of more than twenty characters.",
 };
+
+const NOT_SCORED_NOTE = "Not scored: one static snapshot cannot show it.";
 
 describe("GroundTruthEntrySchema", () => {
   it("accepts a valid flag entry", () => {
@@ -91,6 +99,95 @@ describe("GroundTruthEntrySchema", () => {
 
   it("does not list none among the PatternId values", () => {
     expect(PatternIdSchema.options).not.toContain("none");
+  });
+
+  it("lists the seven detection signals", () => {
+    expect([...DETECTION_SIGNALS]).toEqual([
+      "text",
+      "attribute",
+      "style",
+      "reload-variance",
+      "timing",
+      "cross-page",
+      "not-static",
+    ]);
+    expect(DetectionSignalSchema.safeParse("text").success).toBe(true);
+    expect(DetectionSignalSchema.safeParse("magic").success).toBe(false);
+  });
+
+  it("rejects an entry without detectionSignals", () => {
+    const { detectionSignals: _omitted, ...entry } = flagEntry;
+    void _omitted;
+    expect(GroundTruthEntrySchema.safeParse(entry).success).toBe(false);
+  });
+
+  it("rejects an entry without detectionNote", () => {
+    const { detectionNote: _omitted, ...entry } = flagEntry;
+    void _omitted;
+    expect(GroundTruthEntrySchema.safeParse(entry).success).toBe(false);
+  });
+
+  it("rejects an empty detectionSignals list", () => {
+    const entry = { ...flagEntry, detectionSignals: [] };
+    expect(GroundTruthEntrySchema.safeParse(entry).success).toBe(false);
+  });
+
+  it("rejects a signal outside the closed set", () => {
+    const entry = { ...flagEntry, detectionSignals: ["magic"] };
+    expect(GroundTruthEntrySchema.safeParse(entry).success).toBe(false);
+  });
+
+  it("rejects a duplicate signal", () => {
+    const entry = { ...flagEntry, detectionSignals: ["text", "text"] };
+    expect(GroundTruthEntrySchema.safeParse(entry).success).toBe(false);
+  });
+
+  it("accepts several different signals", () => {
+    const entry = { ...flagEntry, detectionSignals: ["text", "reload-variance"] };
+    expect(GroundTruthEntrySchema.safeParse(entry).success).toBe(true);
+  });
+
+  it("rejects a note shorter than 20 characters after trimming", () => {
+    const entry = { ...flagEntry, detectionNote: "   too short note   " };
+    expect(GroundTruthEntrySchema.safeParse(entry).success).toBe(false);
+  });
+
+  it("rejects not-static with a note that does not start with Not scored:", () => {
+    const entry = { ...flagEntry, detectionSignals: ["not-static"] };
+    expect(GroundTruthEntrySchema.safeParse(entry).success).toBe(false);
+  });
+
+  it("rejects a Not scored: note with signals other than not-static", () => {
+    const entry = { ...flagEntry, detectionNote: NOT_SCORED_NOTE };
+    expect(GroundTruthEntrySchema.safeParse(entry).success).toBe(false);
+  });
+
+  it("rejects not-static mixed with another signal", () => {
+    const entry = {
+      ...flagEntry,
+      detectionSignals: ["not-static", "text"],
+      detectionNote: NOT_SCORED_NOTE,
+    };
+    expect(GroundTruthEntrySchema.safeParse(entry).success).toBe(false);
+  });
+
+  it("accepts not-static alone with a Not scored: note", () => {
+    const entry = {
+      ...flagEntry,
+      detectionSignals: ["not-static"],
+      detectionNote: NOT_SCORED_NOTE,
+    };
+    expect(GroundTruthEntrySchema.safeParse(entry).success).toBe(true);
+  });
+
+  it("names the entry id in the not-scored refinement message", () => {
+    const entry = { ...flagEntry, detectionSignals: ["not-static"] };
+    const result = GroundTruthEntrySchema.safeParse(entry);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const messages = result.error.issues.map((issue) => issue.message).join(" | ");
+      expect(messages).toContain(flagEntry.id);
+    }
   });
 });
 
@@ -153,6 +250,59 @@ describe("boo-tique ground-truth fixture", () => {
     for (const e of entries) {
       expect(["urgency", "scarcity", "activity"], e.id).not.toContain(e.pattern);
     }
+  });
+
+  it("gives every entry non-empty detection signals and a note of at least 20 characters", () => {
+    for (const e of entries) {
+      expect(e.detectionSignals.length, e.id).toBeGreaterThan(0);
+      expect(e.detectionNote.trim().length, e.id).toBeGreaterThanOrEqual(20);
+    }
+  });
+
+  it("carries not-static on exactly the three phase-2 flag entries", () => {
+    const notStatic = entries.filter((e) => e.detectionSignals.includes("not-static"));
+    expect(notStatic.map((e) => e.id).sort()).toEqual(
+      [
+        "cart-insurance-sneaked",
+        "checkout-handling-fees-drip",
+        "account-cancel-five-screens",
+      ].sort(),
+    );
+    for (const e of notStatic) {
+      expect(e.detectionSignals, e.id).toEqual(["not-static"]);
+      expect(e.detectionNote.startsWith("Not scored:"), e.id).toBe(true);
+      expect(e.detectionNote, e.id).toContain("boo-tique-flows");
+      expect(e.detectionNote, e.id).toMatch(/snapshot/);
+    }
+  });
+
+  it("keeps the two honest phase-2 entries scored", () => {
+    for (const id of ["checkout-consistent-shipping-tax", "account-one-click-cancel-plan"]) {
+      const entry = entries.find((e) => e.id === id);
+      expect(entry, id).toBeDefined();
+      expect(entry!.detectionSignals, id).not.toContain("not-static");
+      expect(entry!.detectionNote.startsWith("Not scored:"), id).toBe(false);
+    }
+  });
+
+  function noteOf(id: string): string {
+    const entry = entries.find((e) => e.id === id);
+    if (!entry) throw new Error(`No fixture entry ${id}`);
+    return entry.detectionNote;
+  }
+
+  it("records the review caveats in the notes", () => {
+    expect(noteOf("home-rolling-midnight-text")).toContain("midnight");
+    expect(noteOf("club-timer-session-restart")).toContain("10 minutes");
+    expect(noteOf("product-low-stock-random")).toContain("3 samples");
+    expect(noteOf("product-low-stock-random")).toContain("never 3");
+    expect(noteOf("product-viewers-random")).toContain("3 samples");
+    expect(noteOf("product-real-inventory-3-left")).toContain("never equals 3");
+  });
+
+  it("gives the selling-fast badge the product-page-only element text", () => {
+    const entry = entries.find((e) => e.id === "product-selling-fast-badge");
+    expect(entry?.element).toBe("'Selling fast' badge on the product page, no number");
   });
 });
 
@@ -222,6 +372,70 @@ describe("fixture derivation from docs/research", () => {
       expect(f.element, `${r.id} element`).toBe(r.element);
       expect(f.pattern, `${r.id} pattern`).toBe(mapPattern(r.pattern));
       expect(f.route, `${r.id} route`).toBe(mapRoute(r.route));
+    });
+  });
+
+  describe("shared fields, keys and drift detection", () => {
+    const SHARED_FIELDS = [
+      "id",
+      "page",
+      "route",
+      "element",
+      "pattern",
+      "phase",
+      "difficulty",
+      "expectedVerdict",
+    ] as const;
+    const EXTRA_KEYS = ["detectionSignals", "detectionNote"];
+
+    /** Names of the shared fields in which a fixture entry differs from its research entry. */
+    function sharedFieldDiffs(r: ResearchEntry, f: Record<string, unknown>): string[] {
+      const expected: Record<string, unknown> = {
+        ...r,
+        pattern: mapPattern(r.pattern),
+        route: mapRoute(r.route),
+      };
+      return SHARED_FIELDS.filter((name) => f[name] !== expected[name]);
+    }
+
+    it("gives the research JSON neither detectionSignals nor detectionNote", () => {
+      for (const r of research) {
+        const keys = Object.keys(r);
+        for (const extra of EXTRA_KEYS) expect(keys, `${r.id} ${extra}`).not.toContain(extra);
+      }
+    });
+
+    it("gives the fixture the research keys plus the two new keys", () => {
+      const rawFixture = readJson(FIXTURE_PATH) as Record<string, unknown>[];
+      research.forEach((r, i) => {
+        const fixtureKeys = Object.keys(rawFixture[i]).filter((k) => !EXTRA_KEYS.includes(k));
+        expect(fixtureKeys.sort(), r.id).toEqual(Object.keys(r).sort());
+        expect(Object.keys(rawFixture[i]), r.id).toEqual(expect.arrayContaining(EXTRA_KEYS));
+      });
+    });
+
+    it("finds no difference in the shared fields of the real files", () => {
+      research.forEach((r, i) => {
+        expect(sharedFieldDiffs(r, fixture[i]), r.id).toEqual([]);
+      });
+    });
+
+    it("detects a changed element in a mutated copy", () => {
+      const mutated = { ...fixture[0], element: `${fixture[0].element} (edited)` };
+      expect(sharedFieldDiffs(research[0], mutated)).toEqual(["element"]);
+    });
+
+    it("detects a changed phase in a mutated copy", () => {
+      const mutated = { ...fixture[0], phase: 2 };
+      expect(sharedFieldDiffs(research[0], mutated)).toEqual(["phase"]);
+    });
+
+    it("gives the selling-fast element the same text in both files", () => {
+      const text = "'Selling fast' badge on the product page, no number";
+      const r = research.find((e) => e.id === "product-selling-fast-badge");
+      const f = fixture.find((e) => e.id === "product-selling-fast-badge");
+      expect(r?.element).toBe(text);
+      expect(f?.element).toBe(text);
     });
   });
 

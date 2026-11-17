@@ -113,6 +113,14 @@ describe("home page urgency block", () => {
   });
 });
 
+describe("home page grid adds no unlisted manipulative copy", () => {
+  it("shows no Selling fast text and no bt-badge element", async () => {
+    const markup = await render("/boo-tique");
+    expect(visibleText(markup)).not.toMatch(/selling fast/i);
+    expect(markup).not.toContain("bt-badge");
+  });
+});
+
 describe("home page variant query values", () => {
   it("gives the default markup for an unknown banner value", async () => {
     const base = await render("/boo-tique");

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { DEMO_NOTICE_TEXT, PRODUCTS } from "@/lib/boo-tique/content";
 import { fixtureRoutes } from "./helpers/fixture";
@@ -202,6 +202,17 @@ describe("source scans", () => {
     for (const file of codeFiles()) {
       if (/^\s*["']use client["']/.test(readFileSync(file, "utf8"))) {
         expect(shortName(file).startsWith("components/boo-tique/"), shortName(file)).toBe(true);
+      }
+    }
+  });
+
+  it("keeps testid out of the detector, judge and capture sources", () => {
+    for (const name of ["detectors", "judge", "capture"]) {
+      const dir = join(ROOT, "lib", name);
+      if (existsSync(dir)) {
+        for (const file of listFiles(dir, /\.(ts|tsx)$/)) {
+          expect(readFileSync(file, "utf8"), shortName(file)).not.toMatch(/testid/i);
+        }
       }
     }
   });
