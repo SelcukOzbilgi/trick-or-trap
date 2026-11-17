@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { MAX_URL_LENGTH } from "@/lib/capture/constants";
+import { MAX_HOP_URL_LENGTH, MAX_URL_LENGTH } from "@/lib/capture/constants";
 import { checkUrl, checkUrlSyntax, URL_SYNTAX_CHECK_ORDER, type Resolver } from "@/lib/capture/url-check";
 
-function codeOf(input: string, allowOrigin: string | null = null): string {
-  const result = checkUrlSyntax(input, allowOrigin);
+function codeOf(input: string, options?: { maxLength?: number }): string {
+  const result = checkUrlSyntax(input, options);
   return result.ok ? "ok" : result.code;
 }
 
@@ -27,6 +27,23 @@ describe("checkUrlSyntax: length and form", () => {
 
   it("checks the length before anything else", () => {
     expect(codeOf("ftp://" + "a".repeat(MAX_URL_LENGTH))).toBe("url-too-long");
+  });
+
+  it("accepts a 3,000-character URL with maxLength 8,192", () => {
+    const input = padded(3_000);
+    expect(input).toHaveLength(3_000);
+    expect(codeOf(input, { maxLength: MAX_HOP_URL_LENGTH })).toBe("ok");
+    expect(codeOf(input)).toBe("url-too-long");
+  });
+
+  it("accepts 8,192 characters and refuses 8,193 with maxLength 8,192", () => {
+    expect(codeOf(padded(8_192), { maxLength: 8_192 })).toBe("ok");
+    expect(codeOf(padded(8_193), { maxLength: 8_192 })).toBe("url-too-long");
+  });
+
+  it("uses 2,048 when the options hold no maxLength", () => {
+    expect(codeOf(padded(2_048), {})).toBe("ok");
+    expect(codeOf(padded(2_049), {})).toBe("url-too-long");
   });
 
   it.each([
@@ -100,6 +117,11 @@ describe("checkUrlSyntax: host names", () => {
     "http://db.internal/",
     "http://metadata.google.internal/",
     "http://db.internal./",
+    "http://localhost../",
+    "http://LOCALHOST.../",
+    "http://a.local../",
+    "http://b.internal../",
+    "http://x.localhost../",
   ])("blocks %s", (input) => {
     expect(codeOf(input)).toBe("url-host-blocked");
   });
@@ -159,64 +181,52 @@ describe("checkUrlSyntax: IP literals", () => {
 
 describe("checkUrlSyntax: normalisation", () => {
   it("drops the fragment", () => {
-    const result = checkUrlSyntax("https://example.com/p?q=1#frag", null);
+    const result = checkUrlSyntax("https://example.com/p?q=1#frag");
     expect(result).toEqual({ ok: true, url: "https://example.com/p?q=1", hostname: "example.com" });
   });
 
   it("drops an empty fragment marker", () => {
-    const result = checkUrlSyntax("https://example.com/#", null);
+    const result = checkUrlSyntax("https://example.com/#");
     expect(result.ok && result.url).toBe("https://example.com/");
   });
 
   it("returns the normalised form of the URL", () => {
-    const result = checkUrlSyntax("HTTP://Example.COM:80/a/../b", null);
+    const result = checkUrlSyntax("HTTP://Example.COM:80/a/../b");
     expect(result).toEqual({ ok: true, url: "http://example.com/b", hostname: "example.com" });
   });
 
   it("returns the canonical form of a public IPv4 spelled as a number", () => {
-    const result = checkUrlSyntax("http://134744072/", null);
+    const result = checkUrlSyntax("http://134744072/");
     expect(result).toEqual({ ok: true, url: "http://8.8.8.8/", hostname: "8.8.8.8" });
   });
 });
 
-describe("checkUrlSyntax: allow origin", () => {
-  const origin = "https://demo.example.com";
-
-  it("skips the host name rules for the exact origin", () => {
-    expect(codeOf("https://demo.example.com/boo-tique", origin)).toBe("ok");
+describe("checkUrlSyntax: no allowed-origin bypass", () => {
+  it("takes no allowed origin: a second argument holds only options", () => {
+    expect(checkUrlSyntax.length).toBeLessThanOrEqual(2);
+    expect(codeOf("http://localhost/")).toBe("url-host-blocked");
+    expect(codeOf("http://127.0.0.1/")).toBe("url-address-blocked");
   });
 
-  it("skips the host name and address rules for an allowed local name", () => {
-    expect(codeOf("http://localhost/", "http://localhost")).toBe("ok");
-    expect(codeOf("http://127.0.0.1/", "http://127.0.0.1")).toBe("ok");
+  it("applies the host name rules to every host", () => {
+    expect(codeOf("https://demo.example.com/boo-tique")).toBe("ok");
+    expect(codeOf("http://localhost/")).toBe("url-host-blocked");
   });
 
-  it("still applies the port rule to the allowed origin", () => {
-    expect(codeOf("http://localhost:3000/", "http://localhost:3000")).toBe("url-port-blocked");
+  it("still applies the port rule to a local name", () => {
+    expect(codeOf("http://localhost:3000/")).toBe("url-port-blocked");
   });
 
   it("still applies the credentials rule", () => {
-    expect(codeOf("https://user@demo.example.com/", origin)).toBe("url-credentials-blocked");
+    expect(codeOf("https://user@demo.example.com/")).toBe("url-credentials-blocked");
   });
 
   it("still applies the scheme rule", () => {
-    expect(codeOf("ftp://demo.example.com/", origin)).toBe("url-scheme-blocked");
+    expect(codeOf("ftp://demo.example.com/")).toBe("url-scheme-blocked");
   });
 
   it("still applies the length rule", () => {
-    expect(codeOf("https://demo.example.com/" + "a".repeat(MAX_URL_LENGTH), origin)).toBe("url-too-long");
-  });
-
-  it("does not extend the entry to another scheme, subdomain, parent domain or port", () => {
-    expect(codeOf("http://localhost/", "https://localhost")).toBe("url-host-blocked");
-    expect(codeOf("https://x.localhost/", "https://localhost")).toBe("url-host-blocked");
-    expect(codeOf("https://localhost/", "https://x.localhost")).toBe("url-host-blocked");
-    expect(codeOf("http://127.0.0.1/", "https://127.0.0.1")).toBe("url-address-blocked");
-    expect(codeOf("https://10.0.0.1/", "https://10.0.0.2")).toBe("url-address-blocked");
-  });
-
-  it("applies every rule when there is no allow entry", () => {
-    expect(codeOf("http://localhost/", null)).toBe("url-host-blocked");
+    expect(codeOf("https://demo.example.com/" + "a".repeat(MAX_URL_LENGTH))).toBe("url-too-long");
   });
 });
 
@@ -251,12 +261,8 @@ function fakeResolver(answers: Record<string, Answer>): Resolver & { calls: stri
   };
 }
 
-async function checkedCode(
-  input: string,
-  resolver: Resolver,
-  allowOrigin: string | null = null
-): Promise<string> {
-  const result = await checkUrl(input, { resolver, allowOrigin });
+async function checkedCode(input: string, resolver: Resolver): Promise<string> {
+  const result = await checkUrl(input, { resolver });
   return result.ok ? "ok" : result.code;
 }
 
@@ -269,7 +275,7 @@ describe("checkUrl: DNS answers", () => {
 
   it("returns the normalised URL and host name on success", async () => {
     const resolver = fakeResolver({ "example.com": ["93.184.216.34"] });
-    const result = await checkUrl("HTTPS://Example.COM/a#frag", { resolver, allowOrigin: null });
+    const result = await checkUrl("HTTPS://Example.COM/a#frag", { resolver });
     expect(result).toEqual({ ok: true, url: "https://example.com/a", hostname: "example.com" });
   });
 
@@ -350,7 +356,7 @@ describe("checkUrl: DNS answers", () => {
 
   it("does not put the resolver error text into the result", async () => {
     const resolver = fakeResolver({ "example.com": new Error("sk-test-sentinel") });
-    const result = await checkUrl("https://example.com/", { resolver, allowOrigin: null });
+    const result = await checkUrl("https://example.com/", { resolver });
     expect(JSON.stringify(result)).not.toContain("sk-test-sentinel");
   });
 });
@@ -386,66 +392,48 @@ describe("checkUrl: when the resolver is not called", () => {
   });
 });
 
-describe("checkUrl: allow entry", () => {
-  const origin = "https://demo.example.com";
+describe("checkUrl: no allowed-origin bypass", () => {
+  it("has no allowOrigin option in its options type", () => {
+    const options: Parameters<typeof checkUrl>[1] = { resolver: fakeResolver({}) };
+    expect(Object.keys(options)).toEqual(["resolver"]);
+  });
 
-  it("accepts the allowed origin although it resolves to a private address", async () => {
+  it("blocks a host that resolves to a private address, whatever the host is", async () => {
     const resolver = fakeResolver({ "demo.example.com": ["10.0.0.1"] });
-    expect(await checkedCode("https://demo.example.com/boo-tique", resolver, origin)).toBe("ok");
+    expect(await checkedCode("https://demo.example.com/boo-tique", resolver)).toBe("url-address-blocked");
     expect(resolver.calls).toEqual(["demo.example.com"]);
   });
 
-  it("accepts the allowed origin when it resolves to a public address", async () => {
+  it("accepts a host that resolves to a public address", async () => {
     const resolver = fakeResolver({ "demo.example.com": ["93.184.216.34"] });
-    expect(await checkedCode("https://demo.example.com/", resolver, origin)).toBe("ok");
+    expect(await checkedCode("https://demo.example.com/", resolver)).toBe("ok");
   });
 
-  it("still requires the allowed origin to resolve", async () => {
+  it("requires every host to resolve", async () => {
     const resolver = fakeResolver({ "demo.example.com": new Error("ENOTFOUND") });
-    expect(await checkedCode("https://demo.example.com/", resolver, origin)).toBe("dns-failed");
+    expect(await checkedCode("https://demo.example.com/", resolver)).toBe("dns-failed");
   });
 
-  it("still requires an answer for the allowed origin", async () => {
+  it("requires an answer for every host", async () => {
     const resolver = fakeResolver({ "demo.example.com": [] });
-    expect(await checkedCode("https://demo.example.com/", resolver, origin)).toBe("dns-failed");
+    expect(await checkedCode("https://demo.example.com/", resolver)).toBe("dns-failed");
   });
 
-  it("checks a subdomain of the allowed origin normally", async () => {
-    const resolver = fakeResolver({ "sub.demo.example.com": ["10.0.0.1"] });
-    expect(await checkedCode("https://sub.demo.example.com/", resolver, origin)).toBe("url-address-blocked");
-  });
-
-  it("checks another scheme of the allowed host normally", async () => {
-    const resolver = fakeResolver({ "demo.example.com": ["10.0.0.1"] });
-    expect(await checkedCode("http://demo.example.com/", resolver, origin)).toBe("url-address-blocked");
-  });
-
-  it("checks another port of the allowed host normally", async () => {
+  it("blocks credentials before any lookup", async () => {
     const resolver = fakeResolver({ "demo.example.com": ["93.184.216.34"] });
-    expect(await checkedCode("https://demo.example.com:8443/", resolver, origin)).toBe("url-port-blocked");
-  });
-
-  it("checks the parent domain of the allowed origin normally", async () => {
-    const resolver = fakeResolver({ "example.com": ["10.0.0.1"] });
-    expect(await checkedCode("https://example.com/", resolver, origin)).toBe("url-address-blocked");
-  });
-
-  it("still blocks credentials on the allowed origin", async () => {
-    const resolver = fakeResolver({ "demo.example.com": ["93.184.216.34"] });
-    expect(await checkedCode("https://user@demo.example.com/", resolver, origin)).toBe("url-credentials-blocked");
+    expect(await checkedCode("https://user@demo.example.com/", resolver)).toBe("url-credentials-blocked");
     expect(resolver.calls).toHaveLength(0);
   });
 
-  it("blocks an allowed origin on a non-default port", async () => {
+  it("blocks a non-default port before any lookup", async () => {
     const resolver = fakeResolver({ "demo.example.com": ["93.184.216.34"] });
-    expect(
-      await checkedCode("https://demo.example.com:8443/", resolver, "https://demo.example.com:8443")
-    ).toBe("url-port-blocked");
+    expect(await checkedCode("https://demo.example.com:8443/", resolver)).toBe("url-port-blocked");
     expect(resolver.calls).toHaveLength(0);
   });
 
-  it("applies the address rules to a name when there is no allow entry", async () => {
-    const resolver = fakeResolver({ "demo.example.com": ["10.0.0.1"] });
-    expect(await checkedCode("https://demo.example.com/", resolver, null)).toBe("url-address-blocked");
+  it("blocks a host name with trailing dots before any lookup", async () => {
+    const resolver = fakeResolver({});
+    expect(await checkedCode("http://localhost../", resolver)).toBe("url-host-blocked");
+    expect(resolver.calls).toHaveLength(0);
   });
 });

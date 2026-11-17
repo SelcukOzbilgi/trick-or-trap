@@ -83,7 +83,7 @@ describe("capture constants", () => {
 
   it("has the viewport and session values", () => {
     expect(constants.BROWSER_VIEWPORT).toEqual({ width: 1280, height: 800 });
-    expect(constants.SESSION_TIMEOUT_DEFAULT_MINUTES).toBe(2);
+    expect(constants.SESSION_TIMEOUT_DEFAULT_MINUTES).toBe(1);
     expect(constants.SESSION_TIMEOUT_MIN_MINUTES).toBe(1);
     expect(constants.SESSION_TIMEOUT_MAX_MINUTES).toBe(5);
   });

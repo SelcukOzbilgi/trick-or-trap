@@ -349,12 +349,13 @@ describe("capturePage: refusals before any session", () => {
     expect(fake.createCalls).toBe(0);
   });
 
-  it("scans the allowed origin even though it would otherwise be refused", async () => {
+  it("refuses the allowed origin when it resolves to a private address", async () => {
     const { resolver } = createResolver({ "demo.example.com": ["10.0.0.9"] });
     const { clock, fake, deps } = setup({}, { resolver, config: configFor({ allowOrigin: "https://demo.example.com" }) });
     const result = await drive(capturePage("https://demo.example.com/boo-tique", deps), clock);
-    expect(result.ok).toBe(true);
-    expect(fake.createCalls).toBe(1);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("url-address-blocked");
+    expect(fake.createCalls).toBe(0);
   });
 
   it("returns browser-mode-unsupported from an injected getBrowser", async () => {

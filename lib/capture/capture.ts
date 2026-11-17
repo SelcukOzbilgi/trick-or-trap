@@ -149,14 +149,14 @@ async function runCapture(
   if (config.apiKey !== null) ctx.secrets.push(config.apiKey);
 
   const resolver = deps.resolver ?? createDnsResolver();
-  const urlOptions = { resolver, allowOrigin: config.allowOrigin };
+  const urlOptions = { resolver };
 
   // Verdict per origin, so each redirect hop on the same origin does not repeat the DNS
   // lookup. The syntax checks run on every URL; the key is the origin and not the host
-  // because the allowed origin depends on scheme and port.
+  // because the checks depend on scheme and port.
   const verdicts = new Map<string, Promise<UrlErrorCode | null>>();
   const inspect = async (candidate: string): Promise<UrlCheckResult> => {
-    const syntax = checkUrlSyntax(candidate, config.allowOrigin);
+    const syntax = checkUrlSyntax(candidate);
     if (!syntax.ok) return syntax;
     const origin = new URL(syntax.url).origin;
     let pending = verdicts.get(origin);
