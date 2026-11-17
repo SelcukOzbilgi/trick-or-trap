@@ -7,13 +7,13 @@
     "node": ">=20.9.0"
   },
   "scripts": {
-    "prepare": "node scripts/enable-hooks.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --maxWorkers=2"
+    "test": "vitest run --maxWorkers=2",
+    "hooks:enable": "node scripts/enable-hooks.mjs"
   },
   "dependencies": {
     "next": "^16.4.6",

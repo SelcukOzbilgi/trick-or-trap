@@ -1,7 +1,8 @@
-// Run by `npm install` (the prepare script). Points git at .githooks, where the
-// pre-commit secret scan lives. Safe to run again and again: it only sets one
-// config value. It does nothing in CI, and nothing in a copy of the code that
-// isn't a git checkout (a tarball, or a `vercel deploy` upload).
+// Opt-in: run by hand with `npm run hooks:enable`, never by `npm install`.
+// Points git at .githooks, where the pre-commit secret scan lives. Turn it off
+// again with `git config --unset core.hooksPath`. Safe to run again and again: it
+// only sets one config value. It does nothing in CI, and nothing in a copy of the
+// code that isn't a git checkout.
 // It never fails the install: if git is missing or the config can't be written,
 // it prints a note and exits 0.
 
