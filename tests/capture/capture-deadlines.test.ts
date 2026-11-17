@@ -255,6 +255,8 @@ describe("capturePage: deadlines", () => {
     await tick();
     clock.advance(500);
     await tick();
+    clock.advance(500); // the settle delay after the reload (task 14)
+    await tick();
     const result = await promise;
     expect(result.ok).toBe(true);
     expect(clock.pendingTimers).toBe(0);

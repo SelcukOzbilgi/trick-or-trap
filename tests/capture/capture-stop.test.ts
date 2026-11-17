@@ -202,6 +202,8 @@ describe("capturePage: stop is called exactly once on every path", () => {
     await tick();
     clock.advance(500); // the settle delay
     await tick();
+    clock.advance(500); // the settle delay after the reload (task 14)
+    await tick();
     expect(fake.stopCalls).toBe(1);
     expect(settled).toBe(false);
 

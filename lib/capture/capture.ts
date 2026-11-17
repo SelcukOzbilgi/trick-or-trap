@@ -11,7 +11,7 @@
  * It writes nothing to the console.
  */
 import "server-only";
-import { PageSnapshotSchema, type PageSnapshot } from "@/lib/types";
+import { BaseSnapshotSchema, PageSnapshotSchema, type BaseSnapshot, type PageSnapshot } from "@/lib/types";
 import { getBrowser } from "./browser";
 import { createDeadline, createSystemClock, withTimeout, type Clock, type StageLimit } from "./clock";
 import { getCaptureConfig, type CaptureConfig } from "./config";
@@ -21,8 +21,11 @@ import {
   CAPTURE_TIMEOUT_MS,
   MAX_ATTR_CHARS,
   MAX_ELEMENTS,
+  MAX_ELEMENTS_LIGHT,
   MAX_TEXT_CHARS,
+  MAX_TEXT_CHARS_LIGHT,
   NAVIGATION_TIMEOUT_MS,
+  RELOAD_MIN_REMAINING_MS,
   SETTLE_DELAY_MS,
   CDP_CONNECT_TIMEOUT_MS,
 } from "./constants";
@@ -62,6 +65,9 @@ type CaptureContext = {
 };
 
 type CaptureSuccess = { snapshot: PageSnapshot; images: CaptureImage[] };
+
+/** Attributes of the light reload sample. */
+const LIGHT_ATTRIBUTE_NAMES: readonly string[] = ["type", "name", "disabled", "data-testid"];
 
 function sleep(clock: Clock, ms: number): Promise<void> {
   return new Promise<void>((resolve) => {
@@ -248,11 +254,57 @@ async function runCapture(
     throw asStageFailure(error, "screenshot-failed", ctx.secrets);
   }
   for (const code of shots.warnings) ctx.warnings.add(code);
+
+  /**
+   * Reloads the page in the same session and reads it again with the light options.
+   * Every failure, including a block, a timeout and an invalid sample, becomes the
+   * warning `reload-failed`; the result is then `undefined`.
+   */
+  const takeReloadSample = async (): Promise<BaseSnapshot | undefined> => {
+    const remaining = deadline.remainingMs();
+    if (remaining < RELOAD_MIN_REMAINING_MS) {
+      ctx.warnings.add("reload-skipped");
+      return undefined;
+    }
+    try {
+      const navigationMs = Math.min(NAVIGATION_TIMEOUT_MS, remaining);
+      const reloaded = await step(() => page.reload({ timeoutMs: navigationMs }), undefined, {
+        ms: navigationMs,
+        code: "navigation-timeout",
+      });
+      const reloadedAt = await step(() => inspect(reloaded.finalUrl));
+      if (!reloadedAt.ok) throw new CaptureFailure("navigation-blocked");
+      await step(() => sleep(clock, SETTLE_DELAY_MS));
+      const reloadRaw = await step(() =>
+        page.collect({
+          maxElements: MAX_ELEMENTS_LIGHT,
+          maxTextChars: MAX_TEXT_CHARS_LIGHT,
+          maxAttrChars: MAX_ATTR_CHARS,
+          attributeNames: LIGHT_ATTRIBUTE_NAMES,
+        }),
+      );
+      const second = buildSample(reloadRaw, {
+        light: true,
+        url: reloadedAt.url,
+        capturedAt: new Date(clock.now()).toISOString(),
+      });
+      const checked = BaseSnapshotSchema.safeParse(second);
+      if (!checked.success) throw new CaptureFailure("snapshot-invalid");
+      return checked.data;
+    } catch {
+      ctx.warnings.add("reload-failed");
+      return undefined;
+    }
+  };
   const sample = buildSample(raw, { light: false, url: landed.url, capturedAt, images: shots.meta });
   if (sample.capture?.elementsTruncated) ctx.warnings.add("elements-truncated");
 
+  // 9. Second sample after a reload. Never throws and never changes the first capture.
+  const afterReload = await takeReloadSample();
+  const assembled = afterReload ? { ...sample, afterReload } : sample;
+
   // 10. Validation.
-  const parsed = PageSnapshotSchema.safeParse(sample);
+  const parsed = PageSnapshotSchema.safeParse(assembled);
   if (!parsed.success) {
     const paths = parsed.error.issues.slice(0, 5).map((issue) => issue.path.join("."));
     throw new CaptureFailure("snapshot-invalid", toDetail(paths.join(", "), []));

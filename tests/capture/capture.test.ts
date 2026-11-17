@@ -120,7 +120,7 @@ describe("capturePage: success", () => {
     expect(result.snapshot.viewportWidth).toBe(1280);
     expect(result.snapshot.fullHeight).toBe(1_200);
     expect(result.snapshot.screenshotRef).toBeUndefined();
-    expect(result.snapshot.afterReload).toBeUndefined();
+    expect(result.snapshot.afterReload).toBeDefined(); // the reload sample is covered by capture-reload.test.ts
     expect(result.snapshot.secondSample).toBeUndefined();
     expect(result.snapshot.elements).toHaveLength(1);
     expect(result.snapshot.elements[0]).toMatchObject({
@@ -140,14 +140,27 @@ describe("capturePage: success", () => {
     expect(result.snapshot.capture).toMatchObject({ light: false, elementsTruncated: false, eligibleElementCount: 1 });
     expect(result.warnings).toEqual([]);
 
-    expect(fake.calls).toEqual(["createSession", "connect", "installGuards", "goto", "collect", "screenshot", "stop"]);
+    expect(fake.calls).toEqual([
+      "createSession",
+      "connect",
+      "installGuards",
+      "goto",
+      "collect",
+      "screenshot",
+      "reload",
+      "collect",
+      "stop",
+    ]);
     expect(fake.createCalls).toBe(1);
     expect(fake.stopCalls).toBe(1);
     expect(fake.sessionRequests[0]).toEqual({ timeoutMinutes: 2, proxy: "off", viewport: { width: 1280, height: 800 } });
     expect(fake.gotoUrls).toEqual([URL_OK]);
-    expect(fake.collectOptions).toEqual([
-      { maxElements: 1_500, maxTextChars: 300, maxAttrChars: 200, attributeNames: "full" },
-    ]);
+    expect(fake.collectOptions[0]).toEqual({
+      maxElements: 1_500,
+      maxTextChars: 300,
+      maxAttrChars: 200,
+      attributeNames: "full",
+    });
   });
 
   it("passes the session settings of the configuration on", async () => {
@@ -168,10 +181,12 @@ describe("capturePage: success", () => {
     expect(fake.calls).not.toContain("collect");
     clock.advance(1);
     await tick();
+    clock.advance(500); // the settle delay after the reload (task 14)
+    await tick();
 
     const result = await promise;
     expect(result.ok).toBe(true);
-    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(1);
+    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(2);
     expect(fake.calls.indexOf("collect")).toBeLessThan(fake.calls.indexOf("screenshot"));
     expect(fake.calls.indexOf("goto")).toBeLessThan(fake.calls.indexOf("collect"));
   });
@@ -240,7 +255,10 @@ describe("capturePage: success", () => {
   });
 
   it("warns about a redirect and records the final URL", async () => {
-    const { clock, deps } = setup({ goto: { finalUrl: "https://shop.example.com/final?x=1" } });
+    const { clock, deps } = setup({
+      goto: { finalUrl: "https://shop.example.com/final?x=1" },
+      reload: { finalUrl: "https://shop.example.com/final?x=1" },
+    });
     const result = await drive(capturePage(URL_OK, deps), clock);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -249,7 +267,10 @@ describe("capturePage: success", () => {
   });
 
   it("does not call a fragment-only difference a redirect", async () => {
-    const { clock, fake, deps } = setup({ goto: { finalUrl: "https://shop.example.com/#section" } });
+    const { clock, fake, deps } = setup({
+      goto: { finalUrl: "https://shop.example.com/#section" },
+      reload: { finalUrl: "https://shop.example.com/#section" },
+    });
     const result = await drive(capturePage("https://shop.example.com/#top", deps), clock);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -267,6 +288,7 @@ describe("capturePage: success", () => {
         holder.fake?.emit({ kind: "download-refused" });
         return { finalUrl: requestedUrl };
       },
+      reload: { finalUrl: URL_OK },
     });
     holder.fake = fake;
 
