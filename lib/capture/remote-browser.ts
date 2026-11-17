@@ -65,8 +65,8 @@ function noop(): void {}
 
 async function loadChromium(deps: RemoteBrowserDeps): Promise<PwChromium> {
   const loaded = deps.loadPlaywright ? await deps.loadPlaywright() : await import("playwright-core");
-  const module = loaded as unknown as { chromium?: PwChromium; default?: { chromium?: PwChromium } };
-  const chromium = module.chromium ?? module.default?.chromium;
+  const pw = loaded as unknown as { chromium?: PwChromium; default?: { chromium?: PwChromium } };
+  const chromium = pw.chromium ?? pw.default?.chromium;
   if (!chromium || typeof chromium.connectOverCDP !== "function") {
     throw new Error("The browser automation module has no chromium export.");
   }
