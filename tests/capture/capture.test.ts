@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -12,8 +14,8 @@ import { capturePage, type CaptureDeps } from "@/lib/capture/capture";
 import type { CaptureConfig } from "@/lib/capture/config";
 import { COLLECT_LIMITS } from "@/lib/capture/constants";
 import { createRemoteBrowser } from "@/lib/capture/remote-browser";
-import type { GetBrowserResult } from "@/lib/capture/seam";
-import type { CaptureResult, RawElement } from "@/lib/capture/types";
+import type { BrowserProvider, BrowserSessionHandle, GetBrowserResult } from "@/lib/capture/seam";
+import { CaptureFailure, type CaptureResult, type RawElement } from "@/lib/capture/types";
 import type { Resolver } from "@/lib/capture/url-check";
 import { PageSnapshotSchema } from "@/lib/types";
 import { createFakeBrowser, createRawPageRead, type FakeBrowser, type FakeScript } from "./helpers/fake-browser";
@@ -617,5 +619,133 @@ describe("capturePage: capture id", () => {
     expect(typeof body.metadata.captureId).toBe("string");
     expect(body.metadata.captureId).not.toContain(SECRET_KEY);
     expect(body.metadata.captureId).not.toContain("shop.example.com");
+  });
+});
+
+describe("capturePage: waitUntil", () => {
+  it("hands the stop promise to waitUntil", async () => {
+    const waitUntil = vi.fn();
+    const { clock, fake, deps } = setup({}, { waitUntil });
+
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    const handed = waitUntil.mock.calls[0][0] as Promise<unknown>;
+    expect(typeof handed.then).toBe("function");
+    await expect(handed).resolves.toBeUndefined();
+    expect(fake.stopCalls).toBe(1);
+  });
+
+  it("hands the stop promise over even when the stop fails", async () => {
+    const waitUntil = vi.fn();
+    const { clock, deps } = setup({ stop: new Error("stop failed") }, { waitUntil });
+
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    await expect(waitUntil.mock.calls[0][0] as Promise<unknown>).resolves.toBeUndefined();
+  });
+
+  it("hands the reclaim promise to waitUntil", async () => {
+    const waitUntil = vi.fn();
+    const fake = createFakeBrowser({
+      createSession: new CaptureFailure("session-create-timeout", undefined, { reclaim: true }),
+    });
+    const reclaim = vi.fn(async () => {});
+    const provider: BrowserProvider = {
+      mode: "fake",
+      createSession: (request) => fake.provider.createSession(request),
+      reclaim,
+    };
+    const { clock, deps } = setup({}, { getBrowser: () => ({ ok: true, browser: provider }), waitUntil });
+
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(false);
+    expect(reclaim).toHaveBeenCalledTimes(1);
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    await expect(waitUntil.mock.calls[0][0] as Promise<unknown>).resolves.toBeUndefined();
+  });
+
+  it("hands the stop of a session that arrives after the whole deadline to waitUntil", async () => {
+    const fake = createFakeBrowser();
+    const handle = await fake.provider.createSession({
+      timeoutMinutes: 1,
+      proxy: "off",
+      viewport: { width: 1280, height: 800 },
+      captureId: "capture-id-sentinel",
+    });
+    let release: (value: BrowserSessionHandle) => void = () => {};
+    const late = new Promise<BrowserSessionHandle>((resolveLate) => {
+      release = resolveLate;
+    });
+    const clock = createManualClock();
+    const slowResolver: Resolver = {
+      resolveAddresses: () =>
+        new Promise<string[]>((resolveAddresses) => {
+          clock.setTimer(40_000, () => resolveAddresses(["93.184.216.34"]));
+        }),
+    };
+    const waitUntil = vi.fn();
+    const promise = capturePage(URL_OK, {
+      config: configFor(),
+      getBrowser: () => ({ ok: true, browser: { mode: "fake", createSession: () => late } }),
+      resolver: slowResolver,
+      clock,
+      waitUntil,
+    });
+
+    await tick();
+    clock.advance(40_000);
+    await tick();
+    clock.advance(5_000);
+    await tick();
+    const result = await promise;
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("capture-timeout");
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    expect(fake.stopCalls).toBe(0);
+
+    release(handle);
+    await expect(waitUntil.mock.calls[0][0] as Promise<unknown>).resolves.toBeUndefined();
+    expect(fake.stopCalls).toBe(1);
+  });
+
+  it("ignores a waitUntil that throws", async () => {
+    const waitUntil = vi.fn(() => {
+      throw new Error("waitUntil is not available");
+    });
+    const { clock, fake, deps } = setup({}, { waitUntil });
+
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    expect(waitUntil).toHaveBeenCalled();
+    expect(fake.stopCalls).toBe(1);
+  });
+
+  it("behaves as before without waitUntil", async () => {
+    const { clock, fake, deps } = setup();
+    expect(deps.waitUntil).toBeUndefined();
+
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings).toEqual([]);
+    expect(fake.stopCalls).toBe(1);
+  });
+});
+
+describe("capturePage: documentation", () => {
+  it("states in its doc comment that detail is for server logs only", () => {
+    const source = readFileSync(resolve(process.cwd(), "lib/capture/capture.ts"), "utf8");
+    const index = source.indexOf("export async function capturePage");
+    expect(index).toBeGreaterThan(0);
+    const before = source.slice(0, index);
+    const comment = before.slice(before.lastIndexOf("/**"));
+    expect(comment).toMatch(/detail/);
+    expect(comment).toMatch(/server logs only/);
   });
 });

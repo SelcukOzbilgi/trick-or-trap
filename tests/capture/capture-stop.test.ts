@@ -4,11 +4,12 @@ vi.mock("server-only", () => ({}));
 
 import { capturePage, type CaptureDeps } from "@/lib/capture/capture";
 import type { CaptureConfig } from "@/lib/capture/config";
+import { STOP_TIMEOUT_MS } from "@/lib/capture/constants";
 import type { BrowserProvider, BrowserSessionHandle, GetBrowserResult } from "@/lib/capture/seam";
 import { CaptureFailure, ERROR_MESSAGES, type CaptureErrorCode, type CaptureResult } from "@/lib/capture/types";
 import type { Resolver } from "@/lib/capture/url-check";
 import { PageSnapshotSchema } from "@/lib/types";
-import { createFakeBrowser, type FakeScript } from "./helpers/fake-browser";
+import { createFakeBrowser, createRawPageRead, type FakeScript } from "./helpers/fake-browser";
 import { createManualClock, type ManualClock } from "./helpers/manual-clock";
 
 const SECRET_KEY = "sk-test-sentinel";
@@ -329,6 +330,211 @@ describe("capturePage: stop is called exactly once on every path", () => {
     } finally {
       process.off("unhandledRejection", unhandled);
     }
+  });
+});
+
+describe("capturePage: no secret in the result at any stage", () => {
+  const SECRETS = [SECRET_KEY, SESSION_ID, CDP_URL, LIVE_URL];
+  const LEAK = `leak ${SECRET_KEY} ${SESSION_ID} ${CDP_URL} ${LIVE_URL}`;
+  const TALL = createRawPageRead({ scrollHeight: 45_000 });
+
+  /** Makes `installGuards` of the page of a fake browser throw `error`. */
+  function failInstallGuards(fake: ReturnType<typeof createFakeBrowser>, error: Error): void {
+    const realCreate = fake.provider.createSession.bind(fake.provider);
+    vi.spyOn(fake.provider, "createSession").mockImplementation(async (request) => {
+      const handle = await realCreate(request);
+      return {
+        ...handle,
+        async connect(options) {
+          const page = await handle.connect(options);
+          return {
+            ...page,
+            async installGuards() {
+              throw error;
+            },
+          };
+        },
+      };
+    });
+  }
+
+  function expectNoSecret(result: CaptureResult, secrets: readonly string[] = SECRETS): void {
+    const json = JSON.stringify(result);
+    for (const secret of secrets) expect(json).not.toContain(secret);
+  }
+
+  it.each<{ stage: string; script: FakeScript; code: CaptureErrorCode }>([
+    { stage: "connect", script: { connect: new Error(LEAK) }, code: "connect-failed" },
+    { stage: "goto", script: { goto: new Error(LEAK) }, code: "navigation-failed" },
+    { stage: "collect", script: { collect: new Error(LEAK) }, code: "page-read-failed" },
+    { stage: "screenshot", script: { screenshot: new Error(LEAK) }, code: "screenshot-failed" },
+    {
+      stage: "scrollTo",
+      script: { collect: TALL, scrollTo: new Error(LEAK) },
+      code: "screenshot-failed",
+    },
+  ])("redacts all four secrets from an error at $stage", async ({ script, code }) => {
+    const { clock, fake, deps } = setup({ secrets: SECRETS, ...script });
+
+    const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
+
+    expect(result.error.code).toBe(code);
+    expect(result.error.detail).toBeDefined();
+    expect(result.error.detail).toContain("[redacted]");
+    expectNoSecret(result);
+    expect(fake.stopCalls).toBe(1);
+  });
+
+  it("redacts all four secrets from an error at installGuards", async () => {
+    const { clock, fake, deps } = setup({ secrets: SECRETS });
+    failInstallGuards(fake, new Error(LEAK));
+
+    const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
+
+    expect(result.error.code).toBe("connect-failed");
+    expectNoSecret(result);
+  });
+
+  it("redacts the key and the addresses from an error at create", async () => {
+    // The session id does not exist yet when create fails. Redacting what the answer
+    // held is the job of `createSession` in browser-use-api.ts, which has its own test.
+    const { clock, deps } = setup({ secrets: SECRETS, createSession: new Error(LEAK) });
+
+    const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
+
+    expect(result.error.code).toBe("session-create-failed");
+    expectNoSecret(result, [SECRET_KEY, CDP_URL, LIVE_URL]);
+  });
+
+  it("redacts an error text that reaches a CaptureFailure detail unredacted", async () => {
+    const { clock, deps } = setup({ secrets: SECRETS, goto: new CaptureFailure("navigation-failed", LEAK) });
+
+    const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
+
+    expect(result.error.code).toBe("navigation-failed");
+    expectNoSecret(result);
+  });
+
+  it("keeps the result and holds no secret when the reload fails", async () => {
+    const { clock, deps } = setup({ secrets: SECRETS, reload: new Error(LEAK) });
+
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings.map((warning) => warning.code)).toEqual(["reload-failed"]);
+    expectNoSecret(result);
+  });
+
+  it("keeps the result and holds no secret when stop fails", async () => {
+    const { clock, deps } = setup({ secrets: SECRETS, stop: new Error(LEAK) });
+
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    expect(result.warnings.map((warning) => warning.code)).toEqual(["session-stop-failed"]);
+    expectNoSecret(result);
+  });
+});
+
+describe("capturePage: reclaim after a create that may have left a session", () => {
+  function providerWith(fake: ReturnType<typeof createFakeBrowser>, reclaim: (captureId: string) => Promise<void>) {
+    const provider: BrowserProvider = {
+      mode: "fake",
+      createSession: (request) => fake.provider.createSession(request),
+      reclaim,
+    };
+    return provider;
+  }
+
+  it("calls provider.reclaim exactly once with the capture id after a failure with reclaim: true", async () => {
+    const fake = createFakeBrowser({
+      createSession: new CaptureFailure("session-create-timeout", undefined, { reclaim: true }),
+    });
+    const reclaim = vi.fn(async () => {});
+    const { clock, deps } = setup({}, {
+      getBrowser: () => ({ ok: true, browser: providerWith(fake, reclaim) }),
+      newCaptureId: () => "capture-id-reclaim",
+    });
+
+    const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
+
+    expect(result.error.code).toBe("session-create-timeout");
+    expect(reclaim).toHaveBeenCalledTimes(1);
+    expect(reclaim).toHaveBeenCalledWith("capture-id-reclaim");
+    expect(fake.stopCalls).toBe(0);
+  });
+
+  it("does not call provider.reclaim after a failure with reclaim: false", async () => {
+    const fake = createFakeBrowser({ createSession: new CaptureFailure("session-create-failed", "HTTP 500") });
+    const reclaim = vi.fn(async () => {});
+    const { clock, deps } = setup({}, { getBrowser: () => ({ ok: true, browser: providerWith(fake, reclaim) }) });
+
+    const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
+
+    expect(result.error.code).toBe("session-create-failed");
+    expect(reclaim).not.toHaveBeenCalled();
+  });
+
+  it("does not call provider.reclaim when a later stage fails", async () => {
+    const fake = createFakeBrowser({ goto: new Error("boom") });
+    const reclaim = vi.fn(async () => {});
+    const { clock, deps } = setup({}, { getBrowser: () => ({ ok: true, browser: providerWith(fake, reclaim) }) });
+
+    failureOf(await drive(capturePage(URL_OK, deps), clock));
+
+    expect(reclaim).not.toHaveBeenCalled();
+  });
+
+  it("ends a reclaim that hangs at STOP_TIMEOUT_MS and keeps the error", async () => {
+    const fake = createFakeBrowser({
+      createSession: new CaptureFailure("session-create-failed", undefined, { reclaim: true }),
+    });
+    const reclaim = vi.fn(() => new Promise<void>(() => {}));
+    const { clock, deps } = setup({}, { getBrowser: () => ({ ok: true, browser: providerWith(fake, reclaim) }) });
+    const promise = capturePage(URL_OK, deps);
+    let settled = false;
+    void promise.then(() => (settled = true));
+
+    await tick();
+    await tick();
+    expect(reclaim).toHaveBeenCalledTimes(1);
+    expect(settled).toBe(false);
+    clock.advance(STOP_TIMEOUT_MS - 1);
+    await tick();
+    expect(settled).toBe(false);
+    clock.advance(1);
+    await tick();
+    expect(settled).toBe(true);
+
+    const result = failureOf(await promise);
+    expect(result.error.code).toBe("session-create-failed");
+    expect(result.warnings).toEqual([]);
+    expect(reclaim).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a reclaim that rejects", async () => {
+    const fake = createFakeBrowser({
+      createSession: new CaptureFailure("session-create-failed", undefined, { reclaim: true }),
+    });
+    const reclaim = vi.fn(async () => {
+      throw new Error(`reclaim failed ${SECRET_KEY}`);
+    });
+    const { clock, deps } = setup({}, { getBrowser: () => ({ ok: true, browser: providerWith(fake, reclaim) }) });
+
+    const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
+
+    expect(result.error.code).toBe("session-create-failed");
+    expect(JSON.stringify(result)).not.toContain(SECRET_KEY);
+  });
+
+  it("works for a provider without a reclaim method", async () => {
+    const { clock, deps } = setup({
+      createSession: new CaptureFailure("session-create-failed", undefined, { reclaim: true }),
+    });
+
+    const result = failureOf(await drive(capturePage(URL_OK, deps), clock));
+
+    expect(result.error.code).toBe("session-create-failed");
   });
 });
 

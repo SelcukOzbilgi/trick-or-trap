@@ -23,18 +23,20 @@ import {
   MAX_ATTR_CHARS,
   MAX_ELEMENTS,
   MAX_ELEMENTS_LIGHT,
+  MAX_HOP_URL_LENGTH,
   MAX_TEXT_CHARS,
   MAX_TEXT_CHARS_LIGHT,
   NAVIGATION_TIMEOUT_MS,
   RELOAD_MIN_REMAINING_MS,
   SETTLE_DELAY_MS,
+  STOP_TIMEOUT_MS,
   CDP_CONNECT_TIMEOUT_MS,
 } from "./constants";
 import { buildSample } from "./extractor";
-import { toDetail } from "./redact";
+import { redactText, toDetail } from "./redact";
 import { createDnsResolver } from "./resolver";
 import { captureImages } from "./screenshots";
-import type { BrowserSessionHandle, GetBrowserResult, PageGuards } from "./seam";
+import type { BrowserProvider, BrowserSessionHandle, GetBrowserResult, PageGuards } from "./seam";
 import {
   CaptureFailure,
   ERROR_MESSAGES,
@@ -56,18 +58,30 @@ export interface CaptureDeps {
   clock: Clock;
   /** Makes the random id of one capture. Default: `crypto.randomUUID()`. Never derived from the URL or the key. */
   newCaptureId: () => string;
+  /**
+   * Hands cleanup that must outlive the response to the platform (for example `after()`
+   * or `waitUntil`). It receives the stop of a session that arrives after the whole
+   * deadline, the stop call and the create clean-up. The promises it receives never
+   * reject. An exception thrown by it is ignored.
+   */
+  waitUntil?: (promise: Promise<unknown>) => void;
 }
 
 /** What one capture shares between its steps and the cleanup after them. */
 type CaptureContext = {
   handle?: BrowserSessionHandle;
+  /** The API key, and the secrets of the session once it exists. Redacted from every text. */
   secrets: string[];
   warnings: Set<CaptureWarningCode>;
   /** Set when a guard refused a main-frame navigation request. */
   navigationBlocked: boolean;
+  /** Refused requests of this capture: how many, and the reason of the first. */
+  blocked: { count: number; reason?: UrlErrorCode };
 };
 
 type CaptureSuccess = { snapshot: PageSnapshot; images: CaptureImage[] };
+
+type CaptureOutcome = { ok: true; success: CaptureSuccess } | { ok: false; error: unknown };
 
 /** Attributes of the light reload sample. */
 const LIGHT_ATTRIBUTE_NAMES: readonly string[] = ["type", "name", "disabled"];
@@ -80,10 +94,27 @@ function sleep(clock: Clock, ms: number): Promise<void> {
 
 function ignore(): void {}
 
+/** Passes a promise to `deps.waitUntil`. A missing or throwing `waitUntil` changes nothing. */
+function handOff(deps: Partial<CaptureDeps>, promise: Promise<unknown>): void {
+  try {
+    deps.waitUntil?.(promise);
+  } catch {
+    // The platform hook failed; the cleanup still runs in this process.
+  }
+}
+
+/** The secrets of a session handle. A handle that throws or returns junk gives none. */
+function secretsOf(handle: BrowserSessionHandle): string[] {
+  try {
+    return Array.from(handle.secrets()).filter((secret): secret is string => typeof secret === "string");
+  } catch {
+    return [];
+  }
+}
+
 function toCaptureError(error: unknown, secrets: readonly string[]): CaptureError {
   if (error instanceof CaptureFailure) {
     const result: CaptureError = { code: error.code, message: ERROR_MESSAGES[error.code] };
-    // The detail is redacted where it is made; redacting again costs nothing.
     const detail = toDetail(error.detail, secrets);
     if (detail !== undefined) result.detail = detail;
     return result;
@@ -92,6 +123,27 @@ function toCaptureError(error: unknown, secrets: readonly string[]): CaptureErro
   const detail = toDetail(error, secrets);
   if (detail !== undefined) result.detail = detail;
   return result;
+}
+
+/**
+ * Builds the result of a capture. The only place that does it: every `error.detail` and
+ * every text of every warning passes through `redactText` with the full secret list of
+ * the capture here, whatever stage the text came from.
+ */
+function finalise(outcome: CaptureOutcome, ctx: CaptureContext): CaptureResult {
+  const secrets = [...ctx.secrets, ...(ctx.handle ? secretsOf(ctx.handle) : [])];
+  const warnings: CaptureWarning[] = Array.from(ctx.warnings, (code) => {
+    const warning: CaptureWarning = { code, message: redactText(WARNING_MESSAGES[code], secrets) };
+    if (code === "request-blocked" && ctx.blocked.reason !== undefined) {
+      warning.reason = ctx.blocked.reason;
+      warning.count = ctx.blocked.count;
+    }
+    return warning;
+  });
+  if (outcome.ok) {
+    return { ok: true, snapshot: outcome.success.snapshot, images: outcome.success.images, warnings };
+  }
+  return { ok: false, error: toCaptureError(outcome.error, secrets), warnings };
 }
 
 /**
@@ -115,6 +167,26 @@ async function stopSafely(handle: BrowserSessionHandle, clock: Clock, warnings: 
   } catch {
     warnings.add("session-stop-failed");
   }
+}
+
+/**
+ * One clean-up attempt after a create call that may have left a session behind. It is
+ * bounded by `STOP_TIMEOUT_MS`, handed to `waitUntil` and never throws; a failure or a
+ * timeout changes nothing in the result.
+ */
+async function reclaimOnce(
+  provider: BrowserProvider,
+  captureId: string,
+  clock: Clock,
+  deps: Partial<CaptureDeps>,
+): Promise<void> {
+  if (typeof provider.reclaim !== "function") return;
+  const attempt = withTimeout(clock, STOP_TIMEOUT_MS, (async () => provider.reclaim?.(captureId))(), "capture-timeout").then(
+    ignore,
+    ignore,
+  );
+  handOff(deps, attempt);
+  await attempt;
 }
 
 async function runCapture(
@@ -153,17 +225,19 @@ async function runCapture(
   const resolver = deps.resolver ?? createDnsResolver();
   const urlOptions = { resolver };
 
-  // Verdict per origin, so each redirect hop on the same origin does not repeat the DNS
+  // Verdict per origin, so each request on the same origin does not repeat the DNS
   // lookup. The syntax checks run on every URL; the key is the origin and not the host
-  // because the checks depend on scheme and port.
+  // because the checks depend on scheme and port. The DNS check is made on the origin
+  // alone, so a long hop URL does not fail it for its length. `maxLength` is the limit
+  // of this URL: the input URL keeps the default, a hop or a final URL gets the hop limit.
   const verdicts = new Map<string, Promise<UrlErrorCode | null>>();
-  const inspect = async (candidate: string): Promise<UrlCheckResult> => {
-    const syntax = checkUrlSyntax(candidate);
+  const inspect = async (candidate: string, maxLength?: number): Promise<UrlCheckResult> => {
+    const syntax = checkUrlSyntax(candidate, maxLength === undefined ? undefined : { maxLength });
     if (!syntax.ok) return syntax;
     const origin = new URL(syntax.url).origin;
     let pending = verdicts.get(origin);
     if (!pending) {
-      pending = checkUrl(syntax.url, urlOptions).then((result) => (result.ok ? null : result.code));
+      pending = checkUrl(`${origin}/`, urlOptions).then((result) => (result.ok ? null : result.code));
       verdicts.set(origin, pending);
     }
     const code = await pending;
@@ -177,15 +251,17 @@ async function runCapture(
   const getBrowserFor = deps.getBrowser ?? ((c: CaptureConfig) => getBrowser(c, { fetch, clock }));
   const browserResult = getBrowserFor(config);
   if (!browserResult.ok) throw new CaptureFailure(browserResult.error.code);
+  const provider = browserResult.browser;
 
   // 3. Session. If the whole budget ends while the creation is still pending, the
   // session that arrives later is stopped, because nobody else knows about it.
+  const captureId = (deps.newCaptureId ?? (() => globalThis.crypto.randomUUID()))();
   const creation = (async () =>
-    browserResult.browser.createSession({
+    provider.createSession({
       timeoutMinutes: config.sessionTimeoutMinutes,
       proxy: config.proxy,
       viewport: { width: BROWSER_VIEWPORT.width, height: BROWSER_VIEWPORT.height },
-      captureId: (deps.newCaptureId ?? (() => globalThis.crypto.randomUUID()))(),
+      captureId,
     }))();
   try {
     ctx.handle = await step(() => creation, "session-create-failed", {
@@ -195,12 +271,19 @@ async function runCapture(
   } catch (error) {
     if (error instanceof CaptureFailure && error.code === "capture-timeout") {
       // The result is already gone, so a failing stop has nobody to warn: its warnings
-      // go to a set that is thrown away.
-      creation.then((late) => stopSafely(late, clock, new Set<CaptureWarningCode>()), ignore);
+      // go to a set that is thrown away. The promise goes to the platform so that a
+      // frozen function still finishes the stop.
+      handOff(
+        deps,
+        creation.then((late) => stopSafely(late, clock, new Set<CaptureWarningCode>()), ignore),
+      );
     }
+    // An aborted create, or one with no HTTP answer, may have left a session: one clean-up.
+    if (error instanceof CaptureFailure && error.reclaim) await reclaimOnce(provider, captureId, clock, deps);
     throw error;
   }
   const handle = ctx.handle;
+  ctx.secrets.push(...secretsOf(handle));
 
   // 4. Connection and guards.
   const page = await step(() => handle.connect({ timeoutMs: CDP_CONNECT_TIMEOUT_MS }), "connect-failed", {
@@ -209,16 +292,21 @@ async function runCapture(
   });
   const guards: PageGuards = {
     checkSyntax(candidate) {
-      const syntax = checkUrlSyntax(candidate);
+      const syntax = checkUrlSyntax(candidate, { maxLength: MAX_HOP_URL_LENGTH });
       return syntax.ok ? { allowed: true } : { allowed: false, reason: syntax.code };
     },
     async checkHost(candidate) {
-      const verdict = await inspect(candidate);
+      const verdict = await inspect(candidate, MAX_HOP_URL_LENGTH);
       return verdict.ok ? { allowed: true } : { allowed: false, reason: verdict.code };
     },
     report(event) {
-      // Only a refused main-frame request can fail the navigation as a block.
-      if (event.kind === "request-blocked" && event.mainFrame) ctx.navigationBlocked = true;
+      if (event.kind === "request-blocked") {
+        // Only a refused main-frame request can fail the navigation as a block. The
+        // warning carries the count and the first reason, never a URL or a host.
+        if (event.mainFrame) ctx.navigationBlocked = true;
+        ctx.blocked.count += 1;
+        ctx.blocked.reason ??= event.reason;
+      }
       ctx.warnings.add(event.kind);
     },
   };
@@ -236,7 +324,7 @@ async function runCapture(
     if (ctx.navigationBlocked) throw new CaptureFailure("navigation-blocked");
     throw error;
   }
-  const landed = await step(() => inspect(navigation.finalUrl));
+  const landed = await step(() => inspect(navigation.finalUrl, MAX_HOP_URL_LENGTH));
   if (!landed.ok) throw new CaptureFailure("navigation-blocked");
   if (landed.url !== requested.url) ctx.warnings.add("redirected");
 
@@ -282,7 +370,7 @@ async function runCapture(
         ms: navigationMs,
         code: "navigation-timeout",
       });
-      const reloadedAt = await step(() => inspect(reloaded.finalUrl));
+      const reloadedAt = await step(() => inspect(reloaded.finalUrl, MAX_HOP_URL_LENGTH));
       if (!reloadedAt.ok) throw new CaptureFailure("navigation-blocked");
       await step(() => sleep(clock, SETTLE_DELAY_MS));
       const reloadRaw = await step(() =>
@@ -328,26 +416,35 @@ async function runCapture(
  * and uses real defaults for those not supplied.
  *
  * Page text in the snapshot is untrusted input for every consumer, including the LLM judge.
+ *
+ * `error.detail` (and every other text of the result) is redacted, but it may still
+ * contain text controlled by the page or by target URLs.
+ * `detail` is for server logs only and must never be shown to a user. Show `code` and
+ * the fixed `message` instead.
  */
 export async function capturePage(url: string, deps: Partial<CaptureDeps> = {}): Promise<CaptureResult> {
   const clock = deps.clock ?? createSystemClock();
-  const ctx: CaptureContext = { secrets: [], warnings: new Set<CaptureWarningCode>(), navigationBlocked: false };
+  const ctx: CaptureContext = {
+    secrets: [],
+    warnings: new Set<CaptureWarningCode>(),
+    navigationBlocked: false,
+    blocked: { count: 0 },
+  };
 
-  let outcome: { ok: true; success: CaptureSuccess } | { ok: false; error: CaptureError };
+  let outcome: CaptureOutcome;
   try {
     outcome = { ok: true, success: await runCapture(url, deps, clock, ctx) };
   } catch (error) {
-    outcome = { ok: false, error: toCaptureError(error, ctx.secrets) };
+    outcome = { ok: false, error };
   } finally {
-    // Stop the session exactly once on every path, with its own deadline.
-    if (ctx.handle) await stopSafely(ctx.handle, clock, ctx.warnings);
+    // Stop the session exactly once on every path, with its own deadline. The promise
+    // goes to the platform as well, so a frozen function still finishes the stop.
+    if (ctx.handle) {
+      const stopping = stopSafely(ctx.handle, clock, ctx.warnings);
+      handOff(deps, stopping);
+      await stopping;
+    }
   }
 
-  const warnings: CaptureWarning[] = Array.from(ctx.warnings, (code) => ({
-    code,
-    message: WARNING_MESSAGES[code],
-  }));
-  return outcome.ok
-    ? { ok: true, snapshot: outcome.success.snapshot, images: outcome.success.images, warnings }
-    : { ok: false, error: outcome.error, warnings };
+  return finalise(outcome, ctx);
 }
