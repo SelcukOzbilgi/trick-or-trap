@@ -98,14 +98,14 @@ Rules for every task:
   - [x] 8.5 Run `npx vitest run tests/detectors/fake-activity.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 3.4, 3.5, 3.8, 7.15, 7.16, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 14.5_
 
-- [ ] 9. Choice groups and confirmshaming detector
+- [x] 9. Choice groups and confirmshaming detector
   - Uses: `buildIndex`, `ElementIndex` (task 3), `finaliseFindings` (task 4), text helpers (task 2).
   - Files: creates `lib/detectors/shared/choice-groups.ts`, `data/choice-words.ts`, `data/confirmshaming-words.ts`, `tests/detectors/shared/choice-groups.test.ts`, `tests/detectors/confirmshaming.test.ts`; edits `lib/detectors/confirmshaming.ts`.
-  - [ ] 9.1 Create `tests/detectors/shared/choice-groups.test.ts` first: controls under one parent and up to three levels share a group; four levels apart do not; at most 50 groups and 8 controls per group; `classifyControl` for accept, reject, lesser, close glyphs and `aria-label="Close"`, and exact plain declines ("No thanks", "Hayır, teşekkürler").
-  - [ ] 9.2 Create `tests/detectors/confirmshaming.test.ts`: C1 for a phrase-list decline next to an accept control (English and Turkish); C2 for first-person negative wording with a benefit term; "No thanks", "Not now", "Maybe later", "Şimdi değil" never flag, also with equal style; "I don't need a bag" does not flag; a phrase-list hit outside a group gives C2; `measuredValues` has `judgeCandidate: 1` and the right `phraseListMatch`; `elementIds` lists decline then accept.
-  - [ ] 9.3 Create `lib/detectors/data/choice-words.ts` (lists of design section 9.6 plus the plain declines and accept words of section 9.4) and `lib/detectors/shared/choice-groups.ts` (`ControlKind`, `ChoiceGroup`, `findChoiceGroups`, `classifyControl`); run `choice-groups.test.ts`.
-  - [ ] 9.4 Create `lib/detectors/data/confirmshaming-words.ts` (lists of design section 9.4) and replace the stub in `lib/detectors/confirmshaming.ts` with `detectConfirmshaming`, wrapped in `try`/`catch` returning `[]`.
-  - [ ] 9.5 Run both test files (one command each), then `npx tsc --noEmit`.
+  - [x] 9.1 Create `tests/detectors/shared/choice-groups.test.ts` first: controls under one parent and up to three levels share a group; four levels apart do not; at most 50 groups and 8 controls per group; `classifyControl` for accept, reject, lesser, close glyphs and `aria-label="Close"`, and exact plain declines ("No thanks", "Hayır, teşekkürler").
+  - [x] 9.2 Create `tests/detectors/confirmshaming.test.ts`: C1 for a phrase-list decline next to an accept control (English and Turkish); C2 for first-person negative wording with a benefit term; "No thanks", "Not now", "Maybe later", "Şimdi değil" never flag, also with equal style; "I don't need a bag" does not flag; a phrase-list hit outside a group gives C2; `measuredValues` has `judgeCandidate: 1` and the right `phraseListMatch`; `elementIds` lists decline then accept.
+  - [x] 9.3 Create `lib/detectors/data/choice-words.ts` (lists of design section 9.6 plus the plain declines and accept words of section 9.4) and `lib/detectors/shared/choice-groups.ts` (`ControlKind`, `ChoiceGroup`, `findChoiceGroups`, `classifyControl`); run `choice-groups.test.ts`.
+  - [x] 9.4 Create `lib/detectors/data/confirmshaming-words.ts` (lists of design section 9.4) and replace the stub in `lib/detectors/confirmshaming.ts` with `detectConfirmshaming`, wrapped in `try`/`catch` returning `[]`.
+  - [x] 9.5 Run both test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 3.8, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 11.10, 14.5, 15.5_
 
 - [ ] 10. Price parser and preselection detector
