@@ -118,14 +118,14 @@ Rules for every task:
   - [x] 10.5 Run both test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 3.8, 7.5, 7.6, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9, 12.10, 12.11, 12.12, 12.13, 12.14, 12.15, 12.16, 12.17, 14.5_
 
-- [ ] 11. Colour helpers and visual-interference detector
+- [x] 11. Colour helpers and visual-interference detector
   - Uses: `findChoiceGroups`, `classifyControl`, `CONSENT_CONTEXT_WORDS` (task 9), `buildIndex` (task 3), `finaliseFindings` (task 4).
   - Files: creates `lib/detectors/shared/colour.ts`, `tests/detectors/shared/colour.test.ts`, `tests/detectors/visual-interference.test.ts`; edits `lib/detectors/visual-interference.ts`.
-  - [ ] 11.1 Create `tests/detectors/shared/colour.test.ts` first: `rgb(154, 154, 154)`, `rgba(0, 0, 0, 0)`, `rgb(154 154 154 / 0.5)`, `#fff9ee`, `transparent`, and junk or a 1,000,000-character string giving `null`; contrast of black on white is 21 and of `#9a9a9a` on `#fff9ee` about 2.7; opacity 0.6 lowers the contrast of `#b3b3b3`; the effective background comes from an ancestor in `elements`, else white with `assumed: true`.
-  - [ ] 11.2 Create `tests/detectors/visual-interference.test.ts`, pairs: V1 for a large filled accept button next to a small grey link in a cookie region; V1 for a faded ghost reject in a consent area; V2 for exactly two measures; equal style never flags, also with different wording; a pair outside any context never flags; an assumed background cannot give high; measured values use the keys of design section 9.6; a Turkish cookie banner works.
-  - [ ] 11.3 In the same file, close controls: V3 for a 3 × 8 px faint "x" in a `role="dialog"` with a large accept; V4 for two close measures; a toast dismiss "×" in `role="status"` is not a close control; a German dialog with a tiny faint "×" gives V4; empty and non-object inputs give `[]`.
-  - [ ] 11.4 Create `lib/detectors/shared/colour.ts` (`Rgba`, `parseColour`, `composite`, `contrastRatio`, `effectiveBackground`, `textContrast`), run `colour.test.ts`, then replace the stub in `lib/detectors/visual-interference.ts` with `detectVisualInterference`, wrapped in `try`/`catch` returning `[]`.
-  - [ ] 11.5 Run both test files (one command each), then `npx tsc --noEmit`.
+  - [x] 11.1 Create `tests/detectors/shared/colour.test.ts` first: `rgb(154, 154, 154)`, `rgba(0, 0, 0, 0)`, `rgb(154 154 154 / 0.5)`, `#fff9ee`, `transparent`, and junk or a 1,000,000-character string giving `null`; contrast of black on white is 21 and of `#9a9a9a` on `#fff9ee` about 2.7; opacity 0.6 lowers the contrast of `#b3b3b3`; the effective background comes from an ancestor in `elements`, else white with `assumed: true`.
+  - [x] 11.2 Create `tests/detectors/visual-interference.test.ts`, pairs: V1 for a large filled accept button next to a small grey link in a cookie region; V1 for a faded ghost reject in a consent area; V2 for exactly two measures; equal style never flags, also with different wording; a pair outside any context never flags; an assumed background cannot give high; measured values use the keys of design section 9.6; a Turkish cookie banner works.
+  - [x] 11.3 In the same file, close controls: V3 for a 3 × 8 px faint "x" in a `role="dialog"` with a large accept; V4 for two close measures; a toast dismiss "×" in `role="status"` is not a close control; a German dialog with a tiny faint "×" gives V4; empty and non-object inputs give `[]`.
+  - [x] 11.4 Create `lib/detectors/shared/colour.ts` (`Rgba`, `parseColour`, `composite`, `contrastRatio`, `effectiveBackground`, `textContrast`), run `colour.test.ts`, then replace the stub in `lib/detectors/visual-interference.ts` with `detectVisualInterference`, wrapped in `try`/`catch` returning `[]`.
+  - [x] 11.5 Run both test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 3.6, 3.8, 7.13, 7.14, 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8, 13.9, 13.10, 13.11, 13.12, 13.13, 13.14, 14.5_
 
 - [ ] 12. Cross-detector rules, word lists and hostile input
