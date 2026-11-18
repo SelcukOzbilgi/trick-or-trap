@@ -150,14 +150,14 @@ Rules for every task:
   - [x] 13.5 Run `npx vitest run tests/detectors/eval/tree.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 16.1, 16.5, 16.10_
 
-- [ ] 14. Boo-tique page trees and structural sync
+- [x] 14. Boo-tique page trees and structural sync
   - Uses: `buildSnapshot`, `PageNode` (task 13), `toLightSample` (task 13), `assertNoTestHooks` (task 12), `renderRoute`, `loadFixture` and the `markup` helpers on `main`, `createProductPage` and `perLoadValues`.
   - Files: creates `tests/detectors/eval/helpers/pages.ts`, `tests/detectors/eval/helpers/entry-map.ts`, `tests/detectors/eval/snapshot-sync.test.ts`.
-  - [ ] 14.1 Read `tests/boo-tique/helpers/render-route.ts`, `markup.ts`, `fixture.ts`, `route-table.ts`, every component used by the seven Boo-tique pages (including the layout shell, `overlay-dialog.tsx`, `product-grid.tsx`, `club-timer.tsx`, `order-summary.tsx`, `summary-list.tsx`) and the Boo-tique stylesheet.
-  - [ ] 14.2 Create `tests/detectors/eval/snapshot-sync.test.ts` first: for each variant render with `renderRoute(route, { shell: true })` (product variants: `createProductPage(random)` with the injected random functions, rendered the way `render-route.ts` renders); assert, finding planted elements in the markup with `tagForEntry` from `no-hooks.ts`, that planted texts, checked states, `aria-checked`, `name` attributes, roles and inline style values match, planted nodes are in markup order, every visible text run of the markup appears in the tree, the product numbers equal `perLoadValues(random)`, `entry-map.ts` covers every scored fixture entry, and `assertNoTestHooks` passes on every snapshot. Run it; it fails.
-  - [ ] 14.3 Create `tests/detectors/eval/helpers/pages.ts`: one tree factory per variant of design section 13 with the shell included, styles from `lib/boo-tique/styles.ts` and `PALETTE`, class-based styles taken from the stylesheet, the reload trees of requirements 16.6 to 16.9, and `PAGE_VARIANTS`.
-  - [ ] 14.4 Create `tests/detectors/eval/helpers/entry-map.ts`: entry id to variant and node keys as in design section 13; a node key for every one of the 27 scored entries (19 flag, 8 look-alike).
-  - [ ] 14.5 Run `npx vitest run tests/detectors/eval/snapshot-sync.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+  - [x] 14.1 Read `tests/boo-tique/helpers/render-route.ts`, `markup.ts`, `fixture.ts`, `route-table.ts`, every component used by the seven Boo-tique pages (including the layout shell, `overlay-dialog.tsx`, `product-grid.tsx`, `club-timer.tsx`, `order-summary.tsx`, `summary-list.tsx`) and the Boo-tique stylesheet.
+  - [x] 14.2 Create `tests/detectors/eval/snapshot-sync.test.ts` first: for each variant render with `renderRoute(route, { shell: true })` (product variants: `createProductPage(random)` with the injected random functions, rendered the way `render-route.ts` renders); assert, finding planted elements in the markup with `tagForEntry` from `no-hooks.ts`, that planted texts, checked states, `aria-checked`, `name` attributes, roles and inline style values match, planted nodes are in markup order, every visible text run of the markup appears in the tree, the product numbers equal `perLoadValues(random)`, `entry-map.ts` covers every scored fixture entry, and `assertNoTestHooks` passes on every snapshot. Run it; it fails.
+  - [x] 14.3 Create `tests/detectors/eval/helpers/pages.ts`: one tree factory per variant of design section 13 with the shell included, styles from `lib/boo-tique/styles.ts` and `PALETTE`, class-based styles taken from the stylesheet, the reload trees of requirements 16.6 to 16.9, and `PAGE_VARIANTS`.
+  - [x] 14.4 Create `tests/detectors/eval/helpers/entry-map.ts`: entry id to variant and node keys as in design section 13; a node key for every one of the 27 scored entries (19 flag, 8 look-alike).
+  - [x] 14.5 Run `npx vitest run tests/detectors/eval/snapshot-sync.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 16.1, 16.2, 16.3, 16.4, 16.6, 16.7, 16.8, 16.9, 16.10, 16.11, 16.12_
 
 - [ ] 15. Scoring and the Boo-tique evaluation
