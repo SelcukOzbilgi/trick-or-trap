@@ -19,3 +19,20 @@ export interface RequestPolicy {
   checkHost(url: string): Promise<GuardVerdict>;
   report(event: RequestGuardEvent): void;
 }
+
+/** Why the guard was given up: the guard session closed, the browser disconnected, or a heartbeat failed. */
+export type GuardLossCause = "session-closed" | "disconnected" | "heartbeat";
+
+/** The browser-target CDP session of the guard. `send` takes exactly two arguments. */
+export interface GuardSession {
+  send(method: string, params?: Record<string, unknown>): Promise<unknown>;
+  onEvent(handler: (event: { method: string; params: unknown }) => void | Promise<void>): void;
+  onClose(handler: () => void): void;
+}
+
+/** The part of the browser connection the guard needs: one browser-target session and the disconnect signal. */
+export interface GuardBrowser {
+  /** `browser.newBrowserCDPSession()` on the real client. */
+  openGuardSession(): Promise<GuardSession>;
+  onDisconnected(handler: () => void): void;
+}

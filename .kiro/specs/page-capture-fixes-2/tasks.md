@@ -10,11 +10,11 @@ Rules for every task:
 - Never write the name of the test-id attribute; build it with `tests/capture/helpers/forbidden-attribute.ts`. Never read or write `.env` files. Touch no path listed as out of scope.
 - Do not weaken a test. A test that pins a now-wrong behaviour may change only where the task names it.
 
-- [ ] 1. Faithful fake of the guard session and its browser
-  - [ ] 1.1 Add `GuardSession`, `GuardBrowser` and `GuardLossCause` to `lib/capture/guard-types.ts` (types only, as in `design.md`).
-  - [ ] 1.2 Create `tests/capture/fake-guard-browser.test.ts` first: `send` with three arguments throws and records a violation; `params.sessionId` throws; `Network.setBlockedURLs`, `Page.getFrameTree`, `Runtime.evaluate` and `Emulation.setScrollbarsHidden` reject with `'<method>' wasn't found`; `Browser.getVersion` and `Fetch.*` answer; paused events of every source arrive on the one session with `frameId`, `resourceType`, headers and `redirectedRequestId`; an unanswered request stays pending; an unknown or second answer rejects with `Invalid InterceptionId`; `detach()` and `dropConnection()` record pending requests as gone out and emit `close` (and `disconnected` for the drop); a deliberately wrong guard that passes a third argument makes `assertNoViolations()` throw.
-  - [ ] 1.3 Create `tests/capture/helpers/fake-guard-browser.ts` implementing `GuardBrowser` with that behaviour, scripted answers per method (value, `Error`, `"hang"`), and `assertNoViolations()`.
-  - [ ] 1.4 Run `npx vitest run tests/capture/fake-guard-browser.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+- [x] 1. Faithful fake of the guard session and its browser
+  - [x] 1.1 Add `GuardSession`, `GuardBrowser` and `GuardLossCause` to `lib/capture/guard-types.ts` (types only, as in `design.md`).
+  - [x] 1.2 Create `tests/capture/fake-guard-browser.test.ts` first: `send` with three arguments throws and records a violation; `params.sessionId` throws; `Network.setBlockedURLs`, `Page.getFrameTree`, `Runtime.evaluate` and `Emulation.setScrollbarsHidden` reject with `'<method>' wasn't found`; `Browser.getVersion` and `Fetch.*` answer; paused events of every source arrive on the one session with `frameId`, `resourceType`, headers and `redirectedRequestId`; an unanswered request stays pending; an unknown or second answer rejects with `Invalid InterceptionId`; `detach()` and `dropConnection()` record pending requests as gone out and emit `close` (and `disconnected` for the drop); a deliberately wrong guard that passes a third argument makes `assertNoViolations()` throw.
+  - [x] 1.3 Create `tests/capture/helpers/fake-guard-browser.ts` implementing `GuardBrowser` with that behaviour, scripted answers per method (value, `Error`, `"hang"`), and `assertNoViolations()`.
+  - [x] 1.4 Run `npx vitest run tests/capture/fake-guard-browser.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9_
 
 - [ ] 2. Guard reason codes and the `guard-lost` error
