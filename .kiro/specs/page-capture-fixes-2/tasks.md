@@ -117,9 +117,9 @@ Rules for every task:
   - [x] 17.3 Do not run the file. Run `npx tsc --noEmit`.
   _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7, 17.8, 17.9, 17.10, 17.11, 17.12, 17.13, 17.14, 17.15, 17.16, 17.17, 17.18, 17.19, 17.20_
 
-- [ ] 18. Steering notes, `.env.example` and lint
-  - [ ] 18.1 In `.env.example`, fix the `NEXT_PUBLIC_APP_URL` comment (public origin, bypasses no capture check) and add `LIVE_FIXTURE_BASE_URL=` and `LIVE_FIXTURE_ALT_BASE_URL=` with one comment each; change no other line.
-  - [ ] 18.2 In `.kiro/steering/structure.md`, fix the `extractor.ts` line, replace `request-guard.ts` with `browser-guard.ts`, add `guard-policy.ts`, `response-hardening.ts`, `outcome.ts`, `lib/capture-fixture/`, `app/capture-fixture/` and the new test files and helpers.
-  - [ ] 18.3 In `.kiro/steering/tech.md`, replace the request-guard paragraph with the browser-level guard, fail-closed loss, heartbeat, service-worker refusal and hardening switch; replace the residual-risk sentence with the list of requirement 18 and the egress-proxy recommendation; add the live-test variables and the fixture routes with their switch. Delete only statements this spec made wrong.
-  - [ ] 18.4 Run `lib-text-rules.test.ts`, `config.test.ts`, then `npm run lint` (fix findings only in files this spec touched), then `npx tsc --noEmit`.
+- [x] 18. Steering notes, `.env.example` and lint
+  - [x] 18.1 In `.env.example`, fix the `NEXT_PUBLIC_APP_URL` comment (public origin, bypasses no capture check) and add `LIVE_FIXTURE_BASE_URL=` and `LIVE_FIXTURE_ALT_BASE_URL=` with one comment each; change no other line.
+  - [x] 18.2 In `.kiro/steering/structure.md`, fix the `extractor.ts` line, replace `request-guard.ts` with `browser-guard.ts`, add `guard-policy.ts`, `response-hardening.ts`, `outcome.ts`, `lib/capture-fixture/`, `app/capture-fixture/` and the new test files and helpers.
+  - [x] 18.3 In `.kiro/steering/tech.md`, replace the request-guard paragraph with the browser-level guard, fail-closed loss, heartbeat, service-worker refusal and hardening switch; replace the residual-risk sentence with the list of requirement 18 and the egress-proxy recommendation; add the live-test variables and the fixture routes with their switch. Delete only statements this spec made wrong.
+  - [x] 18.4 Run `lib-text-rules.test.ts`, `config.test.ts`, then `npm run lint` (fix findings only in files this spec touched), then `npx tsc --noEmit`.
   _Requirements: 19.1, 19.2, 19.3, 19.4, 19.5, 19.6, 19.7, 19.9_

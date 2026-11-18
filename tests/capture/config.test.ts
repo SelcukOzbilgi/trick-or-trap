@@ -307,6 +307,25 @@ describe(".env.example", () => {
     expect(lines.filter((line) => line.includes("CAPTURE_WEBSOCKET_HARDENING"))).toHaveLength(1);
   });
 
+  it.each(["LIVE_FIXTURE_BASE_URL", "LIVE_FIXTURE_ALT_BASE_URL"])(
+    "lists %s with an empty value and one comment line",
+    (name) => {
+      const index = lines.findIndex((line) => line.startsWith(`${name}=`));
+      expect(index).toBeGreaterThan(1);
+      expect(lines[index]).toBe(`${name}=`);
+      expect(lines[index - 1].startsWith("#")).toBe(true);
+      expect(lines[index - 2]).toBe("");
+    },
+  );
+
+  it("describes NEXT_PUBLIC_APP_URL as the public origin that bypasses no capture check", () => {
+    const index = lines.findIndex((line) => line.startsWith("NEXT_PUBLIC_APP_URL="));
+    const comment = lines[index - 1];
+    expect(comment).toContain("public origin");
+    expect(comment).toContain("bypasses no page capture check");
+    expect(comment).not.toContain("despite");
+  });
+
   it("gives every NAME= line an empty value", () => {
     const assignments = lines.filter((line) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(line));
     expect(assignments.length).toBeGreaterThan(0);

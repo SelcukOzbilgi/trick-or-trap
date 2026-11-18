@@ -39,6 +39,52 @@ describe("forbidden attribute helper", () => {
   });
 });
 
+describe("steering notes match the capture code", () => {
+  const structure = readFileSync(join(ROOT, ".kiro/steering/structure.md"), "utf8");
+  const tech = readFileSync(join(ROOT, ".kiro/steering/tech.md"), "utf8");
+
+  it.each(readdirSync(join(ROOT, "lib/capture")))("structure.md lists lib/capture/%s", (file) => {
+    expect(structure).toContain(file);
+  });
+
+  it("structure.md lists the fixture directories and drops the deleted guard", () => {
+    expect(structure).toContain("lib/capture-fixture");
+    expect(structure).toMatch(/capture-fixture\/\s+# test-only routes/);
+    expect(structure).toMatch(/capture-fixture\/\n.*pages\.ts/);
+    expect(structure).not.toContain("request-guard");
+    expect(structure).not.toContain("page.evaluate");
+  });
+
+  it.each(["fake-guard-browser.ts", "browser-guard.test.ts", "response-hardening.test.ts", "outcome.test.ts"])(
+    "structure.md lists %s",
+    (name) => {
+      expect(structure).toContain(name);
+    },
+  );
+
+  it.each([
+    "browser-level",
+    "guard-lost",
+    "GUARD_HEARTBEAT_INTERVAL_MS",
+    "service-worker-blocked",
+    "CAPTURE_WEBSOCKET_HARDENING",
+    "CAPTURE_FIXTURE_ROUTES",
+    "LIVE_FIXTURE_BASE_URL",
+    "LIVE_FIXTURE_ALT_BASE_URL",
+    "WebTransport",
+    "DNS rebinding",
+    "customProxy",
+  ])("tech.md mentions %s", (text) => {
+    expect(tech).toContain(text);
+  });
+
+  it("tech.md no longer describes the child-target design or the service-worker bypass", () => {
+    expect(tech).not.toContain("Service workers are bypassed");
+    expect(tech).not.toContain("puts the same guard on child targets");
+    expect(tech).not.toContain("also sets the allowed origin");
+  });
+});
+
 describe("text rules: the test-id attribute is named nowhere", () => {
   const files = [...DIRECTORIES.flatMap((dir) => listFiles(join(ROOT, dir))), ...FILES.map((f) => join(ROOT, f))];
 

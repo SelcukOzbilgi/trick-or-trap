@@ -128,8 +128,8 @@ function request(path: string): Request {
 }
 
 async function call(route: RouteCase): Promise<Response> {
-  const module = await route.load();
-  return module.GET(request(route.path));
+  const routeModule = await route.load();
+  return routeModule.GET(request(route.path));
 }
 
 const saved = new Map<string, string | undefined>();
@@ -275,9 +275,9 @@ describe("fixture routes: files", () => {
 
   it.each([...new Set(ROUTES.map((route) => route.folder))])("%s exports dynamic force-dynamic and GET", async (folder) => {
     const route = ROUTES.find((candidate) => candidate.folder === folder) as RouteCase;
-    const module = await route.load();
-    expect(module.dynamic).toBe("force-dynamic");
-    expect(typeof module.GET).toBe("function");
+    const routeModule = await route.load();
+    expect(routeModule.dynamic).toBe("force-dynamic");
+    expect(typeof routeModule.GET).toBe("function");
   });
 
   it("imports nothing from lib/capture in any route file", () => {
