@@ -112,13 +112,22 @@ describe("capturePage: reload sample", () => {
     await tick();
     clock.advance(500); // first settle
     await tick();
-    expect(fake.calls).toEqual(["createSession", "connect", "installGuards", "goto", "collect", "screenshot", "reload"]);
+    expect(fake.calls).toEqual([
+      "createSession",
+      "connect",
+      "installGuards",
+      "goto",
+      "collect",
+      "screenshot",
+      "collect", // the layout drift re-read, before the reload
+      "reload",
+    ]);
 
-    // The settle after the reload: no second read before 500 ms have passed.
+    // The settle after the reload: no light read of the reload before 500 ms have passed.
     await tick();
     clock.advance(499);
     await tick();
-    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(1);
+    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(2);
     clock.advance(1);
     await tick();
 
@@ -131,19 +140,22 @@ describe("capturePage: reload sample", () => {
       "goto",
       "collect",
       "screenshot",
+      "collect",
       "reload",
       "collect",
       "stop",
     ]);
+    const light = {
+      maxElements: 750,
+      maxTextChars: 120,
+      maxAttrChars: 200,
+      attributeNames: ["type", "name", "disabled"],
+      limits: COLLECT_LIMITS,
+    };
     expect(fake.collectOptions).toEqual([
       { maxElements: 1_500, maxTextChars: 300, maxAttrChars: 200, attributeNames: "full", limits: COLLECT_LIMITS },
-      {
-        maxElements: 750,
-        maxTextChars: 120,
-        maxAttrChars: 200,
-        attributeNames: ["type", "name", "disabled"],
-        limits: COLLECT_LIMITS,
-      },
+      light, // the layout drift re-read
+      light, // the reload sample
     ]);
     expect(fake.screenshotRequests).toHaveLength(1);
     expect(fake.scrollRequests).toEqual([]);
@@ -220,7 +232,8 @@ describe("capturePage: reload sample", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(fake.calls).not.toContain("reload");
-    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(1);
+    // The first read and the layout drift re-read (3,000 ms or more remain); no reload read.
+    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(2);
     expect(result.snapshot.afterReload).toBeUndefined();
     expect(result.snapshot.secondSample).toBeUndefined();
     expect(warningCodes(result)).toEqual(["reload-skipped"]);
@@ -334,12 +347,13 @@ describe("capturePage: a failing reload is only a warning", () => {
   });
 
   it("when the whole deadline ends during the reload", async () => {
-    // 12,000 ms remain; the reload answers, then the second read never does.
+    // 12,000 ms remain; the reload answers, then the second read never does. Read 1 is the
+    // first read, read 2 the layout drift re-read, read 3 the reload sample.
     const { result, fake } = await expectReloadFailed((clock) => ({
       screenshot: slowScreenshot(clock, 32_500),
-      collect: (n) => (n === 1 ? rawWithElements() : "hang"),
+      collect: (n) => (n <= 2 ? rawWithElements() : "hang"),
     }));
-    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(2);
+    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(3);
     expect(result.ok).toBe(true);
   });
 
@@ -348,15 +362,18 @@ describe("capturePage: a failing reload is only a warning", () => {
       screenshot: slowScreenshot(clock, 32_500),
       reload: "hang",
     }));
-    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(1);
+    // The first read and the layout drift re-read; the reload never answers.
+    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(2);
   });
 
   it("when the second read throws", async () => {
-    await expectReloadFailed({ collect: (n) => (n === 1 ? rawWithElements() : new Error("evaluate failed")) });
+    await expectReloadFailed({ collect: (n) => (n <= 2 ? rawWithElements() : new Error("evaluate failed")) });
   });
 
   it("when the second read throws a CaptureFailure", async () => {
-    await expectReloadFailed({ collect: (n) => (n === 1 ? rawWithElements() : new CaptureFailure("page-read-failed")) });
+    await expectReloadFailed({
+      collect: (n) => (n <= 2 ? rawWithElements() : new CaptureFailure("page-read-failed")),
+    });
   });
 
   it("when the sample fails BaseSnapshotSchema", async () => {

@@ -203,7 +203,7 @@ describe("capturePage: stop is called exactly once on every path", () => {
     expect(fake.stopCalls).toBe(0);
   });
 
-  it("stop that hangs gives session-stop-failed after exactly 10 s", async () => {
+  it("stop that hangs gives session-stop-failed at STOP_TIMEOUT_MS and keeps the result", async () => {
     const { clock, fake, deps } = setup({ stop: "hang" });
     const promise = capturePage(URL_OK, deps);
     let settled = false;
@@ -217,7 +217,7 @@ describe("capturePage: stop is called exactly once on every path", () => {
     expect(fake.stopCalls).toBe(1);
     expect(settled).toBe(false);
 
-    clock.advance(9_999);
+    clock.advance(STOP_TIMEOUT_MS - 1);
     await tick();
     expect(settled).toBe(false);
     clock.advance(1);
@@ -226,6 +226,7 @@ describe("capturePage: stop is called exactly once on every path", () => {
 
     const result = await promise;
     expect(result.ok).toBe(true);
+    if (result.ok) expect(PageSnapshotSchema.safeParse(result.snapshot).success).toBe(true);
     expect(result.warnings.map((warning) => warning.code)).toEqual(["session-stop-failed"]);
     expect(fake.stopCalls).toBe(1);
   });

@@ -24,15 +24,19 @@ import {
   MAX_ELEMENTS,
   MAX_ELEMENTS_LIGHT,
   MAX_HOP_URL_LENGTH,
+  MAX_SNAPSHOT_BYTES,
   MAX_TEXT_CHARS,
   MAX_TEXT_CHARS_LIGHT,
   NAVIGATION_TIMEOUT_MS,
   RELOAD_MIN_REMAINING_MS,
   SETTLE_DELAY_MS,
   STOP_TIMEOUT_MS,
+  TILE_MIN_REMAINING_MS,
   CDP_CONNECT_TIMEOUT_MS,
+  LAYOUT_DRIFT_PX,
 } from "./constants";
-import { buildSample } from "./extractor";
+import { buildSample, snapshotBytes } from "./extractor";
+import { maxBoxDrift } from "./geometry";
 import { redactText, toDetail } from "./redact";
 import { createDnsResolver } from "./resolver";
 import { captureImages } from "./screenshots";
@@ -47,6 +51,7 @@ import {
   type CaptureResult,
   type CaptureWarning,
   type CaptureWarningCode,
+  type CollectOptions,
   type UrlErrorCode,
 } from "./types";
 import { checkUrl, checkUrlSyntax, type Resolver, type UrlCheckResult } from "./url-check";
@@ -85,6 +90,15 @@ type CaptureOutcome = { ok: true; success: CaptureSuccess } | { ok: false; error
 
 /** Attributes of the light reload sample. */
 const LIGHT_ATTRIBUTE_NAMES: readonly string[] = ["type", "name", "disabled"];
+
+/** Options of the light reads: the layout drift re-read and the reload sample. */
+const LIGHT_COLLECT_OPTIONS: CollectOptions = {
+  maxElements: MAX_ELEMENTS_LIGHT,
+  maxTextChars: MAX_TEXT_CHARS_LIGHT,
+  maxAttrChars: MAX_ATTR_CHARS,
+  attributeNames: LIGHT_ATTRIBUTE_NAMES,
+  limits: COLLECT_LIMITS,
+};
 
 function sleep(clock: Clock, ms: number): Promise<void> {
   return new Promise<void>((resolve) => {
@@ -157,13 +171,14 @@ function asStageFailure(error: unknown, code: CaptureErrorCode, secrets: readonl
 }
 
 /**
- * Stops a session with its own deadline, apart from the whole-capture budget. A failure
- * or a timeout becomes the warning `session-stop-failed`; it never throws.
+ * Stops a session with its own deadline of `STOP_TIMEOUT_MS`, apart from the
+ * whole-capture budget. A failure or a timeout becomes the warning
+ * `session-stop-failed`; it never throws.
  */
 async function stopSafely(handle: BrowserSessionHandle, clock: Clock, warnings: Set<CaptureWarningCode>): Promise<void> {
   try {
     // The code of the rejection never leaves this function: every failure is the warning.
-    await withTimeout(clock, API_FETCH_TIMEOUT_MS, (async () => handle.stop())(), "capture-timeout");
+    await withTimeout(clock, STOP_TIMEOUT_MS, (async () => handle.stop())(), "capture-timeout");
   } catch {
     warnings.add("session-stop-failed");
   }
@@ -373,15 +388,7 @@ async function runCapture(
       const reloadedAt = await step(() => inspect(reloaded.finalUrl, MAX_HOP_URL_LENGTH));
       if (!reloadedAt.ok) throw new CaptureFailure("navigation-blocked");
       await step(() => sleep(clock, SETTLE_DELAY_MS));
-      const reloadRaw = await step(() =>
-        page.collect({
-          maxElements: MAX_ELEMENTS_LIGHT,
-          maxTextChars: MAX_TEXT_CHARS_LIGHT,
-          maxAttrChars: MAX_ATTR_CHARS,
-          attributeNames: LIGHT_ATTRIBUTE_NAMES,
-          limits: COLLECT_LIMITS,
-        }),
-      );
+      const reloadRaw = await step(() => page.collect(LIGHT_COLLECT_OPTIONS));
       const second = buildSample(reloadRaw, {
         light: true,
         url: reloadedAt.url,
@@ -398,11 +405,38 @@ async function runCapture(
   const sample = buildSample(raw, { light: false, url: landed.url, capturedAt, images: shots.meta });
   if (sample.capture?.elementsTruncated) ctx.warnings.add("elements-truncated");
 
+  /**
+   * Reads the page again with the light options and compares the boxes with those of
+   * the first read. Boxes that moved by more than `LAYOUT_DRIFT_PX` give the warning
+   * `layout-shifted`. The second read is not stored. A failed, timed-out or invalid
+   * read, or too little time, skips the check without an error and without a warning.
+   */
+  const checkLayoutDrift = async (): Promise<void> => {
+    if (deadline.remainingMs() < TILE_MIN_REMAINING_MS) return;
+    try {
+      // A read that hangs must not use up the budget of the reload sample.
+      const again = await step(() => page.collect(LIGHT_COLLECT_OPTIONS), undefined, {
+        ms: TILE_MIN_REMAINING_MS,
+        code: "capture-timeout",
+      });
+      const second = buildSample(again, { light: true, url: landed.url, capturedAt });
+      if (maxBoxDrift(sample.elements, second.elements) > LAYOUT_DRIFT_PX) ctx.warnings.add("layout-shifted");
+    } catch {
+      // The check is optional.
+    }
+  };
+  await checkLayoutDrift();
+
   // 9. Second sample after a reload. Never throws and never changes the first capture.
   const afterReload = await takeReloadSample();
-  const assembled = afterReload ? { ...sample, afterReload } : sample;
+  let assembled = afterReload ? { ...sample, afterReload } : sample;
 
-  // 10. Validation.
+  // 10. Size, then validation. The size is measured first, so a huge value is never validated.
+  if (snapshotBytes(assembled) > MAX_SNAPSHOT_BYTES && afterReload) {
+    assembled = sample;
+    ctx.warnings.add("reload-failed");
+  }
+  if (snapshotBytes(assembled) > MAX_SNAPSHOT_BYTES) throw new CaptureFailure("snapshot-too-large");
   const parsed = PageSnapshotSchema.safeParse(assembled);
   if (!parsed.success) {
     const paths = parsed.error.issues.slice(0, 5).map((issue) => issue.path.join("."));
