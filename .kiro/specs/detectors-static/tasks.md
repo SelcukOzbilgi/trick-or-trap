@@ -88,14 +88,14 @@ Rules for every task:
   - [x] 7.5 Run `npx vitest run tests/detectors/fake-scarcity.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 3.4, 3.5, 3.8, 7.15, 7.16, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 14.5_
 
-- [ ] 8. fake-activity detector
+- [x] 8. fake-activity detector
   - Uses: tasks 2 to 4 helpers; `@` placeholder of `findPhrases`.
   - Files: creates `lib/detectors/data/activity-words.ts` and `tests/detectors/fake-activity.test.ts`; edits `lib/detectors/fake-activity.ts`.
-  - [ ] 8.1 Create `tests/detectors/fake-activity.test.ts` first, reload rows: a count claim that changes gives A1; a purchase toast (`role="status"`) whose text changes under the same id gives A1; the same toast text in both samples gives A2; no reload never gives A1; English and Turkish for each.
-  - [ ] 8.2 In the same file, context and look-alikes: a plain paragraph count gives A3; `aria-live="polite"`, position `fixed` and "right now" each give context (A2); lower-case names do not match the purchase template; look-alikes ("1,204 reviews", "3 items in your cart", "sepetinizde 3 ürün") give nothing; empty and non-object inputs give `[]`.
-  - [ ] 8.3 Create `lib/detectors/data/activity-words.ts` with the lists of design section 9.3.
-  - [ ] 8.4 Replace the stub in `lib/detectors/fake-activity.ts` with `detectFakeActivity`, wrapped in `try`/`catch` returning `[]`.
-  - [ ] 8.5 Run `npx vitest run tests/detectors/fake-activity.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+  - [x] 8.1 Create `tests/detectors/fake-activity.test.ts` first, reload rows: a count claim that changes gives A1; a purchase toast (`role="status"`) whose text changes under the same id gives A1; the same toast text in both samples gives A2; no reload never gives A1; English and Turkish for each.
+  - [x] 8.2 In the same file, context and look-alikes: a plain paragraph count gives A3; `aria-live="polite"`, position `fixed` and "right now" each give context (A2); lower-case names do not match the purchase template; look-alikes ("1,204 reviews", "3 items in your cart", "sepetinizde 3 ürün") give nothing; empty and non-object inputs give `[]`.
+  - [x] 8.3 Create `lib/detectors/data/activity-words.ts` with the lists of design section 9.3.
+  - [x] 8.4 Replace the stub in `lib/detectors/fake-activity.ts` with `detectFakeActivity`, wrapped in `try`/`catch` returning `[]`.
+  - [x] 8.5 Run `npx vitest run tests/detectors/fake-activity.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 3.4, 3.5, 3.8, 7.15, 7.16, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 14.5_
 
 - [ ] 9. Choice groups and confirmshaming detector
