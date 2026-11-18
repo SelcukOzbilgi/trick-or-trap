@@ -39,6 +39,11 @@ describe("capture constants", () => {
     expect(constants.MAX_HOP_URL_LENGTH).toBe(8_192);
   });
 
+  it("has the guard heartbeat values", () => {
+    expect(constants.GUARD_HEARTBEAT_INTERVAL_MS).toBe(2_000);
+    expect(constants.GUARD_HEARTBEAT_TIMEOUT_MS).toBe(5_000);
+  });
+
   it("has the stop and sweep values", () => {
     expect(constants.STOP_TIMEOUT_MS).toBe(10_000);
     expect(constants.STALE_SESSION_AGE_MS).toBe(120_000);
