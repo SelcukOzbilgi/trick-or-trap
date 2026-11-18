@@ -160,15 +160,15 @@ Rules for every task:
   - [x] 14.5 Run `npx vitest run tests/detectors/eval/snapshot-sync.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 16.1, 16.2, 16.3, 16.4, 16.6, 16.7, 16.8, 16.9, 16.10, 16.11, 16.12_
 
-- [ ] 15. Scoring and the Boo-tique evaluation
+- [x] 15. Scoring and the Boo-tique evaluation
   - Uses: `PAGE_VARIANTS` (task 14), entry map (task 14), `loadFixture`, `runAllDetectors` (task 1), `FORBIDDEN_WORDS` (task 2).
   - Files: creates `tests/detectors/eval/helpers/score.ts`, `tests/detectors/eval/score.test.ts`, `tests/detectors/eval/boo-tique-eval.test.ts`.
-  - [ ] 15.1 Create `tests/detectors/eval/score.test.ts` first with synthetic findings: a row-level hit; a wrong pattern is a miss; a finding on a look-alike node is a false positive; any finding on a whole-page look-alike is a false positive; flow-pattern findings are ignored; an unmatched finding is "unplanted"; `formatTable` output lists every entry; `recallOf` counts hits over the 19.
-  - [ ] 15.2 Create `tests/detectors/eval/helpers/score.ts` (`score`, `formatTable`, `recallOf`, unplanted list).
-  - [ ] 15.3 Create `tests/detectors/eval/boo-tique-eval.test.ts`, sets: derive the 19 scorable ids, the 3 excluded ids and the 8 look-alike ids from the fixture with `loadFixture()` and assert they equal the lists of requirement 17; assert the 17-entry list of requirement 17.4.
-  - [ ] 15.4 In the same file, targets: run `runAllDetectors` on every variant of `PAGE_VARIANTS`; print the table; assert recall ≥ 0.8 with the primary pairs, zero false positives, no medium or high unplanted finding, no flow-pattern finding, the expected rows of design section 13 for the primary and secondary pairs (S1, A1, U3; S3, A3, U2), and no `FORBIDDEN_WORDS` in any finding string; each failing assertion message contains the table.
-  - [ ] 15.5 If a target is missed, report the table and the cause; do not change word lists or thresholds to fit a Boo-tique string.
-  - [ ] 15.6 Run `npx vitest run tests/detectors/eval/score.test.ts --maxWorkers=2`, `npx vitest run tests/detectors/eval/boo-tique-eval.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+  - [x] 15.1 Create `tests/detectors/eval/score.test.ts` first with synthetic findings: a row-level hit; a wrong pattern is a miss; a finding on a look-alike node is a false positive; any finding on a whole-page look-alike is a false positive; flow-pattern findings are ignored; an unmatched finding is "unplanted"; `formatTable` output lists every entry; `recallOf` counts hits over the 19.
+  - [x] 15.2 Create `tests/detectors/eval/helpers/score.ts` (`score`, `formatTable`, `recallOf`, unplanted list).
+  - [x] 15.3 Create `tests/detectors/eval/boo-tique-eval.test.ts`, sets: derive the 19 scorable ids, the 3 excluded ids and the 8 look-alike ids from the fixture with `loadFixture()` and assert they equal the lists of requirement 17; assert the 17-entry list of requirement 17.4.
+  - [x] 15.4 In the same file, targets: run `runAllDetectors` on every variant of `PAGE_VARIANTS`; print the table; assert recall ≥ 0.8 with the primary pairs, zero false positives, no medium or high unplanted finding, no flow-pattern finding, the expected rows of design section 13 for the primary and secondary pairs (S1, A1, U3; S3, A3, U2), and no `FORBIDDEN_WORDS` in any finding string; each failing assertion message contains the table.
+  - [x] 15.5 If a target is missed, report the table and the cause; do not change word lists or thresholds to fit a Boo-tique string.
+  - [x] 15.6 Run `npx vitest run tests/detectors/eval/score.test.ts --maxWorkers=2`, `npx vitest run tests/detectors/eval/boo-tique-eval.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 3.18, 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7, 17.8, 17.9, 17.10, 17.11, 17.12, 17.13, 17.14, 17.15, 17.16, 17.17, 17.18_
 
 - [ ] 16. Steering, doc comment and lint
