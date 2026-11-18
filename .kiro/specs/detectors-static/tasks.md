@@ -108,14 +108,14 @@ Rules for every task:
   - [x] 9.5 Run both test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 3.8, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 11.10, 14.5, 15.5_
 
-- [ ] 10. Price parser and preselection detector
+- [x] 10. Price parser and preselection detector
   - Uses: `findLabel` (task 3), `finaliseFindings`, `lowerConfidence` (task 4), text helpers (task 2).
   - Files: creates `lib/detectors/shared/price.ts`, `data/preselection-words.ts`, `tests/detectors/shared/price.test.ts`, `tests/detectors/preselection.test.ts`; edits `lib/detectors/preselection.ts`.
-  - [ ] 10.1 Create `tests/detectors/shared/price.test.ts` first: "+$4.99" (499, plus), "$1,299.90", "4,99 TL", "₺1.299,90", "€4,99", "4.99 €", "USD 12", "Free" and "Ücretsiz" handled by the detector as 0, no price in "Size 42"; amounts over the limit ignored.
-  - [ ] 10.2 Create `tests/detectors/preselection.test.ts`, checkboxes and switches: rows P1 to P3 and P6 in English and Turkish; a checked checkbox in a `label` with "+$4.99" gives P1 medium; a checked consent checkbox gives P2; a `role="switch"` with `aria-checked="true"` labelled by a sibling span (sole) gives P1; "nearby" lowers to low; an unchecked option, a disabled one and a "Remember me" box give nothing; a German "+4,99 €" checked box gives P1; no high confidence ever.
-  - [ ] 10.3 In the same file, radio groups: a group with a checked +$9.00 option above a $0.00 one gives P4; the cheapest checked shipping radio gives nothing; a pricier checked shipping radio gives P5 low; an unpriced radio without a "none" word skips the group; a checked radio never uses P1 to P3; evidence quotes the label and the cheapest option; empty and non-object inputs give `[]`.
-  - [ ] 10.4 Create `lib/detectors/shared/price.ts` (`Price`, `parsePrices`) and run `price.test.ts`; then create `lib/detectors/data/preselection-words.ts` (lists of design section 9.5) and replace the stub in `lib/detectors/preselection.ts` with `detectPreselection`, wrapped in `try`/`catch` returning `[]`.
-  - [ ] 10.5 Run both test files (one command each), then `npx tsc --noEmit`.
+  - [x] 10.1 Create `tests/detectors/shared/price.test.ts` first: "+$4.99" (499, plus), "$1,299.90", "4,99 TL", "₺1.299,90", "€4,99", "4.99 €", "USD 12", "Free" and "Ücretsiz" handled by the detector as 0, no price in "Size 42"; amounts over the limit ignored.
+  - [x] 10.2 Create `tests/detectors/preselection.test.ts`, checkboxes and switches: rows P1 to P3 and P6 in English and Turkish; a checked checkbox in a `label` with "+$4.99" gives P1 medium; a checked consent checkbox gives P2; a `role="switch"` with `aria-checked="true"` labelled by a sibling span (sole) gives P1; "nearby" lowers to low; an unchecked option, a disabled one and a "Remember me" box give nothing; a German "+4,99 €" checked box gives P1; no high confidence ever.
+  - [x] 10.3 In the same file, radio groups: a group with a checked +$9.00 option above a $0.00 one gives P4; the cheapest checked shipping radio gives nothing; a pricier checked shipping radio gives P5 low; an unpriced radio without a "none" word skips the group; a checked radio never uses P1 to P3; evidence quotes the label and the cheapest option; empty and non-object inputs give `[]`.
+  - [x] 10.4 Create `lib/detectors/shared/price.ts` (`Price`, `parsePrices`) and run `price.test.ts`; then create `lib/detectors/data/preselection-words.ts` (lists of design section 9.5) and replace the stub in `lib/detectors/preselection.ts` with `detectPreselection`, wrapped in `try`/`catch` returning `[]`.
+  - [x] 10.5 Run both test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 3.8, 7.5, 7.6, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9, 12.10, 12.11, 12.12, 12.13, 12.14, 12.15, 12.16, 12.17, 14.5_
 
 - [ ] 11. Colour helpers and visual-interference detector
