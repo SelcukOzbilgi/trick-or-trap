@@ -58,13 +58,13 @@ Rules for every task:
   - [x] 4.4 Run `npx vitest run tests/detectors/shared/finding.test.ts --maxWorkers=2`, `npx vitest run tests/detectors/all.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 2.8, 2.11, 2.12, 2.13, 3.1, 3.2, 3.7, 3.9, 3.10, 3.11, 3.13, 3.15, 3.16, 3.17_
 
-- [ ] 5. Countdown and calendar-date parsers
+- [x] 5. Countdown and calendar-date parsers
   - Uses: `tokenise`, `Token`, `compilePhrases` (task 2).
   - Files: creates `lib/detectors/data/months.ts`, `shared/countdown.ts`, `shared/calendar-date.ts` and `tests/detectors/shared/countdown.test.ts`, `calendar-date.test.ts`.
-  - [ ] 5.1 Create `tests/detectors/shared/countdown.test.ts` first: `04:59:59` gives 17,999 s unit 1; `9:59` and `09:59`; `04:61:00` is rejected (minutes over 59 in the three-part form) and `75:00` parses as 4,500 s; "2h 30m", "1 day 3 hours", "3 days" (unit 86,400), "2 gün 4 saat", "15 dk 30 sn"; "23:59 UTC", "at 23:59", "saat 23:59", "8:30 pm" and "28 Feb 2027, 23:59" are times of day, not countdowns.
-  - [ ] 5.2 Create `tests/detectors/shared/calendar-date.test.ts`: "28 Feb 2027", "February 28, 2027", "28 Şubat 2027", "28 şubat", "2027-02-28", "28.02.2027" parse as full or no-year; "29 Feb 2027" and "31 Nisan 2027" are invalid; "03/04/2027" is ambiguous and "13/04/2027" is not; `endMs` uses the stated time when present, else 23:59:59 UTC; no `Date.parse` is used (source read).
-  - [ ] 5.3 Create `lib/detectors/data/months.ts` (`MONTHS`, `TIME_ZONE_TOKENS`), `lib/detectors/shared/countdown.ts` (`Countdown`, `parseCountdowns`) and `lib/detectors/shared/calendar-date.ts` (`CalendarDate`, `parseCalendarDates`).
-  - [ ] 5.4 Run both test files (one command each), then `npx tsc --noEmit`.
+  - [x] 5.1 Create `tests/detectors/shared/countdown.test.ts` first: `04:59:59` gives 17,999 s unit 1; `9:59` and `09:59`; `04:61:00` is rejected (minutes over 59 in the three-part form) and `75:00` parses as 4,500 s; "2h 30m", "1 day 3 hours", "3 days" (unit 86,400), "2 gün 4 saat", "15 dk 30 sn"; "23:59 UTC", "at 23:59", "saat 23:59", "8:30 pm" and "28 Feb 2027, 23:59" are times of day, not countdowns.
+  - [x] 5.2 Create `tests/detectors/shared/calendar-date.test.ts`: "28 Feb 2027", "February 28, 2027", "28 Şubat 2027", "28 şubat", "2027-02-28", "28.02.2027" parse as full or no-year; "29 Feb 2027" and "31 Nisan 2027" are invalid; "03/04/2027" is ambiguous and "13/04/2027" is not; `endMs` uses the stated time when present, else 23:59:59 UTC; no `Date.parse` is used (source read).
+  - [x] 5.3 Create `lib/detectors/data/months.ts` (`MONTHS`, `TIME_ZONE_TOKENS`), `lib/detectors/shared/countdown.ts` (`Countdown`, `parseCountdowns`) and `lib/detectors/shared/calendar-date.ts` (`CalendarDate`, `parseCalendarDates`).
+  - [x] 5.4 Run both test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 8.1, 8.2, 8.3, 8.12, 8.13_
 
 - [ ] 6. fake-urgency detector
