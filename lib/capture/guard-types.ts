@@ -1,5 +1,5 @@
 /**
- * Types of the request guard. Types only, no code. `seam.ts` and `request-guard.ts`
+ * Types of the request guard. Types only, no code. `seam.ts` and `browser-guard.ts`
  * both import from here, so neither imports the other.
  */
 import type { GuardReasonCode } from "./types";

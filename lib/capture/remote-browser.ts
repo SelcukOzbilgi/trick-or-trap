@@ -11,7 +11,7 @@
  */
 import "server-only";
 import type { Clock } from "./clock";
-import { hideScrollbars, readPageMetrics, runInIsolatedWorld, scrollInPage, type CdpSession } from "./cdp";
+import { hideScrollbars, readMainFrameId, readPageMetrics, runInIsolatedWorld, scrollInPage, type CdpSession } from "./cdp";
 import type { CaptureConfig } from "./config";
 import {
   createSession as createApiSession,
@@ -19,11 +19,12 @@ import {
   stopSession,
   type CreatedSession,
 } from "./browser-use-api";
+import { installBrowserGuard, type BrowserGuard } from "./browser-guard";
 import { STOP_TIMEOUT_MS } from "./constants";
 import { collectInPage } from "./extractor";
 import { sanitiseMetrics } from "./geometry";
+import type { GuardBrowser, GuardSession } from "./guard-types";
 import { toDetail } from "./redact";
-import { installRequestGuard } from "./request-guard";
 import type {
   BrowserProvider,
   BrowserSessionHandle,
@@ -39,9 +40,6 @@ import type { CaptureErrorCode, CollectOptions, RawCollection, RawPageRead } fro
 /** Longest wait for the best-effort CDP disconnect after the stop request was sent. */
 export const DISCONNECT_TIMEOUT_MS = 3_000;
 
-/** The protocol events the request guard reads. Playwright subscribes by event name. */
-const GUARD_EVENT_NAMES: readonly string[] = ["Fetch.requestPaused", "Target.attachedToTarget"];
-
 export type RemoteBrowserDeps = {
   fetch: typeof fetch;
   clock: Clock;
@@ -52,12 +50,13 @@ export type RemoteBrowserDeps = {
 // A small structural view of the Playwright objects used here. The one cast from the
 // real module into these types is in `loadChromium`.
 type PwDownload = { cancel(): Promise<void> };
-type PwCdpSession = {
-  /**
-   * The public Playwright call takes two arguments. The third one addresses a child
-   * target; whether the real session honours it is unverified until the live test.
-   */
-  send(method: string, params?: Record<string, unknown>, targetSessionId?: string): Promise<unknown>;
+/** The CDP session of the page. `send` takes two arguments; the session has no child sessions. */
+type PwPageCdpSession = {
+  send(method: string, params?: Record<string, unknown>): Promise<unknown>;
+};
+/** The browser-target CDP session of `browser.newBrowserCDPSession()`; events are subscribed by name. */
+type PwBrowserCdpSession = {
+  send(method: string, params?: Record<string, unknown>): Promise<unknown>;
   on(event: string, handler: (params: unknown) => unknown): unknown;
 };
 type PwPage = {
@@ -71,22 +70,52 @@ type PwPage = {
 type PwContext = {
   pages(): PwPage[];
   newPage(): Promise<PwPage>;
-  newCDPSession(page: PwPage): Promise<PwCdpSession>;
+  newCDPSession(page: PwPage): Promise<PwPageCdpSession>;
   on(event: "page", handler: (page: PwPage) => unknown): unknown;
 };
-type PwBrowser = { contexts(): PwContext[]; close(): Promise<void> };
+type PwBrowser = {
+  contexts(): PwContext[];
+  newBrowserCDPSession(): Promise<PwBrowserCdpSession>;
+  on(event: "disconnected", handler: () => unknown): unknown;
+  close(): Promise<void>;
+};
 type PwChromium = { connectOverCDP(url: string, options: { timeout: number }): Promise<PwBrowser> };
+
+/** What the page needs from the session handle: the browser to guard, and the stop state. */
+type SessionLinks = {
+  browser: PwBrowser;
+  /** True from the moment `stop()` is called. A loss signal after that is not a guard loss. */
+  isStopping(): boolean;
+  /** Hands over the running guard, so `stop()` can stop its loss reporting first. */
+  setGuard(guard: BrowserGuard): void;
+};
 
 function noop(): void {}
 
-/** Views a Playwright CDP session as the structural `CdpSession` that `lib/capture` uses. */
-function toCdpSession(session: PwCdpSession): CdpSession {
+/** Views a Playwright CDP session of the page as the structural `CdpSession` that `lib/capture` uses. */
+function toCdpSession(session: PwPageCdpSession): CdpSession {
   return {
-    send: (method, params, targetSessionId) => session.send(method, params, targetSessionId),
-    onEvent(handler) {
-      for (const name of GUARD_EVENT_NAMES) {
-        session.on(name, (params) => handler({ method: name, params }));
-      }
+    send: (method, params) => session.send(method, params),
+  };
+}
+
+/** Views the Playwright browser as the `GuardBrowser` of the browser-level request guard. */
+function toGuardBrowser(browser: PwBrowser): GuardBrowser {
+  return {
+    async openGuardSession(): Promise<GuardSession> {
+      const session = await browser.newBrowserCDPSession();
+      return {
+        send: (method, params) => session.send(method, params),
+        onEvent(handler) {
+          session.on("Fetch.requestPaused", (params) => handler({ method: "Fetch.requestPaused", params }));
+        },
+        onClose(handler) {
+          session.on("close", () => handler());
+        },
+      };
+    },
+    onDisconnected(handler) {
+      browser.on("disconnected", () => handler());
     },
   };
 }
@@ -120,6 +149,7 @@ function createCapturePage(
   cdp: CdpSession,
   secrets: readonly string[],
   clock: Clock,
+  links: SessionLinks,
 ): CapturePage {
   const fail = (code: CaptureErrorCode, error: unknown) => new CaptureFailure(code, toDetail(error, secrets));
 
@@ -138,9 +168,22 @@ function createCapturePage(
   return {
     async installGuards(guards: PageGuards): Promise<void> {
       try {
-        // The CDP session was opened in `connect` and is shared with the reads. Interception
-        // goes through CDP `Fetch`, so redirect hops, sub-frames and sub-resources are all seen.
-        await installRequestGuard(cdp, guards, { clock });
+        // The main frame id comes from the page session. It must be read before the guard
+        // session opens, so the guard can tell a main-frame document from any other.
+        const mainFrameId = await readMainFrameId(cdp);
+        // One browser-level session sees the requests of every target (page, frames, workers,
+        // popups). The promise resolves only after `Fetch.enable` did, so no navigation can
+        // start unguarded.
+        const guard = await installBrowserGuard(toGuardBrowser(links.browser), guards, {
+          clock,
+          mainFrameId,
+          onLost: () => {
+            // The capture's own stop closes the connection too; that is never a loss.
+            if (links.isStopping()) return;
+            guards.report({ kind: "guard-lost" });
+          },
+        });
+        links.setGuard(guard);
       } catch (error) {
         throw fail("connect-failed", error);
       }
@@ -222,7 +265,7 @@ function createHandle(session: CreatedSession, config: CaptureConfig, deps: Remo
   const apiKey = config.apiKey as string;
   // Everything that must never appear in an error text, known only after the create call.
   const secrets = [apiKey, session.id, session.cdpUrl, session.liveUrl ?? ""];
-  const state: { browser?: PwBrowser; stopped: boolean } = { stopped: false };
+  const state: { browser?: PwBrowser; stopped: boolean; guard?: BrowserGuard } = { stopped: false };
 
   /**
    * Best-effort CDP disconnect, bounded by `budgetMs`. A failure or a hang never
@@ -255,11 +298,20 @@ function createHandle(session: CreatedSession, config: CaptureConfig, deps: Remo
         const context = browser.contexts()[0];
         if (!context) throw new CaptureFailure("connect-failed");
         const page = context.pages()[0] ?? (await context.newPage());
-        // One CDP session serves the scrollbar setting, the request guard and every read.
+        // One CDP session serves the scrollbar setting and every read of the page. The guard
+        // has its own browser-level session, opened in `installGuards`.
         // The scrollbars are hidden before the page is returned, so before any read.
         const cdp = toCdpSession(await context.newCDPSession(page));
         await hideScrollbars(cdp);
-        return createCapturePage(page, context, cdp, secrets, deps.clock);
+        return createCapturePage(page, context, cdp, secrets, deps.clock, {
+          browser,
+          isStopping: () => state.stopped,
+          setGuard: (guard) => {
+            state.guard = guard;
+            // The stop may have started while the guard was being installed.
+            if (state.stopped) guard.stopWatching();
+          },
+        });
       } catch (error) {
         if (error instanceof CaptureFailure) throw error;
         throw new CaptureFailure("connect-failed", toDetail(error, secrets));
@@ -268,6 +320,10 @@ function createHandle(session: CreatedSession, config: CaptureConfig, deps: Remo
 
     async stop(): Promise<void> {
       state.stopped = true;
+      // Our own teardown closes the connection. Loss reporting stops first, so that is never
+      // read as a guard loss. The guard session is never detached: the stop request ends the
+      // browser, then `browser.close()` closes the connection.
+      state.guard?.stopWatching();
       const startedAt = deps.clock.now();
       // The stop request comes first: it ends the billing. The disconnect then gets what
       // is left of the stop budget, and a failed request does not skip it.

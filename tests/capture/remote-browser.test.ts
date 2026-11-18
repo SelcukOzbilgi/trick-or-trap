@@ -1,17 +1,24 @@
-import { readFileSync } from "node:fs";
-import { describe, expect, it, vi } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
 import { scrollInPage } from "@/lib/capture/cdp";
 import { collectInPage } from "@/lib/capture/extractor";
-import { BROWSER_VIEWPORT, COLLECT_LIMITS, MAX_PLAUSIBLE_PX, STOP_TIMEOUT_MS } from "@/lib/capture/constants";
+import {
+  BROWSER_VIEWPORT,
+  COLLECT_LIMITS,
+  GUARD_HEARTBEAT_INTERVAL_MS,
+  MAX_PLAUSIBLE_PX,
+  STOP_TIMEOUT_MS,
+} from "@/lib/capture/constants";
 import { createRemoteBrowser, DISCONNECT_TIMEOUT_MS } from "@/lib/capture/remote-browser";
 import type { CaptureConfig } from "@/lib/capture/config";
 import type { BrowserSessionHandle, CapturePage, GuardEvent, GuardVerdict, PageGuards } from "@/lib/capture/seam";
 import { CaptureFailure } from "@/lib/capture/types";
 import type { CollectOptions, RawCollection, RawPageRead } from "@/lib/capture/types";
 import { createFakeCdp, type CdpCall, type CdpScript } from "./helpers/fake-cdp";
+import { createFakeGuardBrowser, type FakeGuardBrowser } from "./helpers/fake-guard-browser";
 import { createManualClock } from "./helpers/manual-clock";
 
 const API_KEY = "sk-test-sentinel";
@@ -69,6 +76,17 @@ type AnyFn = (...args: never[]) => unknown;
 
 const MAIN_FRAME_ID = "main-frame-1";
 
+/** Every fake page session and guard browser made in a test; `afterEach` checks that none broke the protocol. */
+const fakes: Array<{ cdp: ReturnType<typeof createFakeCdp>; guard: FakeGuardBrowser }> = [];
+
+afterEach(() => {
+  const made = fakes.splice(0);
+  for (const { cdp, guard } of made) {
+    cdp.assertNoViolations();
+    guard.assertNoViolations();
+  }
+});
+
 /** Lets every pending promise callback run. The tests use real timers for this only. */
 function flush(): Promise<void> {
   return new Promise<void>((resolve) => setImmediate(resolve));
@@ -113,17 +131,36 @@ function createFakePlaywright(options: FakePlaywrightOptions = {}) {
     },
     ...options.cdpScript,
   });
-  // The shape of a Playwright CDPSession: `send` and `on` by event name.
+  // The shape of a Playwright CDPSession for the page: `send` with two arguments. The page session has no
+  // events here, because every protocol event of the guard comes from the browser-level session below.
+  // The wrapper forwards every argument, so a third one reaches the fake and is recorded as a violation.
   const cdpSession = {
-    send: vi.fn((method: string, params?: Record<string, unknown>, targetSessionId?: string) =>
-      cdp.send(method, params, targetSessionId),
-    ),
-    on: vi.fn((name: string, handler: (params: unknown) => unknown) => {
-      cdp.onEvent(async (event) => {
-        if (event.method === name && event.targetSessionId === undefined) await handler(event.params);
-      });
-    }),
+    send: vi.fn((...args: unknown[]) => (cdp.send as (...a: unknown[]) => Promise<unknown>)(...args)),
   };
+
+  // The browser-level guard session of `browser.newBrowserCDPSession()`, backed by the faithful fake guard browser.
+  const guard = createFakeGuardBrowser();
+  const disconnectedHandlers: Array<() => void> = [];
+  const guardCdpSession = (session: Awaited<ReturnType<FakeGuardBrowser["openGuardSession"]>>) => ({
+    send: vi.fn((...args: unknown[]) => (session.send as (...a: unknown[]) => Promise<unknown>)(...args)),
+    on: vi.fn((event: string, handler: (params?: unknown) => unknown) => {
+      if (event === "Fetch.requestPaused") {
+        session.onEvent(async (paused) => {
+          if (paused.method === event) await handler(paused.params);
+        });
+      } else if (event === "close") {
+        session.onClose(() => {
+          void handler();
+        });
+      } else {
+        throw new Error(`The fake browser session has no event "${event}".`);
+      }
+    }),
+    detach: vi.fn(async () => {}),
+  });
+  const guardSessions: Array<ReturnType<typeof guardCdpSession>> = [];
+  fakes.push({ cdp, guard });
+
   const pageHandlers: Record<string, AnyFn> = {};
   const contextHandlers: Record<string, AnyFn> = {};
 
@@ -171,6 +208,18 @@ function createFakePlaywright(options: FakePlaywrightOptions = {}) {
       events.push("close");
       if (options.closeError) throw options.closeError;
     }),
+    // The browser-level CDP session the guard uses. There is deliberately no `route` and no `detach` call expected.
+    newBrowserCDPSession: vi.fn(async () => {
+      events.push("open");
+      const session = guardCdpSession(await guard.openGuardSession());
+      guardSessions.push(session);
+      return session;
+    }),
+    on: vi.fn((event: string, handler: () => void) => {
+      if (event !== "disconnected") throw new Error(`The fake browser has no event "${event}".`);
+      disconnectedHandlers.push(handler);
+      guard.onDisconnected(handler);
+    }),
   };
 
   const connectOverCDP = vi.fn(async (_url: string, _options: { timeout: number }) => {
@@ -190,6 +239,12 @@ function createFakePlaywright(options: FakePlaywrightOptions = {}) {
     events,
     cdp,
     cdpSession,
+    guard,
+    guardSessions,
+    /** Calls the handlers registered for the browser's `disconnected` event, without a session close. */
+    emitDisconnected: () => {
+      for (const handler of disconnectedHandlers) handler();
+    },
     pageHandler: (event: string) => pageHandlers[event] as unknown as (arg: unknown) => unknown,
     contextHandler: (event: string) => contextHandlers[event] as unknown as (arg: unknown) => unknown,
   };
@@ -370,9 +425,7 @@ describe("connect", () => {
     const { fake } = await connectedPage();
     expect(fake.context.newCDPSession).toHaveBeenCalledTimes(1);
     expect(fake.context.newCDPSession).toHaveBeenCalledWith(fake.firstPage);
-    expect(fake.cdp.calls).toEqual([
-      { method: "Emulation.setScrollbarsHidden", params: { hidden: true }, targetSessionId: undefined },
-    ]);
+    expect(fake.cdp.calls).toEqual([{ method: "Emulation.setScrollbarsHidden", params: { hidden: true } }]);
   });
 
   it("hides the scrollbars on the page that was created when the context had none", async () => {
@@ -442,43 +495,90 @@ describe("connect", () => {
 });
 
 describe("guards", () => {
-  it("runs the request guard through the CDP session opened at connect, in order", async () => {
+  it("reads the frame tree on the page session, then opens the guard session, then enables Fetch once", async () => {
     const { fake, page } = await connectedPage();
-    const { guards } = createGuards({ allowed: true });
-    await page.installGuards(guards);
+    fake.cdp.script("Page.getFrameTree", () => {
+      fake.events.push("frame-tree");
+      return { frameTree: { frame: { id: MAIN_FRAME_ID } } };
+    });
+    fake.guard.script("Fetch.enable", () => {
+      fake.events.push("enable");
+      return {};
+    });
+    await page.installGuards(createGuards({ allowed: true }).guards);
 
-    // One session for the whole page: opened in connect, shared by the guard and the reads.
+    expect(fake.events).toEqual(["frame-tree", "open", "enable"]);
+    // The page session got the scrollbar call and the frame-tree read, and nothing else.
+    expect(fake.cdp.calls.map((call) => call.method)).toEqual(["Emulation.setScrollbarsHidden", "Page.getFrameTree"]);
+    // One page session and one guard session.
     expect(fake.context.newCDPSession).toHaveBeenCalledTimes(1);
-    expect(fake.context.newCDPSession).toHaveBeenCalledWith(fake.firstPage);
-    expect(fake.cdp.calls.map((call) => call.method)).toEqual([
-      "Emulation.setScrollbarsHidden",
-      "Network.setBypassServiceWorker",
-      "Page.getFrameTree",
-      "Fetch.enable",
-      "Target.setAutoAttach",
-    ]);
-    expect(fake.cdp.callsOf("Fetch.enable")[0].params).toEqual({
+    expect(fake.browser.newBrowserCDPSession).toHaveBeenCalledTimes(1);
+    expect(fake.guard.openCalls).toBe(1);
+    expect(fake.guard.callsOf("Fetch.enable")).toHaveLength(1);
+    expect(fake.guard.callsOf("Fetch.enable")[0].params).toEqual({
       patterns: [{ urlPattern: "*", requestStage: "Request" }],
     });
   });
 
-  it("registers the event handlers before the first command of the guard", async () => {
+  it("registers the paused, close and disconnected handlers before the first command of the guard", async () => {
     const { fake, page } = await connectedPage();
-    let handlersSeen: number | undefined;
-    fake.cdp.script("Network.setBypassServiceWorker", () => {
-      handlersSeen = fake.cdp.handlerCount;
-      return {};
-    });
     await page.installGuards(createGuards({ allowed: true }).guards);
-    expect(handlersSeen).toBeGreaterThan(0);
+    expect(fake.guard.handlersAtFirstSend).toEqual({ event: 1, close: 1, disconnected: 1 });
+    expect(fake.guard.calls[0].method).toBe("Fetch.enable");
   });
 
-  it("never calls route on the context or the page", async () => {
+  it("sends none of the child-target, page-domain or bypass commands, and no Fetch.enable on the page session", async () => {
+    const { fake, page } = await connectedPage();
+    await page.installGuards(createGuards({ allowed: true }).guards);
+    const methods = [...fake.cdp.calls, ...fake.guard.calls].map((call) => call.method);
+    for (const forbidden of [
+      "Target.setAutoAttach",
+      "Runtime.runIfWaitingForDebugger",
+      "Target.closeTarget",
+      "Network.setBypassServiceWorker",
+    ]) {
+      expect(methods).not.toContain(forbidden);
+    }
+    expect(fake.cdp.callsOf("Fetch.enable")).toEqual([]);
+    expect(fake.guard.calls.every((call) => !/^(Network|Page|Runtime|Emulation|Target)\./.test(call.method))).toBe(true);
+  });
+
+  it("never calls route on the context or the page, and never detaches the guard session", async () => {
     const { fake, page } = await connectedPage();
     await page.installGuards(createGuards({ allowed: true }).guards);
     expect("route" in fake.context).toBe(false);
     expect("route" in fake.firstPage).toBe(false);
     expect("routeWebSocket" in fake.context).toBe(false);
+    for (const session of fake.guardSessions) expect(session.detach).not.toHaveBeenCalled();
+  });
+
+  it("does not navigate while Fetch.enable has not resolved", async () => {
+    const { fake, page } = await connectedPage();
+    fake.guard.script("Fetch.enable", "hang");
+
+    let settled = false;
+    void page.installGuards(createGuards({ allowed: true }).guards).then(
+      () => {
+        settled = true;
+      },
+      () => {
+        settled = true;
+      },
+    );
+    await flush();
+
+    expect(fake.guard.callsOf("Fetch.enable")).toHaveLength(1);
+    expect(settled).toBe(false);
+    // `capturePage` calls goto only after installGuards resolved, so goto has not run here.
+    expect(fake.firstPage.goto).not.toHaveBeenCalled();
+  });
+
+  it("starts the guard heartbeat on the guard session", async () => {
+    const { fake, clock, page } = await connectedPage();
+    await page.installGuards(createGuards({ allowed: true }).guards);
+    expect(fake.guard.callsOf("Browser.getVersion")).toEqual([]);
+    clock.advance(GUARD_HEARTBEAT_INTERVAL_MS);
+    expect(fake.guard.callsOf("Browser.getVersion")).toHaveLength(1);
   });
 
   it("continues a paused request that the guards allow", async () => {
@@ -486,16 +586,16 @@ describe("guards", () => {
     const { guards, checkHost, events } = createGuards({ allowed: true });
     await page.installGuards(guards);
 
-    await fake.cdp.emit("Fetch.requestPaused", {
+    await fake.guard.emitPaused({
       requestId: "req-1",
-      request: { url: "https://shop.example.com/a" },
+      url: "https://shop.example.com/a",
       resourceType: "Document",
       frameId: MAIN_FRAME_ID,
-    });
+    }).handled;
 
     expect(checkHost).toHaveBeenCalledWith("https://shop.example.com/a");
-    expect(fake.cdp.callsOf("Fetch.continueRequest").map((call) => call.params)).toEqual([{ requestId: "req-1" }]);
-    expect(fake.cdp.callsOf("Fetch.failRequest")).toEqual([]);
+    expect(fake.guard.callsOf("Fetch.continueRequest").map((call) => call.params)).toEqual([{ requestId: "req-1" }]);
+    expect(fake.guard.callsOf("Fetch.failRequest")).toEqual([]);
     expect(events).toEqual([]);
   });
 
@@ -504,19 +604,34 @@ describe("guards", () => {
     const { guards, events } = createGuards({ allowed: false, reason: "url-address-blocked" });
     await page.installGuards(guards);
 
-    await fake.cdp.emit("Fetch.requestPaused", {
+    await fake.guard.emitPaused({
       requestId: "req-2",
-      request: { url: "http://10.0.0.1/" },
+      url: "http://10.0.0.1/",
       resourceType: "Document",
       frameId: MAIN_FRAME_ID,
-    });
+    }).handled;
 
-    expect(fake.cdp.callsOf("Fetch.failRequest").map((call) => call.params)).toEqual([
+    expect(fake.guard.callsOf("Fetch.failRequest").map((call) => call.params)).toEqual([
       { requestId: "req-2", errorReason: "BlockedByClient" },
     ]);
-    expect(fake.cdp.callsOf("Fetch.continueRequest")).toEqual([]);
+    expect(fake.guard.callsOf("Fetch.continueRequest")).toEqual([]);
     expect(events).toEqual([{ kind: "request-blocked", reason: "url-address-blocked", mainFrame: true }]);
     expect(JSON.stringify(events)).not.toContain("10.0.0.1");
+  });
+
+  it("uses the main frame id read from the page: a document of another frame is not a main-frame request", async () => {
+    const { fake, page } = await connectedPage();
+    const { guards, events } = createGuards({ allowed: false, reason: "url-address-blocked" });
+    await page.installGuards(guards);
+
+    await fake.guard.emitPaused({
+      requestId: "req-frame",
+      url: "http://10.0.0.1/",
+      resourceType: "Document",
+      frameId: "some-other-frame",
+    }).handled;
+
+    expect(events).toEqual([{ kind: "request-blocked", reason: "url-address-blocked", mainFrame: false }]);
   });
 
   it("fails a paused request when the check itself throws", async () => {
@@ -530,32 +645,151 @@ describe("guards", () => {
       report: (event) => events.push(event),
     });
 
-    await fake.cdp.emit("Fetch.requestPaused", {
+    await fake.guard.emitPaused({
       requestId: "req-3",
-      request: { url: "https://shop.example.com/" },
+      url: "https://shop.example.com/",
       resourceType: "Image",
       frameId: MAIN_FRAME_ID,
-    });
+    }).handled;
 
-    expect(fake.cdp.callsOf("Fetch.failRequest")).toHaveLength(1);
+    expect(fake.guard.callsOf("Fetch.failRequest")).toHaveLength(1);
     expect(events).toEqual([{ kind: "request-blocked", reason: "url-invalid", mainFrame: false }]);
   });
 
-  it.each(["Network.setBypassServiceWorker", "Fetch.enable", "Target.setAutoAttach"])(
-    "maps a failing %s to connect-failed and keeps every secret out of the detail",
-    async (method) => {
-      const { page } = await connectedPage({
-        cdpScript: {
-          [method]: new Error(`${method} refused: key=${API_KEY} id=${SESSION_ID} cdp=${CDP_URL} live=${LIVE_URL}`),
-        },
-      });
-      const failure = await failureOf(page.installGuards(createGuards({ allowed: true }).guards));
-      expect(failure.code).toBe("connect-failed");
-      expectNoSecrets(failure.message);
-      expectNoSecrets(failure.detail ?? "");
-      expect(failure.detail ?? "").toContain(method);
-    },
-  );
+  it("maps a failing frame-tree read to connect-failed without a secret, opens no guard session and does not navigate", async () => {
+    const { fake, page } = await connectedPage({
+      cdpScript: {
+        "Page.getFrameTree": new Error(`tree refused: key=${API_KEY} id=${SESSION_ID} cdp=${CDP_URL} live=${LIVE_URL}`),
+      },
+    });
+    const failure = await failureOf(page.installGuards(createGuards({ allowed: true }).guards));
+    expect(failure.code).toBe("connect-failed");
+    expectNoSecrets(failure.message);
+    expectNoSecrets(failure.detail ?? "");
+    expect(failure.detail ?? "").toContain("tree refused");
+    expect(fake.browser.newBrowserCDPSession).not.toHaveBeenCalled();
+    expect(fake.guard.calls).toEqual([]);
+    expect(fake.firstPage.goto).not.toHaveBeenCalled();
+  });
+
+  it("maps a frame tree without a main frame id to connect-failed", async () => {
+    const { fake, page } = await connectedPage({ cdpScript: { "Page.getFrameTree": { frameTree: {} } } });
+    const failure = await failureOf(page.installGuards(createGuards({ allowed: true }).guards));
+    expect(failure.code).toBe("connect-failed");
+    expect(fake.browser.newBrowserCDPSession).not.toHaveBeenCalled();
+  });
+
+  it("maps a failing guard session open to connect-failed without a secret, and sends no Fetch.enable", async () => {
+    const { fake, page } = await connectedPage();
+    fake.browser.newBrowserCDPSession.mockRejectedValueOnce(
+      new Error(`no browser session: key=${API_KEY} id=${SESSION_ID} cdp=${CDP_URL} live=${LIVE_URL}`),
+    );
+    const failure = await failureOf(page.installGuards(createGuards({ allowed: true }).guards));
+    expect(failure.code).toBe("connect-failed");
+    expectNoSecrets(failure.message);
+    expectNoSecrets(failure.detail ?? "");
+    expect(failure.detail ?? "").toContain("no browser session");
+    expect(fake.guard.calls).toEqual([]);
+    expect(fake.firstPage.goto).not.toHaveBeenCalled();
+  });
+
+  it("maps a failing Fetch.enable to connect-failed without a secret", async () => {
+    const { fake, page } = await connectedPage();
+    fake.guard.script(
+      "Fetch.enable",
+      new Error(`Fetch.enable refused: key=${API_KEY} id=${SESSION_ID} cdp=${CDP_URL} live=${LIVE_URL}`),
+    );
+    const failure = await failureOf(page.installGuards(createGuards({ allowed: true }).guards));
+    expect(failure.code).toBe("connect-failed");
+    expectNoSecrets(failure.message);
+    expectNoSecrets(failure.detail ?? "");
+    expect(failure.detail ?? "").toContain("Fetch.enable");
+    expect(fake.firstPage.goto).not.toHaveBeenCalled();
+  });
+
+  it("reports guard-lost when the guard session closes", async () => {
+    const { fake, page } = await connectedPage();
+    const { guards, events } = createGuards({ allowed: true });
+    await page.installGuards(guards);
+
+    fake.guard.detach();
+
+    expect(events).toEqual([{ kind: "guard-lost" }]);
+  });
+
+  it("reports guard-lost when the browser disconnects", async () => {
+    const { fake, page } = await connectedPage();
+    const { guards, events } = createGuards({ allowed: true });
+    await page.installGuards(guards);
+
+    fake.emitDisconnected();
+
+    expect(events).toEqual([{ kind: "guard-lost" }]);
+  });
+
+  it("reports guard-lost once when the connection drops with both signals", async () => {
+    const { fake, page } = await connectedPage();
+    const { guards, events } = createGuards({ allowed: true });
+    await page.installGuards(guards);
+
+    fake.guard.dropConnection();
+
+    expect(events).toEqual([{ kind: "guard-lost" }]);
+  });
+
+  it("reports guard-lost when the heartbeat is rejected", async () => {
+    const { fake, clock, page } = await connectedPage();
+    const { guards, events } = createGuards({ allowed: true });
+    await page.installGuards(guards);
+    fake.guard.script("Browser.getVersion", new Error("Target closed"));
+
+    clock.advance(GUARD_HEARTBEAT_INTERVAL_MS);
+    await flush();
+
+    expect(events).toEqual([{ kind: "guard-lost" }]);
+  });
+
+  it("reports no guard-lost for a close, a disconnect or a heartbeat after stop() has started", async () => {
+    const { fake, clock, handle, page } = await connectedPage();
+    const { guards, events } = createGuards({ allowed: true });
+    await page.installGuards(guards);
+
+    // The stop is started and not awaited: the signals below arrive while it runs.
+    const stopped = handle.stop();
+    fake.guard.dropConnection();
+    fake.emitDisconnected();
+    // Less than the stop budget, so the manual clock cannot fire the stop request's own timeout.
+    clock.advance(2 * GUARD_HEARTBEAT_INTERVAL_MS);
+    await stopped;
+    await flush();
+
+    expect(events).toEqual([]);
+    expect(fake.guard.callsOf("Browser.getVersion")).toEqual([]);
+  });
+
+  it("reports no guard-lost when the connection closes after stop() has ended", async () => {
+    const { fake, handle, page } = await connectedPage();
+    const { guards, events } = createGuards({ allowed: true });
+    await page.installGuards(guards);
+
+    await handle.stop();
+    fake.guard.detach();
+    fake.emitDisconnected();
+
+    expect(events).toEqual([]);
+  });
+
+  it("keeps the guard session attached through stop: the stop request first, then browser.close, never detach", async () => {
+    const { fake, fetchFake, handle, page } = await connectedPage();
+    await page.installGuards(createGuards({ allowed: true }).guards);
+
+    await handle.stop();
+
+    expect(fake.events).toEqual(["open", "patch", "close"]);
+    expect(fetchFake.calls.filter((call) => call.method === "PATCH")).toHaveLength(1);
+    for (const session of fake.guardSessions) expect(session.detach).not.toHaveBeenCalled();
+    expect(fake.guard.pending()).toEqual([]);
+  });
 
   it("maps a failing newCDPSession to connect-failed with a redacted detail", async () => {
     const harness = await openSession();
@@ -612,6 +846,28 @@ describe("guards", () => {
 
     expect(fake.firstPage.close).not.toHaveBeenCalled();
     expect(events).toEqual([]);
+  });
+});
+
+describe("child-session code", () => {
+  it("is gone from every file under lib/capture, and so is the old guard module", () => {
+    const files = readdirSync("lib/capture").filter((name) => name.endsWith(".ts"));
+    expect(files).not.toContain("request-guard.ts");
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) {
+      const source = readFileSync(`lib/capture/${file}`, "utf8");
+      for (const forbidden of [
+        "targetSessionId",
+        "Target.attachedToTarget",
+        "waitForDebuggerOnStart",
+        "Target.setAutoAttach",
+        "Runtime.runIfWaitingForDebugger",
+        "Network.setBypassServiceWorker",
+        "Target.closeTarget",
+      ]) {
+        expect(source, `${file} mentions ${forbidden}`).not.toContain(forbidden);
+      }
+    }
   });
 });
 
