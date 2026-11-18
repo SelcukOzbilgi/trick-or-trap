@@ -40,7 +40,7 @@ No code outside `lib/capture` calls Playwright directly. This seam makes the det
 
 ## Detectors
 
-Detectors are pure TypeScript functions. Each detector receives a `PageSnapshot` (DOM text, computed styles, element boxes, checkbox states, reload samples) and returns an array of `Finding` objects. `Finding` and `PageSnapshot` are defined in `lib/types` and validated with Zod. Detectors have no side effects and no network calls.
+Detectors are pure TypeScript functions. Each detector receives a `PageSnapshot` (DOM text, computed styles, element boxes, checkbox states, reload samples) and returns an array of `Finding` objects. `Finding` and `PageSnapshot` are defined in `lib/types` and validated with Zod. Detectors have no side effects and no network calls. `runAllDetectors` in `lib/detectors/all.ts` is the entry point for the six static detectors; it builds a fresh registry on every call, and nothing registers on import. Word lists live in `lib/detectors/data/` (English and Turkish).
 
 ## LLM judge
 

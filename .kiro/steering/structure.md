@@ -60,11 +60,16 @@ trick-or-trap/
 │   │   ├── geometry.ts            # pure maths: boxes, mode choice, tiles, sizes
 │   │   └── screenshots.ts         # captureImages: single or tiled screenshots
 │   ├── detectors/
-│   │   ├── fake-urgency.ts
-│   │   ├── fake-scarcity.ts
-│   │   ├── confirmshaming.ts
-│   │   ├── preselection.ts
-│   │   └── visual-interference.ts
+│   │   ├── index.ts               # registry: createRegistry, defaultRegistry, runDetectors
+│   │   ├── all.ts                 # STATIC_DETECTOR_NAMES, createStaticRegistry(), runAllDetectors()
+│   │   ├── fake-urgency.ts        # detectFakeUrgency
+│   │   ├── fake-scarcity.ts       # detectFakeScarcity
+│   │   ├── fake-activity.ts       # detectFakeActivity
+│   │   ├── confirmshaming.ts      # detectConfirmshaming
+│   │   ├── preselection.ts        # detectPreselection
+│   │   ├── visual-interference.ts # detectVisualInterference
+│   │   ├── shared/                # text, patterns, elements, samples, labels, parsers, colour, finding builder
+│   │   └── data/                  # English and Turkish word lists, one file per detector family
 │   ├── judge/
 │   │   ├── interface.ts           # Judge interface
 │   │   ├── haiku.ts               # Claude Haiku 5.5 implementation
@@ -81,9 +86,19 @@ trick-or-trap/
 │   ├── detectors/
 │   │   ├── fake-urgency.test.ts
 │   │   ├── fake-scarcity.test.ts
+│   │   ├── fake-activity.test.ts
 │   │   ├── confirmshaming.test.ts
 │   │   ├── preselection.test.ts
-│   │   └── visual-interference.test.ts
+│   │   ├── visual-interference.test.ts
+│   │   ├── registry.test.ts       # createRegistry and runDetectors
+│   │   ├── all.test.ts            # runAllDetectors wiring, fresh registry per call
+│   │   ├── parsed-copies.test.ts  # runDetectors returns parsed copies of findings
+│   │   ├── source-rules.test.ts   # no clock, random, locale case, stray regex, hook word or demo terms
+│   │   ├── word-lists.test.ts     # list shape, generality, other languages
+│   │   ├── hostile-input.test.ts  # bounds, invariance and wording on hostile snapshots
+│   │   ├── shared/                # one test file per lib/detectors/shared file
+│   │   ├── helpers/               # demo-terms.ts
+│   │   └── eval/                  # Boo-tique harness: helpers/, tree, snapshot-sync, score and boo-tique-eval tests
 │   ├── capture/
 │   │   ├── extractor.test.ts
 │   │   ├── collector-dom.test.ts  # collectInPage on real DOM (jsdom)
@@ -115,9 +130,9 @@ trick-or-trap/
 - **Functions and variables:** camelCase.
 - **Zod schemas:** PascalCase with a `Schema` suffix (`FindingSchema`, `PageSnapshotSchema`).
 - **Types inferred from Zod:** PascalCase without suffix (`Finding`, `PageSnapshot`).
-- **Detector files:** one file per detector, named after the pattern (`fake-urgency.ts`). The default export is the detector function.
+- **Detector files:** one file per detector, named after the pattern (`fake-urgency.ts`). Each static detector file exports one named pure function (`detectFakeUrgency` and so on) and has no default export and no import side effects; `lib/detectors/all.ts` registers them in a fixed order on a fresh registry per call and exposes `runAllDetectors`.
 - **Test files:** the test for `lib/<area>/<name>.ts` is `tests/<area>/<name>.test.ts`. The test for `lib/<area>/index.ts` is `tests/<area>/<topic>.test.ts`, where `<topic>` names what the tests cover. Examples: `tests/types/schemas.test.ts` for `lib/types/index.ts` and `tests/detectors/registry.test.ts` for `lib/detectors/index.ts`.
 
 ## Specs
 
-Each feature has its own spec directory under `.kiro/specs/<feature-name>/`, containing three files: `requirements.md`, `design.md` and `tasks.md`. See `specs.md` steering file for the required format. Detectors get individual specs (e.g. `.kiro/specs/detector-fake-urgency/`).
+Each feature has its own spec directory under `.kiro/specs/<feature-name>/`, containing three files: `requirements.md`, `design.md` and `tasks.md`. See `specs.md` steering file for the required format. The spec `.kiro/specs/detectors-static/` covers all six static detectors.

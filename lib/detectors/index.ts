@@ -157,7 +157,10 @@ export function createRegistry(): Registry {
   return { registerDetector, runDetectors };
 }
 
-/** The registry used by detector modules that self-register on import. */
+/**
+ * Nothing registers into this registry. The static detectors run through
+ * `runAllDetectors` in `lib/detectors/all.ts`, which uses a fresh registry per call.
+ */
 export const defaultRegistry: Registry = createRegistry();
 
 export const { registerDetector, runDetectors } = defaultRegistry;
