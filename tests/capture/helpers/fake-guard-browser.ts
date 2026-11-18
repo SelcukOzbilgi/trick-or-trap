@@ -26,17 +26,45 @@ export type PausedInit = {
   requestId?: string;
   /** Where the request came from (page, iframe, worker, popup, ...). Informational only: the event does not carry it. */
   source?: string;
+  /** Present: the request is paused at the response stage, with these response fields. Absent: request stage. */
+  response?: PausedResponseInit;
 };
 
-export type FakeRequestState = "pending" | "continued" | "failed" | "gone-out";
+export type FakeHeaderEntry = { name: string; value: string };
+
+export type PausedResponseInit = {
+  /** Default 200, unless `errorReason` is set (then no status code is sent). */
+  status?: number;
+  statusText?: string;
+  errorReason?: string;
+  /** Response headers as a list of entries, so repeated names are kept. */
+  headers?: FakeHeaderEntry[];
+  /** What `Fetch.getResponseBody` returns. Default: an empty, not base64-encoded body. */
+  body?: string;
+  base64Encoded?: boolean;
+};
+
+export type FakeRequestState = "pending" | "continued" | "failed" | "fulfilled" | "gone-out";
+
+export type FakeFulfilment = {
+  responseCode: number;
+  responsePhrase?: string;
+  responseHeaders?: FakeHeaderEntry[];
+  /** Base64 text, as sent. */
+  body?: string;
+};
 
 export type FakeRequest = {
   readonly requestId: string;
   readonly url: string;
   readonly source: string | undefined;
+  /** `"response"` when the event carried response fields. */
+  readonly stage: "request" | "response";
   state: FakeRequestState;
   /** The `errorReason` of the `Fetch.failRequest` that answered it. */
   errorReason?: string;
+  /** What the `Fetch.fulfillRequest` that answered it carried. */
+  fulfilled?: FakeFulfilment;
 };
 
 export type PausedHandle = {
@@ -105,6 +133,8 @@ export function createFakeGuardBrowser(): FakeGuardBrowser {
   const violations: string[] = [];
   const handlerErrors: Error[] = [];
   const requests: FakeRequest[] = [];
+  /** The response fields of each response-stage request, by request id. */
+  const responses = new Map<string, PausedResponseInit>();
   const scripts = new Map<string, GuardScriptEntry>();
   const eventHandlers: EventHandler[] = [];
   const closeHandlers: Array<() => void> = [];
@@ -155,6 +185,45 @@ export function createFakeGuardBrowser(): FakeGuardBrowser {
         const reason = (params as { errorReason?: unknown }).errorReason;
         if (typeof reason === "string") request.errorReason = reason;
       }
+      return Promise.resolve({});
+    }
+    if (method === "Fetch.getResponseBody") {
+      const request = findPending(params);
+      if (!request) return Promise.reject(new Error("Invalid InterceptionId"));
+      const response = responses.get(request.requestId);
+      if (request.stage !== "response" || !response || response.errorReason !== undefined) {
+        return Promise.reject(new Error("Can only get response body on requests captured after headers received."));
+      }
+      return Promise.resolve({ body: response.body ?? "", base64Encoded: response.base64Encoded ?? false });
+    }
+    if (method === "Fetch.fulfillRequest") {
+      const request = findPending(params);
+      if (!request) return Promise.reject(new Error("Invalid InterceptionId"));
+      const fields = params as Record<string, unknown>;
+      const code = fields.responseCode;
+      if (typeof code !== "number" || !Number.isInteger(code)) {
+        return Promise.reject(new Error("Invalid parameters: responseCode: integer value expected"));
+      }
+      const fulfilment: FakeFulfilment = { responseCode: code };
+      if (typeof fields.responsePhrase === "string") fulfilment.responsePhrase = fields.responsePhrase;
+      if (Array.isArray(fields.responseHeaders)) fulfilment.responseHeaders = fields.responseHeaders as FakeHeaderEntry[];
+      if (typeof fields.body === "string") fulfilment.body = fields.body;
+      request.state = "fulfilled";
+      request.fulfilled = fulfilment;
+      return Promise.resolve({});
+    }
+    if (method === "Fetch.continueResponse") {
+      const request = findPending(params);
+      if (!request) return Promise.reject(new Error("Invalid InterceptionId"));
+      if (request.stage !== "response") {
+        return Promise.reject(new Error("Can only continue a response of a request paused at the response stage."));
+      }
+      const fields = params as Record<string, unknown>;
+      if (fields.responseHeaders !== undefined && fields.responseCode === undefined) {
+        // Chromium leaves the request paused in this case; the fake rejects so a test sees it.
+        return Promise.reject(new Error("Invalid parameters: responseCode must be set when responseHeaders is set"));
+      }
+      request.state = "continued";
       return Promise.resolve({});
     }
     return Promise.resolve({});
@@ -262,7 +331,13 @@ export function createFakeGuardBrowser(): FakeGuardBrowser {
     emitPaused(init) {
       if (!session) throw new Error("The fake guard browser has no open session; call openGuardSession first.");
       const requestId = init.requestId ?? `REQ-${nextRequestNumber++}`;
-      requests.push({ requestId, url: init.url, source: init.source, state: "pending" });
+      requests.push({
+        requestId,
+        url: init.url,
+        source: init.source,
+        stage: init.response ? "response" : "request",
+        state: "pending",
+      });
       const params: Record<string, unknown> = {
         requestId,
         request: { url: init.url, method: "GET", headers: { ...(init.headers ?? {}) } },
@@ -270,6 +345,16 @@ export function createFakeGuardBrowser(): FakeGuardBrowser {
         resourceType: init.resourceType ?? "Document",
       };
       if (init.redirectedRequestId !== undefined) params.redirectedRequestId = init.redirectedRequestId;
+      if (init.response) {
+        const response = init.response;
+        responses.set(requestId, response);
+        if (response.errorReason !== undefined) params.responseErrorReason = response.errorReason;
+        if (response.status !== undefined || response.errorReason === undefined) {
+          params.responseStatusCode = response.status ?? 200;
+        }
+        if (response.statusText !== undefined) params.responseStatusText = response.statusText;
+        if (response.headers !== undefined) params.responseHeaders = response.headers.map((entry) => ({ ...entry }));
+      }
       return { requestId, handled: deliver("Fetch.requestPaused", params) };
     },
     emitEvent: (method, params) => deliver(method, params),

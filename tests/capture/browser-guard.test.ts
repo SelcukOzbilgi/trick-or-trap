@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { installBrowserGuard, type BrowserGuardOptions } from "@/lib/capture/browser-guard";
 import {
@@ -546,6 +548,97 @@ describe("decision timeout and errors", () => {
     const { fake, clock, baseTimers } = await setup();
     await paused(fake, "r1", "https://shop.example/");
     expect(clock.pendingTimers).toBe(baseTimers);
+  });
+});
+
+describe("response-stage hardening", () => {
+  const HARDENED_PATTERNS = {
+    patterns: [
+      { urlPattern: "*", requestStage: "Request" },
+      { urlPattern: "*", resourceType: "Document", requestStage: "Response" },
+      { urlPattern: "*", resourceType: "Other", requestStage: "Response" },
+    ],
+  };
+
+  it("enables three patterns with hardening, in one Fetch.enable", async () => {
+    const { fake } = await setup({ hardening: { maxBodyBytes: 1_000 } });
+    expect(fake.callsOf("Fetch.enable")).toHaveLength(1);
+    expect(fake.callsOf("Fetch.enable")[0]?.params).toEqual(HARDENED_PATTERNS);
+  });
+
+  it("enables only the request-stage pattern without hardening", async () => {
+    const { fake } = await setup();
+    expect(fake.callsOf("Fetch.enable")[0]?.params).toEqual(PATTERNS);
+  });
+
+  it("reports a refused main-frame document response with mainFrame true, and fails it", async () => {
+    const { fake, policy } = await setup({ hardening: { maxBodyBytes: 10 } });
+    await fake.emitPaused({
+      requestId: "r1",
+      url: "https://shop.example/",
+      response: { headers: [{ name: "Content-Length", value: "11" }] },
+    }).handled;
+    expect(policy.events).toEqual([{ kind: "request-blocked", reason: "response-too-large", mainFrame: true }]);
+    expect(request(fake, "r1").state).toBe("failed");
+    expect(fake.callsOf("Fetch.failRequest")[0]?.params).toEqual({ requestId: "r1", errorReason: "BlockedByClient" });
+  });
+
+  it("reports response-too-large as request-blocked and sends failRequest for a sub-frame response", async () => {
+    const { fake, policy } = await setup({ hardening: { maxBodyBytes: 10 } });
+    await fake.emitPaused({
+      requestId: "r1",
+      url: "https://shop.example/frame",
+      frameId: "CHILD",
+      response: { headers: [{ name: "Content-Length", value: "11" }] },
+    }).handled;
+    expect(policy.events).toEqual([{ kind: "request-blocked", reason: "response-too-large", mainFrame: false }]);
+    expect(request(fake, "r1").state).toBe("failed");
+  });
+
+  it("reports response-rewrite-failed as request-blocked and sends failRequest for a sub-frame response", async () => {
+    const { fake, policy } = await setup({ hardening: { maxBodyBytes: 10 } });
+    fake.script("Fetch.getResponseBody", new Error("gone"));
+    await fake.emitPaused({
+      requestId: "r1",
+      url: "https://shop.example/frame",
+      frameId: "CHILD",
+      response: { body: "x" },
+    }).handled;
+    expect(policy.events).toEqual([{ kind: "request-blocked", reason: "response-rewrite-failed", mainFrame: false }]);
+    expect(request(fake, "r1").state).toBe("failed");
+  });
+
+  it("answers an allowed response and reports nothing", async () => {
+    const { fake, policy } = await setup({ hardening: { maxBodyBytes: 10 } });
+    await fake.emitPaused({ requestId: "r1", url: "https://shop.example/", response: { body: "ok" } }).handled;
+    expect(request(fake, "r1").state).toBe("fulfilled");
+    expect(policy.events).toEqual([]);
+  });
+
+  it("still decides a request-stage event by the request rules when hardening is on", async () => {
+    const { fake, policy } = await setup({ hardening: { maxBodyBytes: 10 } });
+    await paused(fake, "r1", "http://10.0.0.1/");
+    expect(request(fake, "r1").state).toBe("failed");
+    expect(policy.events).toEqual([{ kind: "request-blocked", reason: "url-address-blocked", mainFrame: true }]);
+  });
+});
+
+describe("residual-risk header of the guard module", () => {
+  const source = readFileSync(join(process.cwd(), "lib/capture/browser-guard.ts"), "utf8");
+  const header = source.slice(0, source.indexOf("\nimport "));
+
+  it.each([
+    ["states what is covered", ["Covered", "WebSocket", "service-worker", "iframe", "popup"]],
+    ["lists what is not covered", ["WebTransport", "WebRTC", "preconnect", "DNS prefetch", "DNS rebinding"]],
+    ["states the fail-open window and the proxy", ["fail-open", "customProxy", "egress"]],
+    ["states the scope of WebSocket coverage", ["hardening is on", "Chrome 156"]],
+    [
+      "lists what is unverified",
+      ["nested", "downloads", "keepalive", "module workers", "importScripts", "worklets", "vendor proxy"],
+    ],
+    ["names the verification states", ["live", "by reading", "untested"]],
+  ])("%s", (_name, words) => {
+    for (const word of words) expect(header).toContain(word);
   });
 });
 

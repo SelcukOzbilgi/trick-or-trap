@@ -75,6 +75,10 @@ export const MAX_REQUEST_HOSTS = 100;
 export const GUARD_HEARTBEAT_INTERVAL_MS = 2_000;
 /** A heartbeat with no answer after this long counts as a lost guard. */
 export const GUARD_HEARTBEAT_TIMEOUT_MS = 5_000;
+/** Largest response body the WebSocket hardening re-serves, in bytes (8 MiB). Larger responses are refused. */
+export const MAX_REWRITE_BODY_BYTES = 8_388_608;
+/** The policy the hardening adds to every re-served response. It blocks `ws:` and `wss:` connections. */
+export const HARDENING_CSP = "connect-src http: https: data: blob:";
 /** Deadline for the whole stop chain (stop call and disconnect). */
 export const STOP_TIMEOUT_MS = 10_000;
 /** A tagged session older than this is stopped by the sweep helper. */

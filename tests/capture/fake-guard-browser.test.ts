@@ -256,6 +256,175 @@ describe("fake guard browser: paused requests", () => {
   });
 });
 
+describe("fake guard browser: response stage", () => {
+  const HEADERS = [
+    { name: "Content-Type", value: "text/html" },
+    { name: "Set-Cookie", value: "a=1" },
+    { name: "Set-Cookie", value: "b=2" },
+  ];
+
+  it("emits a response-stage event with status, phrase, headers and no error reason", async () => {
+    const { fake, session } = await open();
+    const events: PausedEvent[] = [];
+    session.onEvent((event) => {
+      events.push(event);
+    });
+    const paused = fake.emitPaused({
+      url: "https://example.com/",
+      response: { status: 201, statusText: "Created", headers: HEADERS },
+    });
+    await flush();
+    expect(events[0]?.params).toMatchObject({
+      requestId: paused.requestId,
+      responseStatusCode: 201,
+      responseStatusText: "Created",
+      responseHeaders: HEADERS,
+    });
+    expect(events[0]?.params).not.toHaveProperty("responseErrorReason");
+    expect(fake.requests[0]?.stage).toBe("response");
+  });
+
+  it("defaults the status to 200 and gives an error reason without a status code", async () => {
+    const { fake, session } = await open();
+    const events: PausedEvent[] = [];
+    session.onEvent((event) => {
+      events.push(event);
+    });
+    fake.emitPaused({ url: "https://example.com/a", response: {} });
+    fake.emitPaused({ url: "https://example.com/b", response: { errorReason: "Failed" } });
+    await flush();
+    expect(events[0]?.params).toMatchObject({ responseStatusCode: 200 });
+    expect(events[1]?.params).toMatchObject({ responseErrorReason: "Failed" });
+    expect(events[1]?.params).not.toHaveProperty("responseStatusCode");
+  });
+
+  it("marks a request without a response as request stage and sends no response fields", async () => {
+    const { fake, session } = await open();
+    const events: PausedEvent[] = [];
+    session.onEvent((event) => {
+      events.push(event);
+    });
+    fake.emitPaused({ url: "https://example.com/a" });
+    await flush();
+    expect(fake.requests[0]?.stage).toBe("request");
+    expect(events[0]?.params).not.toHaveProperty("responseStatusCode");
+    expect(events[0]?.params).not.toHaveProperty("responseHeaders");
+  });
+
+  it("returns the body of a response-stage request and keeps it pending", async () => {
+    const { fake, session } = await open();
+    const a = fake.emitPaused({ url: "https://example.com/a", response: { body: "<p>hi</p>" } });
+    const b = fake.emitPaused({ url: "https://example.com/b", response: { body: "aGk=", base64Encoded: true } });
+    await expect(session.send("Fetch.getResponseBody", { requestId: a.requestId })).resolves.toEqual({
+      body: "<p>hi</p>",
+      base64Encoded: false,
+    });
+    await expect(session.send("Fetch.getResponseBody", { requestId: b.requestId })).resolves.toEqual({
+      body: "aGk=",
+      base64Encoded: true,
+    });
+    expect(fake.requests.map((request) => request.state)).toEqual(["pending", "pending"]);
+  });
+
+  it("rejects getResponseBody for an unknown id, a request-stage request and an errored response", async () => {
+    const { fake, session } = await open();
+    const early = fake.emitPaused({ url: "https://example.com/a" });
+    const errored = fake.emitPaused({ url: "https://example.com/b", response: { errorReason: "Failed" } });
+    await expect(session.send("Fetch.getResponseBody", { requestId: "nope" })).rejects.toThrow("Invalid InterceptionId");
+    await expect(session.send("Fetch.getResponseBody", { requestId: early.requestId })).rejects.toThrow(
+      /response|headers received/i,
+    );
+    await expect(session.send("Fetch.getResponseBody", { requestId: errored.requestId })).rejects.toThrow(
+      /response|headers received/i,
+    );
+  });
+
+  it("fulfils a pending request once and records what was sent", async () => {
+    const { fake, session } = await open();
+    const a = fake.emitPaused({ url: "https://example.com/a", response: { body: "x" } });
+    await session.send("Fetch.fulfillRequest", {
+      requestId: a.requestId,
+      responseCode: 200,
+      responsePhrase: "OK",
+      responseHeaders: HEADERS,
+      body: "eA==",
+    });
+    expect(fake.requests[0]?.state).toBe("fulfilled");
+    expect(fake.requests[0]?.fulfilled).toEqual({
+      responseCode: 200,
+      responsePhrase: "OK",
+      responseHeaders: HEADERS,
+      body: "eA==",
+    });
+    await expect(session.send("Fetch.fulfillRequest", { requestId: a.requestId, responseCode: 200 })).rejects.toThrow(
+      "Invalid InterceptionId",
+    );
+    await expect(session.send("Fetch.failRequest", { requestId: a.requestId })).rejects.toThrow("Invalid InterceptionId");
+  });
+
+  it("rejects fulfillRequest for an unknown id and without an integer responseCode", async () => {
+    const { fake, session } = await open();
+    const a = fake.emitPaused({ url: "https://example.com/a", response: {} });
+    await expect(session.send("Fetch.fulfillRequest", { requestId: "nope", responseCode: 200 })).rejects.toThrow(
+      "Invalid InterceptionId",
+    );
+    await expect(session.send("Fetch.fulfillRequest", { requestId: a.requestId })).rejects.toThrow(/responseCode/);
+    await expect(session.send("Fetch.fulfillRequest", { requestId: a.requestId, responseCode: "200" })).rejects.toThrow(
+      /responseCode/,
+    );
+    expect(fake.requests[0]?.state).toBe("pending");
+  });
+
+  it("lets a request-stage request be fulfilled too", async () => {
+    const { fake, session } = await open();
+    const a = fake.emitPaused({ url: "https://example.com/a" });
+    await session.send("Fetch.fulfillRequest", { requestId: a.requestId, responseCode: 204 });
+    expect(fake.requests[0]?.state).toBe("fulfilled");
+  });
+
+  it("rejects continueResponse with headers and no responseCode, and leaves the request pending", async () => {
+    const { fake, session } = await open();
+    const a = fake.emitPaused({ url: "https://example.com/a", response: {} });
+    await expect(
+      session.send("Fetch.continueResponse", { requestId: a.requestId, responseHeaders: HEADERS }),
+    ).rejects.toThrow(/responseCode/);
+    expect(fake.requests[0]?.state).toBe("pending");
+    expect(fake.callsOf("Fetch.continueResponse")).toHaveLength(1);
+  });
+
+  it("accepts continueResponse with a responseCode, or with nothing, at the response stage only", async () => {
+    const { fake, session } = await open();
+    const a = fake.emitPaused({ url: "https://example.com/a", response: {} });
+    const b = fake.emitPaused({ url: "https://example.com/b", response: {} });
+    const early = fake.emitPaused({ url: "https://example.com/c" });
+    await session.send("Fetch.continueResponse", { requestId: a.requestId, responseCode: 200, responseHeaders: HEADERS });
+    await session.send("Fetch.continueResponse", { requestId: b.requestId });
+    await expect(session.send("Fetch.continueResponse", { requestId: early.requestId })).rejects.toThrow(
+      /response stage|Invalid InterceptionId/,
+    );
+    await expect(session.send("Fetch.continueResponse", { requestId: a.requestId })).rejects.toThrow(
+      "Invalid InterceptionId",
+    );
+    expect(fake.requests.map((request) => request.state)).toEqual(["continued", "continued", "pending"]);
+  });
+
+  it("answers a response-stage request with continueRequest, like Chromium does", async () => {
+    const { fake, session } = await open();
+    const a = fake.emitPaused({ url: "https://example.com/a", response: {} });
+    await session.send("Fetch.continueRequest", { requestId: a.requestId });
+    expect(fake.requests[0]?.state).toBe("continued");
+  });
+
+  it("lets a fulfilled or never-answered request not count as gone out when the connection drops", async () => {
+    const { fake, session } = await open();
+    const done = fake.emitPaused({ url: "https://example.com/a", response: {} });
+    const waiting = fake.emitPaused({ url: "https://example.com/b", response: {} });
+    await session.send("Fetch.fulfillRequest", { requestId: done.requestId, responseCode: 200 });
+    fake.dropConnection();
+    expect(fake.wentOut().map((request) => request.requestId)).toEqual([waiting.requestId]);
+  });
+});
+
 describe("fake guard browser: losing the connection", () => {
   it("detach records the pending requests as gone out and emits close only", async () => {
     const { fake, session } = await open();

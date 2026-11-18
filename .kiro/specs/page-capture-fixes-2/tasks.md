@@ -48,11 +48,11 @@ Rules for every task:
   - [x] 6.4 Run `fake-cdp.test.ts`, `remote-browser.test.ts`, `cdp.test.ts`, `browser-guard.test.ts`, `capture-guards.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 1.1, 1.2, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 4.1, 4.2, 4.9, 4.10, 11.1, 11.2, 11.11_
 
-- [ ] 7. Response-stage WebSocket hardening in the guard
-  - [ ] 7.1 Extend the fake guard browser and its test first: response-stage events, `Fetch.getResponseBody`, `Fetch.fulfillRequest`, and `Fetch.continueResponse` that rejects headers without `responseCode`.
-  - [ ] 7.2 Create `tests/capture/response-hardening.test.ts` first: every branch of "WebSocket hardening" in `design.md` (3xx, error reason, `Document`, `Other` with `javascript` and `ecmascript`, other types, `Content-Length` and decoded size over the cap, non-base64 body, timeout, rejected read or fulfil, header removal in any case, repeated `Set-Cookie` kept, no `continueResponse`). Extend `browser-guard.test.ts`: three patterns with hardening, one without; a refused main-frame document reports `mainFrame: true`; every response refusal reports `request-blocked` and sends `failRequest`.
-  - [ ] 7.3 Create `lib/capture/response-hardening.ts`; edit `browser-guard.ts` (option `hardening`, response hand-off, the residual-risk header of requirement 18) and `constants.ts` (`MAX_REWRITE_BODY_BYTES`, `HARDENING_CSP`) with `constants.test.ts`.
-  - [ ] 7.4 Run `fake-guard-browser.test.ts`, `response-hardening.test.ts`, `browser-guard.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
+- [x] 7. Response-stage WebSocket hardening in the guard
+  - [x] 7.1 Extend the fake guard browser and its test first: response-stage events, `Fetch.getResponseBody`, `Fetch.fulfillRequest`, and `Fetch.continueResponse` that rejects headers without `responseCode`.
+  - [x] 7.2 Create `tests/capture/response-hardening.test.ts` first: every branch of "WebSocket hardening" in `design.md` (3xx, error reason, `Document`, `Other` with `javascript` and `ecmascript`, other types, `Content-Length` and decoded size over the cap, non-base64 body, timeout, rejected read or fulfil, header removal in any case, repeated `Set-Cookie` kept, no `continueResponse`). Extend `browser-guard.test.ts`: three patterns with hardening, one without; a refused main-frame document reports `mainFrame: true`; every response refusal reports `request-blocked` and sends `failRequest`.
+  - [x] 7.3 Create `lib/capture/response-hardening.ts`; edit `browser-guard.ts` (option `hardening`, response hand-off, the residual-risk header of requirement 18) and `constants.ts` (`MAX_REWRITE_BODY_BYTES`, `HARDENING_CSP`) with `constants.test.ts`.
+  - [x] 7.4 Run `fake-guard-browser.test.ts`, `response-hardening.test.ts`, `browser-guard.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.15, 18.1, 18.2, 18.3, 18.4, 18.5, 18.6_
 
 - [ ] 8. Hardening switch in configuration and adapter
