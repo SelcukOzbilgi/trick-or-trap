@@ -67,10 +67,10 @@ Rules for every task:
   - [x] 9.3 Run `guard-policy.test.ts`, `browser-guard.test.ts`, `capture-guards.test.ts`, `capture.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7_
 
-- [ ] 10. Collector against DOM clobbering
-  - [ ] 10.1 Extend `tests/capture/collector-dom.test.ts` first: for each name of 9.3 a form with such an input and a text span; assert first that the member is shadowed (else shadow it with `Object.defineProperty` on the form, as `design.md` says); the collector does not throw, collects the form's eligible elements and the span text; the `String(collectInPage)` source check still holds.
-  - [ ] 10.2 Edit `lib/capture/extractor.ts`: capture every getter and method of the table in `design.md` at the start of `collectInPage` and use them with `.call`; no named inner function.
-  - [ ] 10.3 Run `collector-dom.test.ts`, `extractor.test.ts`, `cdp.test.ts`, then `npx tsc --noEmit`.
+- [x] 10. Collector against DOM clobbering
+  - [x] 10.1 Extend `tests/capture/collector-dom.test.ts` first: for each name of 9.3 a form with such an input and a text span; assert first that the member is shadowed (else shadow it with `Object.defineProperty` on the form, as `design.md` says); the collector does not throw, collects the form's eligible elements and the span text; the `String(collectInPage)` source check still holds.
+  - [x] 10.2 Edit `lib/capture/extractor.ts`: capture every getter and method of the table in `design.md` at the start of `collectInPage` and use them with `.call`; no named inner function.
+  - [x] 10.3 Run `collector-dom.test.ts`, `extractor.test.ts`, `cdp.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
 
 - [ ] 11. Session listing with `filterBy=active` and paging
