@@ -26,16 +26,16 @@ Rules for every task:
   - [x] 1.8 Run `npx vitest run tests/detectors/all.test.ts --maxWorkers=2`, `npx vitest run tests/detectors/parsed-copies.test.ts --maxWorkers=2`, `npx vitest run tests/detectors/registry.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.1, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 2. Constants, safe patterns and text helpers
+- [x] 2. Constants, safe patterns and text helpers
   - Uses: nothing from earlier tasks.
   - Files: creates `lib/detectors/shared/constants.ts`, `shared/patterns.ts`, `shared/text.ts`, `data/forbidden-words.ts` and `tests/detectors/shared/constants.test.ts`, `patterns.test.ts`, `text.test.ts`.
-  - [ ] 2.1 Create `tests/detectors/shared/constants.test.ts` first: every constant of design section 4 has its value.
-  - [ ] 2.2 Create `tests/detectors/shared/patterns.test.ts`: for each `SAFE_PATTERNS` entry, `.source` has no `+`, no `*`, no `{n,}`, no quantifier other than `?` after `)`, no quantified group whose body has a quantifier, and every `{m,n}` bound ≤ 300; `isoUtc` accepts `2026-12-01T12:00:00.000Z` and rejects `2026-12-01T12:00:00+02:00` and `2026-12-01`.
-  - [ ] 2.3 Create `tests/detectors/shared/text.test.ts`, normalising: `normaliseText` gives `"i"` for each of "İ", "I", "ı", "i"; "İSTANBUL" and "istanbul" normalise equal; NFKC (fullwidth digits, "ﬁ"); zero-width characters and the soft hyphen removed; curly apostrophes and dashes unified; whitespace collapsed; non-strings give ""; the cap is applied before any other work.
-  - [ ] 2.4 In the same file, tokens and phrases: `tokenise` splits "2h 30m", keeps "04:59:59", "4,99" and "1.299,90" as one number token each, keeps `surface` casing and stops at `MAX_TOKENS_PER_TEXT`; `compilePhrases` and `findPhrases` handle `#` and `@` placeholders, English and Turkish entries, give no match across a missing token, and stay bounded on 5,000 repeated near-matches.
-  - [ ] 2.5 In the same file, quoting: `quote` adds double quotes, swaps inner `"` for `'`, strips control characters, cuts to 120 characters plus "…", and masks a forbidden word as "[word omitted]"; `maskDigits("Only 4 left")` equals `maskDigits("Only 7 left")`.
-  - [ ] 2.6 Create `lib/detectors/shared/constants.ts`, `lib/detectors/shared/patterns.ts`, `lib/detectors/data/forbidden-words.ts` (`FORBIDDEN_WORDS` of design section 7) and `lib/detectors/shared/text.ts` (`Language`, `WordList`, `Token`, `normaliseText`, `tokenise`, `PhraseMatcher`, `compilePhrases`, `PhraseHit`, `findPhrases`, `hasAny`, `quote`, `maskDigits`). No regex outside `patterns.ts`; whitespace collapse and tokenising use character loops.
-  - [ ] 2.7 Run the three test files (one command each), then `npx tsc --noEmit`.
+  - [x] 2.1 Create `tests/detectors/shared/constants.test.ts` first: every constant of design section 4 has its value.
+  - [x] 2.2 Create `tests/detectors/shared/patterns.test.ts`: for each `SAFE_PATTERNS` entry, `.source` has no `+`, no `*`, no `{n,}`, no quantifier other than `?` after `)`, no quantified group whose body has a quantifier, and every `{m,n}` bound ≤ 300; `isoUtc` accepts `2026-12-01T12:00:00.000Z` and rejects `2026-12-01T12:00:00+02:00` and `2026-12-01`.
+  - [x] 2.3 Create `tests/detectors/shared/text.test.ts`, normalising: `normaliseText` gives `"i"` for each of "İ", "I", "ı", "i"; "İSTANBUL" and "istanbul" normalise equal; NFKC (fullwidth digits, "ﬁ"); zero-width characters and the soft hyphen removed; curly apostrophes and dashes unified; whitespace collapsed; non-strings give ""; the cap is applied before any other work.
+  - [x] 2.4 In the same file, tokens and phrases: `tokenise` splits "2h 30m", keeps "04:59:59", "4,99" and "1.299,90" as one number token each, keeps `surface` casing and stops at `MAX_TOKENS_PER_TEXT`; `compilePhrases` and `findPhrases` handle `#` and `@` placeholders, English and Turkish entries, give no match across a missing token, and stay bounded on 5,000 repeated near-matches.
+  - [x] 2.5 In the same file, quoting: `quote` adds double quotes, swaps inner `"` for `'`, strips control characters, cuts to 120 characters plus "…", and masks a forbidden word as "[word omitted]"; `maskDigits("Only 4 left")` equals `maskDigits("Only 7 left")`.
+  - [x] 2.6 Create `lib/detectors/shared/constants.ts`, `lib/detectors/shared/patterns.ts`, `lib/detectors/data/forbidden-words.ts` (`FORBIDDEN_WORDS` of design section 7) and `lib/detectors/shared/text.ts` (`Language`, `WordList`, `Token`, `normaliseText`, `tokenise`, `PhraseMatcher`, `compilePhrases`, `PhraseHit`, `findPhrases`, `hasAny`, `quote`, `maskDigits`). No regex outside `patterns.ts`; whitespace collapse and tokenising use character loops.
+  - [x] 2.7 Run the three test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 3.3, 3.12, 14.2, 14.3, 15.4, 15.6, 15.7_
 
 - [ ] 3. Element index, reload pairs and labels
