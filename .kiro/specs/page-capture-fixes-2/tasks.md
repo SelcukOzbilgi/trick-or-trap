@@ -92,10 +92,10 @@ Rules for every task:
   - [x] 13.3 Run the four test files, `constants.test.ts`, `npx vitest run tests/types/schemas.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 12.4, 12.5, 12.6, 12.7, 12.8, 13.1, 13.2, 13.3, 13.4, 13.5_
 
-- [ ] 14. Fixture page builders
-  - [ ] 14.1 Create `tests/capture-fixture/pages.test.ts` first: each builder's HTML has the robots meta tag and the result list; the main page holds every source of the fixture table with its own tag from `FIXTURE_TAGS`; the cross-site frame appears only for an `https` alt origin; the frame posts `loaded`; scripts fetch their tag first; no output holds the test-id attribute or any `data-` attribute; the source of `pages.ts` imports nothing from `lib/capture`.
-  - [ ] 14.2 Create `lib/capture-fixture/pages.ts` (`FIXTURE_FORBIDDEN_ORIGIN`, `FIXTURE_TAGS`, `readFixtureEnv`, builders, `fixtureResponse`).
-  - [ ] 14.3 Run `npx vitest run tests/capture-fixture/pages.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+- [x] 14. Fixture page builders
+  - [x] 14.1 Create `tests/capture-fixture/pages.test.ts` first: each builder's HTML has the robots meta tag and the result list; the main page holds every source of the fixture table with its own tag from `FIXTURE_TAGS`; the cross-site frame appears only for an `https` alt origin; the frame posts `loaded`; scripts fetch their tag first; no output holds the test-id attribute or any `data-` attribute; the source of `pages.ts` imports nothing from `lib/capture`.
+  - [x] 14.2 Create `lib/capture-fixture/pages.ts` (`FIXTURE_FORBIDDEN_ORIGIN`, `FIXTURE_TAGS`, `readFixtureEnv`, builders, `fixtureResponse`).
+  - [x] 14.3 Run `npx vitest run tests/capture-fixture/pages.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 15.4, 15.7, 15.8, 15.9, 15.10, 15.11, 15.13, 15.14_
 
 - [ ] 15. Fixture routes behind their switch
