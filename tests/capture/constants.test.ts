@@ -80,6 +80,17 @@ describe("capture constants", () => {
     expect(constants.MAX_SNAPSHOT_BYTES).toBe(1_500_000);
   });
 
+  it("has the gesture function name rule", () => {
+    const rule = constants.GESTURE_FUNCTION_NAME;
+    expect(rule).toBeInstanceOf(RegExp);
+    expect(rule.source).toBe("^[A-Za-z_$][A-Za-z0-9_$]{0,63}$");
+    // The rule has no global or sticky flag, so repeated `test` calls do not depend on `lastIndex`.
+    expect(rule.global).toBe(false);
+    expect(rule.sticky).toBe(false);
+    for (const accepted of ["openFixturePopups", "_x", "$y", "a".repeat(64)]) expect(rule.test(accepted)).toBe(true);
+    for (const refused of ["", "a.b", "x()", "1a", "a b", "a-b", "a".repeat(65)]) expect(rule.test(refused)).toBe(false);
+  });
+
   it("has the HTTP status and reload comparison values", () => {
     expect(constants.HTTP_ERROR_STATUS_MIN).toBe(400);
     expect(constants.RELOAD_ELEMENT_MIN_COUNT).toBe(50);

@@ -13,7 +13,7 @@ import {
   MAX_REWRITE_BODY_BYTES,
   STOP_TIMEOUT_MS,
 } from "@/lib/capture/constants";
-import { createRemoteBrowser, DISCONNECT_TIMEOUT_MS } from "@/lib/capture/remote-browser";
+import { createRemoteBrowser, DISCONNECT_TIMEOUT_MS, type PageGestureControl } from "@/lib/capture/remote-browser";
 import type { CaptureConfig } from "@/lib/capture/config";
 import type { BrowserSessionHandle, CapturePage, GuardEvent, GuardVerdict, PageGuards } from "@/lib/capture/seam";
 import { CaptureFailure } from "@/lib/capture/types";
@@ -311,6 +311,7 @@ async function openSession(
   playwright: FakePlaywrightOptions = {},
   fetchOptions: { stopStatus?: number; stopError?: Error; stopHangs?: boolean; stopDelayMs?: number } = {},
   config: CaptureConfig = CONFIG,
+  onPageReady?: (control: PageGestureControl) => void,
 ): Promise<Harness> {
   const events: string[] = [];
   const fake = createFakePlaywright({ ...playwright, events });
@@ -320,6 +321,7 @@ async function openSession(
     fetch: fetchFake.fetch,
     clock,
     loadPlaywright: fake.loadPlaywright,
+    ...(onPageReady ? { onPageReady } : {}),
   });
   const handle = await provider.createSession(SESSION_REQUEST);
   return { fake, fetchFake, clock, handle };
@@ -1433,6 +1435,133 @@ describe("stop", () => {
     );
     expect(error).toBeInstanceOf(Error);
     expectNoSecrets(String((error as Error).message));
+  });
+});
+
+describe("onPageReady gesture control", () => {
+  /** Connects with an `onPageReady` that keeps every control it receives. */
+  async function connectedWithControl(playwright: FakePlaywrightOptions = {}) {
+    const controls: PageGestureControl[] = [];
+    const harness = await openSession(playwright, {}, CONFIG, (control) => {
+      controls.push(control);
+    });
+    const page = await harness.handle.connect({ timeoutMs: 15_000 });
+    return { ...harness, page, controls };
+  }
+
+  it("calls onPageReady once per connected page, with a control that offers only callWithGesture", async () => {
+    const { controls, page, fake } = await connectedWithControl();
+    expect(controls).toHaveLength(1);
+    expect(Object.keys(controls[0])).toEqual(["callWithGesture"]);
+    expect(typeof controls[0].callWithGesture).toBe("function");
+
+    // Later calls on the page do not give out a second control.
+    await page.installGuards(createGuards({ allowed: true }).guards);
+    await page.goto("https://shop.example.com/", { timeoutMs: 1000 });
+    expect(controls).toHaveLength(1);
+    expect(fake.cdp.callsOf("Runtime.evaluate")).toEqual([]);
+  });
+
+  it("does not call onPageReady when connect fails", async () => {
+    const controls: PageGestureControl[] = [];
+    const harness = await openSession({ contexts: "none" }, {}, CONFIG, (control) => {
+      controls.push(control);
+    });
+    await failureOf(harness.handle.connect({ timeoutMs: 15_000 }));
+    expect(controls).toEqual([]);
+  });
+
+  it("sends Runtime.evaluate with a user gesture on the page session, calling only the named global function", async () => {
+    const { controls, fake } = await connectedWithControl();
+    fake.cdp.calls.length = 0;
+
+    await controls[0].callWithGesture("openFixturePopups");
+
+    expect(fake.cdp.calls).toEqual([
+      {
+        method: "Runtime.evaluate",
+        params: {
+          expression: "openFixturePopups()",
+          userGesture: true,
+          awaitPromise: false,
+          returnByValue: false,
+        },
+      },
+    ]);
+    // The guard session got nothing from the control.
+    expect(fake.guard.calls).toEqual([]);
+  });
+
+  it.each(["a.b", "x()", "a b", "", "1abc", "a-b", "a;b", "a\nb", "eval('1')", "a".repeat(65)])(
+    "rejects the name %j without any CDP call",
+    async (name) => {
+      const { controls, fake } = await connectedWithControl();
+      fake.cdp.calls.length = 0;
+
+      await expect(controls[0].callWithGesture(name)).rejects.toBeInstanceOf(Error);
+
+      expect(fake.cdp.calls).toEqual([]);
+      expect(fake.guard.calls).toEqual([]);
+    },
+  );
+
+  it.each(["openFixturePopups", "_x", "$y", "a".repeat(64)])("accepts the name %j", async (name) => {
+    const { controls, fake } = await connectedWithControl();
+    await controls[0].callWithGesture(name);
+    expect(fake.cdp.callsOf("Runtime.evaluate")).toHaveLength(1);
+  });
+
+  it("rejects without a secret when the call fails", async () => {
+    const { controls } = await connectedWithControl({
+      cdpScript: {
+        "Runtime.evaluate": new Error(`evaluate refused: key=${API_KEY} id=${SESSION_ID} cdp=${CDP_URL} live=${LIVE_URL}`),
+      },
+    });
+    const error = await controls[0].callWithGesture("openFixturePopups").then(
+      () => undefined,
+      (e: unknown) => e as Error,
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain("evaluate refused");
+    expectNoSecrets((error as Error).message);
+  });
+
+  it("rejects without a secret when the page function throws", async () => {
+    const { controls } = await connectedWithControl({
+      cdpScript: {
+        "Runtime.evaluate": {
+          result: { type: "object" },
+          exceptionDetails: {
+            text: "Uncaught",
+            exception: { description: `ReferenceError: nope is not defined ${API_KEY} ${LIVE_URL}` },
+          },
+        },
+      },
+    });
+    const error = await controls[0].callWithGesture("nope").then(
+      () => undefined,
+      (e: unknown) => e as Error,
+    );
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain("ReferenceError");
+    expectNoSecrets((error as Error).message);
+  });
+
+  it("sends no Runtime.evaluate when onPageReady is not given", async () => {
+    const { fake, page } = await connectedPage();
+    await page.installGuards(createGuards({ allowed: true }).guards);
+    await page.goto("https://shop.example.com/", { timeoutMs: 1000 });
+    await page.collect(COLLECT_OPTIONS);
+    await page.scrollTo(0);
+    await page.screenshot({ kind: "viewport", quality: 70 });
+    await page.reload({ timeoutMs: 1000 });
+    expect(fake.cdp.callsOf("Runtime.evaluate")).toEqual([]);
+    expect(fake.guard.callsOf("Runtime.evaluate")).toEqual([]);
+  });
+
+  it("has no Runtime.evaluate in the adapter source outside the gesture control", () => {
+    const source = readFileSync("lib/capture/remote-browser.ts", "utf8");
+    expect(source.match(/Runtime\.evaluate/g)?.length ?? 0).toBe(1);
   });
 });
 

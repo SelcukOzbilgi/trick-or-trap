@@ -104,11 +104,11 @@ Rules for every task:
   - [x] 15.3 Run `routes.test.ts`, `lib-text-rules.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 15.1, 15.2, 15.3, 15.5, 15.6, 15.12, 19.8_
 
-- [ ] 16. Live-test support: gesture control and pixel decoder
-  - [ ] 16.1 Extend `tests/capture/dependencies.test.ts` first (`jpeg-js` exactly `0.4.4` in `devDependencies`; runtime dependencies unchanged; no file under `lib/` or `app/` mentions `jpeg-js`). Run it, then run the one allowed install. If the install fails, stop and report.
-  - [ ] 16.2 Extend `remote-browser.test.ts` first: `onPageReady` is called once with a control whose `callWithGesture("openFixturePopups")` sends `Runtime.evaluate` with `userGesture: true` on the page session; `"a.b"`, `"x()"` and a 65-character name reject with no CDP call; a failing call rejects without secrets; without `onPageReady` no `Runtime.evaluate` is sent. Extend `tests/capture/browser.test.ts`: `getBrowser` passes no `onPageReady`.
-  - [ ] 16.3 Edit `lib/capture/remote-browser.ts` and `constants.ts` (`GESTURE_FUNCTION_NAME`) with `constants.test.ts`.
-  - [ ] 16.4 Run `dependencies.test.ts`, `remote-browser.test.ts`, `browser.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
+- [x] 16. Live-test support: gesture control and pixel decoder
+  - [x] 16.1 Extend `tests/capture/dependencies.test.ts` first (`jpeg-js` exactly `0.4.4` in `devDependencies`; runtime dependencies unchanged; no file under `lib/` or `app/` mentions `jpeg-js`). Run it, then run the one allowed install. If the install fails, stop and report.
+  - [x] 16.2 Extend `remote-browser.test.ts` first: `onPageReady` is called once with a control whose `callWithGesture("openFixturePopups")` sends `Runtime.evaluate` with `userGesture: true` on the page session; `"a.b"`, `"x()"` and a 65-character name reject with no CDP call; a failing call rejects without secrets; without `onPageReady` no `Runtime.evaluate` is sent. Extend `tests/capture/browser.test.ts`: `getBrowser` passes no `onPageReady`.
+  - [x] 16.3 Edit `lib/capture/remote-browser.ts` and `constants.ts` (`GESTURE_FUNCTION_NAME`) with `constants.test.ts`.
+  - [x] 16.4 Run `dependencies.test.ts`, `remote-browser.test.ts`, `browser.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5, 16.6, 16.7, 16.8_
 
 - [ ] 17. Opt-in live test rewrite (written, never run)

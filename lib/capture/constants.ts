@@ -135,3 +135,10 @@ export const SESSION_TIMEOUT_MAX_MINUTES = 5;
 
 /** Longest `detail` text of an error, in characters. */
 export const MAX_DETAIL_CHARS = 200;
+
+/**
+ * The only names the gesture control of the opt-in live test may call: a plain global
+ * identifier of at most 64 characters. No dot, bracket, parenthesis or space gets through,
+ * so the name can never carry other code into `Runtime.evaluate`.
+ */
+export const GESTURE_FUNCTION_NAME: RegExp = /^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/;

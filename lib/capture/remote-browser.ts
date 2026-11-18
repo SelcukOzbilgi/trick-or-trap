@@ -20,7 +20,7 @@ import {
   type CreatedSession,
 } from "./browser-use-api";
 import { installBrowserGuard, type BrowserGuard } from "./browser-guard";
-import { MAX_REWRITE_BODY_BYTES, STOP_TIMEOUT_MS } from "./constants";
+import { GESTURE_FUNCTION_NAME, MAX_REWRITE_BODY_BYTES, STOP_TIMEOUT_MS } from "./constants";
 import { collectInPage } from "./extractor";
 import { sanitiseMetrics } from "./geometry";
 import type { GuardBrowser, GuardSession } from "./guard-types";
@@ -40,11 +40,30 @@ import type { CaptureErrorCode, CollectOptions, RawCollection, RawPageRead } fro
 /** Longest wait for the best-effort CDP disconnect after the stop request was sent. */
 export const DISCONNECT_TIMEOUT_MS = 3_000;
 
+/**
+ * What the opt-in live test gets for the connected page: one way to run a named global
+ * page function with a user gesture, which is what lets a page open a popup. Nothing else
+ * of the page or its session is exposed.
+ */
+export type PageGestureControl = {
+  /**
+   * Calls `globalFunctionName()` in the main world of the page, as if a user had clicked.
+   * The name must match `GESTURE_FUNCTION_NAME`, else this rejects with no CDP call. Rejects
+   * with a redacted message when the call or the page function fails.
+   */
+  callWithGesture(globalFunctionName: string): Promise<void>;
+};
+
 export type RemoteBrowserDeps = {
   fetch: typeof fetch;
   clock: Clock;
   /** Loads `playwright-core`. Tests inject a fake; the default is a lazy `import()`. */
   loadPlaywright?: () => Promise<unknown>;
+  /**
+   * Opt-in live test only. Called once per connected page, after the page session is ready.
+   * `getBrowser` never sets it, so a capture started by `capturePage` has no such control.
+   */
+  onPageReady?: (control: PageGestureControl) => void;
 };
 
 // A small structural view of the Playwright objects used here. The one cast from the
@@ -93,6 +112,45 @@ type SessionLinks = {
 };
 
 function noop(): void {}
+
+/**
+ * Builds the gesture control over the page session. The expression is the validated name
+ * plus `()`, and nothing else, so no page text or caller text other than a plain global
+ * identifier ever reaches the evaluate call.
+ */
+function createGestureControl(cdp: CdpSession, secrets: readonly string[]): PageGestureControl {
+  return Object.freeze({
+    async callWithGesture(globalFunctionName: string): Promise<void> {
+      if (typeof globalFunctionName !== "string" || !GESTURE_FUNCTION_NAME.test(globalFunctionName)) {
+        throw new Error("The gesture function name is not a plain global function name.");
+      }
+      let answer: unknown;
+      try {
+        answer = await cdp.send("Runtime.evaluate", {
+          expression: `${globalFunctionName}()`,
+          userGesture: true,
+          awaitPromise: false,
+          returnByValue: false,
+        });
+      } catch (error) {
+        throw new Error(toDetail(error, secrets) ?? "The gesture call failed.");
+      }
+      const exception =
+        typeof answer === "object" && answer !== null
+          ? (answer as { exceptionDetails?: unknown }).exceptionDetails
+          : undefined;
+      if (exception !== undefined && exception !== null) {
+        const details = exception as { text?: unknown; exception?: { description?: unknown } };
+        const description = details.exception?.description;
+        const text = typeof description === "string" && description !== "" ? description : details.text;
+        throw new Error(
+          toDetail(`The page function failed: ${typeof text === "string" ? text : "unknown error"}`, secrets) ??
+            "The gesture call failed.",
+        );
+      }
+    },
+  });
+}
 
 /** Views a Playwright CDP session of the page as the structural `CdpSession` that `lib/capture` uses. */
 function toCdpSession(session: PwPageCdpSession): CdpSession {
@@ -328,7 +386,7 @@ function createHandle(session: CreatedSession, config: CaptureConfig, deps: Remo
         // The scrollbars are hidden before the page is returned, so before any read.
         const cdp = toCdpSession(await context.newCDPSession(page));
         await hideScrollbars(cdp);
-        return createCapturePage(page, context, cdp, secrets, deps.clock, {
+        const capturePage = createCapturePage(page, context, cdp, secrets, deps.clock, {
           browser,
           isStopping: () => state.stopped,
           hardening: config.websocketHardening === "off" ? undefined : { maxBodyBytes: MAX_REWRITE_BODY_BYTES },
@@ -338,6 +396,9 @@ function createHandle(session: CreatedSession, config: CaptureConfig, deps: Remo
             if (state.stopped) guard.stopWatching();
           },
         });
+        // Only the opt-in live test sets this. It gets the one control over the ready page.
+        deps.onPageReady?.(createGestureControl(cdp, secrets));
+        return capturePage;
       } catch (error) {
         if (error instanceof CaptureFailure) throw error;
         throw new CaptureFailure("connect-failed", toDetail(error, secrets));
