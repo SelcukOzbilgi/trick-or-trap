@@ -140,14 +140,14 @@ Rules for every task:
   - [x] 12.7 Run the three test files (one command each), `npx vitest run tests/boo-tique/safety.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 2.2, 2.3, 2.4, 2.5, 2.7, 2.15, 3.11, 3.14, 3.18, 6.2, 6.3, 6.4, 6.5, 6.6, 14.1, 14.4, 14.6, 14.7, 14.8, 14.9, 15.6, 15.8_
 
-- [ ] 13. Harness snapshot builder and light sample
+- [x] 13. Harness snapshot builder and light sample
   - Uses: `PageSnapshotSchema` from `@/lib/types`, `assertNoTestHooks` (task 12).
   - Files: creates `tests/detectors/eval/helpers/tree.ts`, `tests/detectors/eval/helpers/light.ts`, `tests/detectors/eval/tree.test.ts`.
-  - [ ] 13.1 Read `lib/capture/extractor.ts` again for the eligibility, text and attribute rules the builder mirrors.
-  - [ ] 13.2 Create `tests/detectors/eval/tree.test.ts` first, builder: `buildSnapshot` gives `el-1` for `<body>` and child-index ids below it; a `div` without own text and role is left out but its children keep their ids; a zero-size `span` is left out and a zero-size `input` kept; a `label`'s text includes its descendants' text; `#9a9a9a` becomes `rgb(154, 154, 154)` and `20px` stays `20px`; a missing style gets the defaults of design section 13; `keyToId` maps node keys to ids and is not part of the snapshot; the result passes `PageSnapshotSchema`.
-  - [ ] 13.3 In the same file, light sample and hooks: `toLightSample` cuts text to 120, keeps only `type`, `name`, `disabled`, drops `outsideImage` and `capture.images`, sets `capture.light`, caps elements at 750; `assertNoTestHooks` passes on every built snapshot and throws on a tree node with a `data-*` attribute.
-  - [ ] 13.4 Create `tests/detectors/eval/helpers/tree.ts` (`PageNode`, `buildSnapshot`, style conversion, box estimate) and `tests/detectors/eval/helpers/light.ts` (`toLightSample`).
-  - [ ] 13.5 Run `npx vitest run tests/detectors/eval/tree.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+  - [x] 13.1 Read `lib/capture/extractor.ts` again for the eligibility, text and attribute rules the builder mirrors.
+  - [x] 13.2 Create `tests/detectors/eval/tree.test.ts` first, builder: `buildSnapshot` gives `el-1` for `<body>` and child-index ids below it; a `div` without own text and role is left out but its children keep their ids; a zero-size `span` is left out and a zero-size `input` kept; a `label`'s text includes its descendants' text; `#9a9a9a` becomes `rgb(154, 154, 154)` and `20px` stays `20px`; a missing style gets the defaults of design section 13; `keyToId` maps node keys to ids and is not part of the snapshot; the result passes `PageSnapshotSchema`.
+  - [x] 13.3 In the same file, light sample and hooks: `toLightSample` cuts text to 120, keeps only `type`, `name`, `disabled`, drops `outsideImage` and `capture.images`, sets `capture.light`, caps elements at 750; `assertNoTestHooks` passes on every built snapshot and throws on a tree node with a `data-*` attribute.
+  - [x] 13.4 Create `tests/detectors/eval/helpers/tree.ts` (`PageNode`, `buildSnapshot`, style conversion, box estimate) and `tests/detectors/eval/helpers/light.ts` (`toLightSample`).
+  - [x] 13.5 Run `npx vitest run tests/detectors/eval/tree.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 16.1, 16.5, 16.10_
 
 - [ ] 14. Boo-tique page trees and structural sync
