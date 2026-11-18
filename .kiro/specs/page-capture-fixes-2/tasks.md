@@ -98,10 +98,10 @@ Rules for every task:
   - [x] 14.3 Run `npx vitest run tests/capture-fixture/pages.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 15.4, 15.7, 15.8, 15.9, 15.10, 15.11, 15.13, 15.14_
 
-- [ ] 15. Fixture routes behind their switch
-  - [ ] 15.1 Create `tests/capture-fixture/routes.test.ts` first: each route's `GET` with the switch unset, `off` and `On` gives 404 and an empty body; with `on` gives 200 (302 for the redirect), `X-Robots-Tag` and `Cache-Control` as required; `dynamic` is `"force-dynamic"`.
-  - [ ] 15.2 Create the route files of `design.md` under `app/capture-fixture/`. Add `CAPTURE_FIXTURE_ROUTES=` and `CAPTURE_FIXTURE_ALT_ORIGIN=` with one comment each to `.env.example`. Add `lib/capture-fixture`, `app/capture-fixture` and `.kiro/specs/page-capture-fixes-2` to `DIRECTORIES` in `tests/capture/lib-text-rules.test.ts`.
-  - [ ] 15.3 Run `routes.test.ts`, `lib-text-rules.test.ts`, then `npx tsc --noEmit`.
+- [x] 15. Fixture routes behind their switch
+  - [x] 15.1 Create `tests/capture-fixture/routes.test.ts` first: each route's `GET` with the switch unset, `off` and `On` gives 404 and an empty body; with `on` gives 200 (302 for the redirect), `X-Robots-Tag` and `Cache-Control` as required; `dynamic` is `"force-dynamic"`.
+  - [x] 15.2 Create the route files of `design.md` under `app/capture-fixture/`. Add `CAPTURE_FIXTURE_ROUTES=` and `CAPTURE_FIXTURE_ALT_ORIGIN=` with one comment each to `.env.example`. Add `lib/capture-fixture`, `app/capture-fixture` and `.kiro/specs/page-capture-fixes-2` to `DIRECTORIES` in `tests/capture/lib-text-rules.test.ts`.
+  - [x] 15.3 Run `routes.test.ts`, `lib-text-rules.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 15.1, 15.2, 15.3, 15.5, 15.6, 15.12, 19.8_
 
 - [ ] 16. Live-test support: gesture control and pixel decoder

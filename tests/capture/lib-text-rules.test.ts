@@ -7,7 +7,15 @@ import { FORBIDDEN_NAME_SAMPLES, TEST_ID_ATTRIBUTE } from "./helpers/forbidden-a
 const WORD = "test" + "id";
 
 const ROOT = process.cwd();
-const DIRECTORIES = ["lib/capture", "tests/capture", ".kiro/specs/page-capture", ".kiro/specs/page-capture-fixes"];
+const DIRECTORIES = [
+  "lib/capture",
+  "lib/capture-fixture",
+  "app/capture-fixture",
+  "tests/capture",
+  ".kiro/specs/page-capture",
+  ".kiro/specs/page-capture-fixes",
+  ".kiro/specs/page-capture-fixes-2",
+];
 const FILES = [".kiro/steering/tech.md", ".kiro/steering/structure.md"];
 
 function listFiles(path: string): string[] {
