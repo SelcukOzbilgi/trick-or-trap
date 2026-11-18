@@ -32,7 +32,8 @@ function fail(code: UrlErrorCode): UrlCheckResult {
 }
 
 function isBlockedHostName(hostname: string): boolean {
-  const name = hostname.endsWith(".") ? hostname.slice(0, -1) : hostname;
+  // Every trailing dot is stripped, so `localhost..` is judged like `localhost`.
+  const name = hostname.replace(/\.+$/, "");
   if (name === "localhost") return true;
   return BLOCKED_HOST_SUFFIXES.some((suffix) => name.endsWith(suffix));
 }
@@ -41,15 +42,18 @@ function isIpLiteral(hostname: string): boolean {
   return hostname.startsWith("[") || DOTTED_QUAD.test(hostname);
 }
 
+export type UrlSyntaxOptions = {
+  /** Longest accepted URL in characters. Default `MAX_URL_LENGTH`. */
+  maxLength?: number;
+};
+
 /**
  * Checks the form of a URL without any DNS lookup, in the order of
- * `URL_SYNTAX_CHECK_ORDER`, and returns the first failure.
- *
- * `allowOrigin` is an exact origin (scheme, host, port). A URL with that origin
- * skips the host name and address checks only.
+ * `URL_SYNTAX_CHECK_ORDER`, and returns the first failure. No host is exempt from
+ * any check.
  */
-export function checkUrlSyntax(input: string, allowOrigin: string | null): UrlCheckResult {
-  if (input.length > MAX_URL_LENGTH) return fail("url-too-long");
+export function checkUrlSyntax(input: string, options?: UrlSyntaxOptions): UrlCheckResult {
+  if (input.length > (options?.maxLength ?? MAX_URL_LENGTH)) return fail("url-too-long");
 
   if (CONTROL_OR_SPACE.test(input)) return fail("url-invalid");
   let url: URL;
@@ -64,13 +68,10 @@ export function checkUrlSyntax(input: string, allowOrigin: string | null): UrlCh
   // The WHATWG parser drops a default port, so an empty port is always acceptable.
   if (url.port !== "" && !ALLOWED_PORTS.includes(Number(url.port))) return fail("url-port-blocked");
 
-  const allowed = allowOrigin !== null && url.origin === allowOrigin;
-  if (!allowed) {
-    if (isBlockedHostName(url.hostname)) return fail("url-host-blocked");
-    if (isIpLiteral(url.hostname)) {
-      const address = url.hostname.startsWith("[") ? url.hostname.slice(1, -1) : url.hostname;
-      if (classifyAddress(address).blocked) return fail("url-address-blocked");
-    }
+  if (isBlockedHostName(url.hostname)) return fail("url-host-blocked");
+  if (isIpLiteral(url.hostname)) {
+    const address = url.hostname.startsWith("[") ? url.hostname.slice(1, -1) : url.hostname;
+    if (classifyAddress(address).blocked) return fail("url-address-blocked");
   }
 
   url.hash = "";
@@ -82,18 +83,17 @@ export interface Resolver {
   resolveAddresses(hostname: string): Promise<readonly string[]>;
 }
 
-export type UrlCheckOptions = { resolver: Resolver; allowOrigin: string | null };
+export type UrlCheckOptions = { resolver: Resolver };
 
 /**
  * Runs `checkUrlSyntax`, then resolves a host name and checks every address it
  * resolves to. An IP literal is never resolved: the syntax check has judged it.
  *
- * A URL with the allowed origin must still resolve, but its addresses are not
- * classified. The resolver error text is never copied into the result.
+ * The resolver error text is never copied into the result.
  */
 export async function checkUrl(input: string, options: UrlCheckOptions): Promise<UrlCheckResult> {
-  const { resolver, allowOrigin } = options;
-  const syntax = checkUrlSyntax(input, allowOrigin);
+  const { resolver } = options;
+  const syntax = checkUrlSyntax(input);
   if (!syntax.ok) return syntax;
   if (isIpLiteral(syntax.hostname)) return syntax;
 
@@ -105,12 +105,9 @@ export async function checkUrl(input: string, options: UrlCheckOptions): Promise
   }
   if (!Array.isArray(addresses) || addresses.length === 0) return fail("dns-failed");
 
-  const allowed = allowOrigin !== null && new URL(syntax.url).origin === allowOrigin;
-  if (!allowed) {
-    for (const address of addresses) {
-      if (typeof address !== "string" || classifyAddress(address).blocked) {
-        return fail("url-address-blocked");
-      }
+  for (const address of addresses) {
+    if (typeof address !== "string" || classifyAddress(address).blocked) {
+      return fail("url-address-blocked");
     }
   }
   return syntax;

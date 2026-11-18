@@ -33,7 +33,9 @@ export type FakeScript = {
   /** Default: a few JPEG marker bytes. */
   screenshot?: FakeStep<Uint8Array, [ScreenshotRequest]>;
   stop?: FakeStep<undefined, []>;
-  /** URLs passed to `guards.allowNavigation` by every `goto` and `reload`, in order. */
+  /** The secrets `handle.secrets()` returns. Default: none. */
+  secrets?: readonly string[];
+  /** URLs checked by every `goto` and `reload` with `guards.checkSyntax` and then `guards.checkHost`, in order. */
   hops?: readonly string[];
   /** Largest `scrollY` the fake page can reach; the default `scrollTo` clamps to it. */
   maxScrollY?: number;
@@ -102,9 +104,11 @@ export function createFakeBrowser(script: FakeScript = {}): FakeBrowser {
     const guards = fake.guards;
     if (!guards) return;
     for (const hop of script.hops ?? []) {
-      const verdict = await guards.allowNavigation(hop);
+      // The same two calls the real request guard makes for a main-frame document request.
+      const syntax = guards.checkSyntax(hop);
+      const verdict = syntax.allowed ? await guards.checkHost(hop) : syntax;
       if (!verdict.allowed) {
-        guards.report({ kind: "request-blocked", reason: verdict.reason });
+        guards.report({ kind: "request-blocked", reason: verdict.reason, mainFrame: true });
         throw new CaptureFailure("navigation-failed");
       }
     }
@@ -170,6 +174,9 @@ export function createFakeBrowser(script: FakeScript = {}): FakeBrowser {
       const n = next("stop");
       fake.stopCalls += 1;
       await runStep(script.stop, () => undefined, n, []);
+    },
+    secrets() {
+      return script.secrets ?? [];
     },
   };
 

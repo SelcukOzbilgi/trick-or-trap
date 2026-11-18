@@ -19,6 +19,7 @@ async function setup(script: FakeScript = {}) {
     timeoutMinutes: 2,
     proxy: "off",
     viewport: { width: 1280, height: 800 },
+    captureId: "capture-id-sentinel",
   });
   const page: CapturePage = await handle.connect({ timeoutMs: 1_000 });
   return { clock, deadline, fake, page };
@@ -47,10 +48,33 @@ describe("captureImages: single mode", () => {
     expect(outcome.warnings).toEqual([]);
   });
 
-  it("rounds the width up to a whole pixel", async () => {
+  it("rounds the layout width up to a whole pixel", async () => {
     const { page, deadline, fake } = await setup();
-    await captureImages(page, createRawPageRead({ innerWidth: 1280.4, scrollHeight: 900 }), deadline);
-    expect(fake.screenshotRequests[0]).toMatchObject({ clip: { width: 1281, height: 900 } });
+    await captureImages(page, createRawPageRead({ innerWidth: 1100.4, scrollHeight: 900 }), deadline);
+    expect(fake.screenshotRequests[0]).toMatchObject({ clip: { width: 1101, height: 900 } });
+  });
+
+  it("uses the layout width and not the inner width for the image", async () => {
+    const { page, deadline, fake } = await setup();
+    const outcome = await captureImages(
+      page,
+      createRawPageRead({ innerWidth: 1280, layoutWidth: 1265, scrollHeight: 900 }),
+      deadline,
+    );
+    expect(fake.screenshotRequests[0]).toMatchObject({ clip: { width: 1265, height: 900 } });
+    expect(outcome.meta.items).toEqual([{ offsetY: 0, width: 1265, height: 900 }]);
+  });
+
+  it.each([1280.4, 3_000, 1e9])("clamps a layout width of %s to 1,280", async (layoutWidth) => {
+    const { page, deadline, fake } = await setup();
+    await captureImages(page, createRawPageRead({ layoutWidth, scrollHeight: 900 }), deadline);
+    expect(fake.screenshotRequests[0]).toMatchObject({ clip: { width: 1280, height: 900 } });
+  });
+
+  it("uses 1,280 for a layout width that is not a number and does not throw", async () => {
+    const { page, deadline, fake } = await setup();
+    await captureImages(page, createRawPageRead({ layoutWidth: Number.NaN, scrollHeight: 900 }), deadline);
+    expect(fake.screenshotRequests[0]).toMatchObject({ clip: { width: 1280, height: 900 } });
   });
 
   it("cuts a 20,000 px page to 8,000 px and warns", async () => {
@@ -66,10 +90,11 @@ describe("captureImages: single mode", () => {
   });
 
   it.each([
-    { scrollHeight: 30_000, devicePixelRatio: 1, mode: "single" },
+    { scrollHeight: 20_000, devicePixelRatio: 1, mode: "single" },
     { scrollHeight: 15_000, devicePixelRatio: 2, mode: "single" },
-    { scrollHeight: 30_001, devicePixelRatio: 1, mode: "tiled" },
-    { scrollHeight: 15_001, devicePixelRatio: 2, mode: "tiled" },
+    { scrollHeight: 20_000, devicePixelRatio: 3, mode: "single" },
+    { scrollHeight: 20_001, devicePixelRatio: 1, mode: "tiled" },
+    { scrollHeight: 20_001, devicePixelRatio: 2, mode: "tiled" },
   ])("chooses $mode mode at height $scrollHeight with DPR $devicePixelRatio", async (testCase) => {
     const { page, deadline } = await setup();
     const outcome = await captureImages(
@@ -78,6 +103,14 @@ describe("captureImages: single mode", () => {
       deadline,
     );
     expect(outcome.meta.mode).toBe(testCase.mode);
+  });
+
+  it("does not let a device pixel ratio of 0 or NaN change the mode", async () => {
+    const { page, deadline } = await setup();
+    for (const devicePixelRatio of [0, Number.NaN]) {
+      const outcome = await captureImages(page, createRawPageRead({ scrollHeight: 5_000, devicePixelRatio }), deadline);
+      expect(outcome.meta.mode).toBe("single");
+    }
   });
 
   it("returns screenshot-failed when the screenshot throws a plain error", async () => {
@@ -141,28 +174,59 @@ describe("captureImages: tiled mode", () => {
     expect(outcome.meta.items.slice(0, 4).map((item) => item.offsetY)).toEqual([0, 800, 1_601, 2_400]);
   });
 
-  it("takes 4 tiles for a 3,000 px document and keeps the clamped last offset", async () => {
+  it("keeps the clamped last offset when the page cannot scroll further", async () => {
     const { page, deadline, fake } = await setup({ maxScrollY: 2_200 });
-    // 3,000 px at DPR 11 is 33,000 device px, which is above the single-mode limit.
-    const read = createRawPageRead({ scrollHeight: 3_000, devicePixelRatio: 11 });
+    const read = createRawPageRead({ scrollHeight: 20_001 });
 
     const outcome = await captureImages(page, read, deadline);
 
     expect(outcome.images.map((image) => image.offsetY)).toEqual([0, 800, 1_600, 2_200]);
-    expect(outcome.meta.truncated).toBe(false);
-    expect(outcome.warnings).toEqual(["tall-page-tiled"]);
+    // Ten tiles of at most 800 px never reach the bottom of a page above 20,000 px.
+    expect(outcome.meta.truncated).toBe(true);
+    expect(outcome.warnings).toEqual(["tall-page-tiled", "screenshot-truncated"]);
     expect(fake.log[fake.log.length - 1]).toEqual({ kind: "scrollTo", y: 0 });
   });
 
-  it("stops before further tiles when the previous tile reached the bottom", async () => {
+  it("stops at the first tile that does not move instead of repeating it", async () => {
     const { page, deadline, fake } = await setup({ maxScrollY: 200 });
-    const read = createRawPageRead({ scrollHeight: 1_000, devicePixelRatio: 40 });
+    const read = createRawPageRead({ scrollHeight: 25_000 });
 
     const outcome = await captureImages(page, read, deadline);
 
     expect(outcome.images.map((image) => image.offsetY)).toEqual([0, 200]);
-    expect(outcome.meta.truncated).toBe(false);
     expect(fake.screenshotRequests).toHaveLength(2);
+  });
+
+  it("clamps the tile height to 800 and the tile width to 1,280", async () => {
+    const { page, deadline } = await setup();
+    const outcome = await captureImages(
+      page,
+      createRawPageRead({ scrollHeight: 45_000, innerWidth: 3_000, innerHeight: 2_000 }),
+      deadline,
+    );
+    expect(outcome.images.every((image) => image.width === 1280 && image.height === 800)).toBe(true);
+    expect(outcome.images.map((image) => image.offsetY).slice(0, 3)).toEqual([0, 800, 1_600]);
+  });
+
+  it("uses the real viewport size for tiles when it is smaller than the maximum", async () => {
+    const { page, deadline, fake } = await setup();
+    const outcome = await captureImages(
+      page,
+      createRawPageRead({ scrollHeight: 45_000, innerWidth: 1100.2, innerHeight: 588 }),
+      deadline,
+    );
+    expect(outcome.images[0]).toMatchObject({ width: 1101, height: 588 });
+    expect(fake.scrollRequests.slice(0, 3)).toEqual([0, 588, 1_176]);
+  });
+
+  it("takes viewport sizes of 1,280 by 800 for a read with sizes that are not numbers", async () => {
+    const { page, deadline } = await setup();
+    const outcome = await captureImages(
+      page,
+      createRawPageRead({ scrollHeight: 45_000, innerWidth: Number.NaN, innerHeight: 0 }),
+      deadline,
+    );
+    expect(outcome.images[0]).toMatchObject({ width: 1280, height: 800 });
   });
 
   it("stops when scrolling makes no progress instead of repeating the same tile", async () => {
@@ -220,6 +284,7 @@ describe("captureImages: tiled mode", () => {
       timeoutMinutes: 2,
       proxy: "off",
       viewport: { width: 1280, height: 800 },
+      captureId: "capture-id-sentinel",
     });
     const page = await handle.connect({ timeoutMs: 1_000 });
 

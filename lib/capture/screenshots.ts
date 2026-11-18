@@ -8,16 +8,18 @@
  * design: those stalled on a 45,000 px page).
  */
 import type { Deadline } from "./clock";
-import { SCREENSHOT_JPEG_QUALITY, TILE_MIN_REMAINING_MS } from "./constants";
+import { BROWSER_VIEWPORT, SCREENSHOT_JPEG_QUALITY, TILE_MIN_REMAINING_MS } from "./constants";
 import {
   base64Length,
   chooseMode,
   planSingle,
   reachesBottom,
+  sanitiseMetrics,
   tileCount,
   tileTarget,
   totalFits,
   type ImageBox,
+  type PageMetrics,
   type ScreenshotMode,
 } from "./geometry";
 import { toDetail } from "./redact";
@@ -60,8 +62,8 @@ function finiteOrZero(value: number): number {
   return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
-async function captureSingle(page: CapturePage, read: RawPageRead, deadline: Deadline): Promise<ImagesOutcome> {
-  const plan = planSingle({ fullHeight: read.scrollHeight, viewportWidth: read.innerWidth });
+async function captureSingle(page: CapturePage, metrics: PageMetrics, deadline: Deadline): Promise<ImagesOutcome> {
+  const plan = planSingle({ fullHeight: metrics.scrollHeight, layoutWidth: metrics.layoutWidth });
   let bytes: Uint8Array;
   try {
     bytes = await step(deadline, () =>
@@ -84,10 +86,10 @@ async function captureSingle(page: CapturePage, read: RawPageRead, deadline: Dea
   };
 }
 
-async function captureTiled(page: CapturePage, read: RawPageRead, deadline: Deadline): Promise<ImagesOutcome> {
-  const fullHeight = finiteOrZero(read.scrollHeight);
-  const tileWidth = Math.max(1, Math.ceil(finiteOrZero(read.innerWidth)));
-  const tileHeight = Math.max(1, Math.ceil(finiteOrZero(read.innerHeight)));
+async function captureTiled(page: CapturePage, metrics: PageMetrics, deadline: Deadline): Promise<ImagesOutcome> {
+  const fullHeight = metrics.scrollHeight;
+  const tileWidth = Math.min(BROWSER_VIEWPORT.width, Math.max(1, Math.ceil(metrics.innerWidth)));
+  const tileHeight = Math.min(BROWSER_VIEWPORT.height, Math.max(1, Math.ceil(metrics.innerHeight)));
   const count = tileCount(fullHeight, tileHeight);
   const images: CaptureImage[] = [];
 
@@ -143,10 +145,13 @@ async function captureTiled(page: CapturePage, read: RawPageRead, deadline: Dead
  * Takes the screenshots of the first sample, in single or tiled mode.
  *
  * Throws `CaptureFailure("screenshot-failed" | "screenshot-too-large" | "capture-timeout")`.
- * Uses `read.scrollHeight`, `read.devicePixelRatio`, `read.innerWidth` and
- * `read.innerHeight`; every call counts against the whole-capture `deadline`.
+ * The page metrics of `read` are made safe first (`sanitiseMetrics`): the mode comes
+ * from `scrollHeight` in CSS px, the single image is as wide as the layout width, and
+ * tiles are as large as the viewport, clamped to `BROWSER_VIEWPORT`. Every call counts
+ * against the whole-capture `deadline`.
  */
 export function captureImages(page: CapturePage, read: RawPageRead, deadline: Deadline): Promise<ImagesOutcome> {
-  const mode = chooseMode({ fullHeight: read.scrollHeight, devicePixelRatio: read.devicePixelRatio });
-  return mode === "single" ? captureSingle(page, read, deadline) : captureTiled(page, read, deadline);
+  const metrics = sanitiseMetrics(read);
+  const mode = chooseMode({ fullHeight: metrics.scrollHeight });
+  return mode === "single" ? captureSingle(page, metrics, deadline) : captureTiled(page, metrics, deadline);
 }

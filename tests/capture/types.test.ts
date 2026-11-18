@@ -33,6 +33,7 @@ const OTHER_CODES: CaptureErrorCode[] = [
   "screenshot-failed",
   "screenshot-too-large",
   "snapshot-invalid",
+  "snapshot-too-large",
   "capture-timeout",
   "internal-error",
 ];
@@ -48,6 +49,8 @@ const WARNING_CODES: CaptureWarningCode[] = [
   "download-refused",
   "popup-closed",
   "request-blocked",
+  "request-host-limit",
+  "layout-shifted",
 ];
 
 function expectSafeText(text: string): void {
@@ -59,12 +62,18 @@ function expectSafeText(text: string): void {
 }
 
 describe("ERROR_MESSAGES", () => {
-  it("has 8 url codes and 15 other codes in the table", () => {
+  it("has 8 url codes and 16 other codes in the table (24 in all)", () => {
     expect(URL_CODES).toHaveLength(8);
-    expect(OTHER_CODES).toHaveLength(15);
+    expect(OTHER_CODES).toHaveLength(16);
+    expect(Object.keys(ERROR_MESSAGES)).toHaveLength(24);
     expect(Object.keys(ERROR_MESSAGES).sort()).toEqual(
       [...URL_CODES, ...OTHER_CODES].sort()
     );
+  });
+
+  it("has a fixed message for snapshot-too-large that differs from snapshot-invalid", () => {
+    expect(ERROR_MESSAGES["snapshot-too-large"]).toBeTruthy();
+    expect(ERROR_MESSAGES["snapshot-too-large"]).not.toBe(ERROR_MESSAGES["snapshot-invalid"]);
   });
 
   it.each([...URL_CODES, ...OTHER_CODES])(
@@ -81,13 +90,18 @@ describe("ERROR_MESSAGES", () => {
 });
 
 describe("WARNING_MESSAGES", () => {
-  it("has exactly the 10 warning codes", () => {
-    expect(WARNING_CODES).toHaveLength(10);
+  it("has exactly the 12 warning codes", () => {
+    expect(WARNING_CODES).toHaveLength(12);
     expect(Object.keys(WARNING_MESSAGES).sort()).toEqual([...WARNING_CODES].sort());
   });
 
   it.each(WARNING_CODES)("has a safe fixed message for %s", (code) => {
     expectSafeText(WARNING_MESSAGES[code]);
+  });
+
+  it("has distinct messages for the new warning codes", () => {
+    expect(WARNING_MESSAGES["request-host-limit"]).not.toBe(WARNING_MESSAGES["request-blocked"]);
+    expect(WARNING_MESSAGES["layout-shifted"]).toBeTruthy();
   });
 });
 
@@ -98,6 +112,24 @@ describe("CaptureFailure", () => {
     expect(failure.code).toBe("navigation-failed");
     expect(failure.message).toBe(ERROR_MESSAGES["navigation-failed"]);
     expect(failure.detail).toBeUndefined();
+    expect(failure.reclaim).toBe(false);
+  });
+
+  it("defaults reclaim to false when the detail is given", () => {
+    expect(new CaptureFailure("session-create-failed", "HTTP 500").reclaim).toBe(false);
+  });
+
+  it("sets reclaim to true when the option is given", () => {
+    const failure = new CaptureFailure("session-create-timeout", undefined, { reclaim: true });
+    expect(failure.reclaim).toBe(true);
+    expect(failure.detail).toBeUndefined();
+    expect(failure.message).toBe(ERROR_MESSAGES["session-create-timeout"]);
+  });
+
+  it("keeps the detail next to the reclaim option", () => {
+    const failure = new CaptureFailure("session-create-failed", "fetch failed", { reclaim: true });
+    expect(failure.detail).toBe("fetch failed");
+    expect(failure.reclaim).toBe(true);
   });
 
   it("carries the detail without putting it into the message", () => {

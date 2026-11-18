@@ -25,7 +25,7 @@ describe("parseCaptureConfig: defaults and mode", () => {
     expect(config.browserMode).toBe("remote");
     expect(config.apiKey).toBe("k");
     expect(config.proxy).toBe("off");
-    expect(config.sessionTimeoutMinutes).toBe(2);
+    expect(config.sessionTimeoutMinutes).toBe(1);
     expect(config.allowOrigin).toBeNull();
   });
 
@@ -81,7 +81,16 @@ describe("parseCaptureConfig: proxy", () => {
 });
 
 describe("parseCaptureConfig: session timeout", () => {
-  it.each(["1", "2", "3", "5"])("accepts %s", (value) => {
+  it.each(["1", "5"])("accepts %s", (value) => {
+    const config = expectOk({ BROWSER_USE_API_KEY: "k", BROWSER_USE_SESSION_TIMEOUT_MINUTES: value });
+    expect(config.sessionTimeoutMinutes).toBe(Number(value));
+  });
+
+  it("uses 1 when the timeout is unset", () => {
+    expect(expectOk({ BROWSER_USE_API_KEY: "k" }).sessionTimeoutMinutes).toBe(1);
+  });
+
+  it.each(["2", "3"])("also accepts %s", (value) => {
     const config = expectOk({ BROWSER_USE_API_KEY: "k", BROWSER_USE_SESSION_TIMEOUT_MINUTES: value });
     expect(config.sessionTimeoutMinutes).toBe(Number(value));
   });
@@ -101,7 +110,7 @@ describe("parseCaptureConfig: empty strings count as unset", () => {
     for (const blank of ["", "   ", "\t"]) {
       const config = expectOk({ BROWSER_USE_API_KEY: "k", [name]: blank });
       expect(config.proxy).toBe("off");
-      expect(config.sessionTimeoutMinutes).toBe(2);
+      expect(config.sessionTimeoutMinutes).toBe(1);
       expect(config.allowOrigin).toBeNull();
     }
   });
@@ -129,10 +138,29 @@ describe("parseCaptureConfig: allow origin", () => {
     expect(config.allowOrigin).toBe("https://a.com");
   });
 
-  it("keeps a non-default port and an http scheme", () => {
-    const config = expectOk({ BROWSER_USE_API_KEY: "k", NEXT_PUBLIC_APP_URL: "http://localhost:3000/x?y=1#z" });
-    expect(config.allowOrigin).toBe("http://localhost:3000");
+  it("keeps a non-default port and an https scheme", () => {
+    const config = expectOk({ BROWSER_USE_API_KEY: "k", NEXT_PUBLIC_APP_URL: "https://demo.example.com:8443/x?y=1#z" });
+    expect(config.allowOrigin).toBe("https://demo.example.com:8443");
   });
+
+  it("accepts a public host name with an http scheme", () => {
+    const config = expectOk({ BROWSER_USE_API_KEY: "k", NEXT_PUBLIC_APP_URL: "http://demo.example.com/x" });
+    expect(config.allowOrigin).toBe("http://demo.example.com");
+  });
+
+  it("accepts https://demo.example.com and returns its origin", () => {
+    const config = expectOk({ BROWSER_USE_API_KEY: "k", NEXT_PUBLIC_APP_URL: "https://demo.example.com" });
+    expect(config.allowOrigin).toBe("https://demo.example.com");
+  });
+
+  it.each(["http://10.0.0.5", "http://[::1]", "http://localhost", "http://127.0.0.1", "http://printer.local"])(
+    "rejects the blocked host %s and names only the variable",
+    (value) => {
+      const error = expectInvalid({ BROWSER_USE_API_KEY: "k", NEXT_PUBLIC_APP_URL: value });
+      expect(error.message).toBe("Invalid capture environment: NEXT_PUBLIC_APP_URL");
+      expect(JSON.stringify(error)).not.toContain(value);
+    }
+  );
 
   it.each(["ftp://x", "not a url", "javascript:alert(1)", "//demo.example.com"])("rejects %s", (value) => {
     const error = expectInvalid({ BROWSER_USE_API_KEY: "k", NEXT_PUBLIC_APP_URL: value });
@@ -225,7 +253,8 @@ describe(".env.example", () => {
     const comment = (name: string) => lines[lines.findIndex((l) => l.startsWith(`${name}=`)) - 1];
     expect(comment("CAPTURE_BROWSER_MODE")).toContain("remote");
     expect(comment("BROWSER_USE_PROXY")).toContain("off");
-    expect(comment("BROWSER_USE_SESSION_TIMEOUT_MINUTES")).toContain("2");
+    expect(comment("BROWSER_USE_SESSION_TIMEOUT_MINUTES")).toContain("default: 1");
+    expect(comment("BROWSER_USE_SESSION_TIMEOUT_MINUTES")).not.toContain("default: 2");
   });
 
   it("gives every NAME= line an empty value", () => {

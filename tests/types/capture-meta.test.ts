@@ -3,7 +3,20 @@ import {
   BaseSnapshotSchema,
   PageSnapshotSchema,
   CaptureMetaSchema,
+  ElementSnapshotSchema,
 } from "@/lib/types";
+import {
+  MAX_ATTR_CHARS,
+  MAX_ATTR_NAME_CHARS,
+  MAX_ATTRS_PER_ELEMENT,
+  MAX_ELEMENT_ID_CHARS,
+  MAX_ELEMENTS,
+  MAX_HOP_URL_LENGTH,
+  MAX_ROLE_CHARS,
+  MAX_STYLE_CHARS,
+  MAX_TAG_CHARS,
+  MAX_TILES,
+} from "@/lib/capture/constants";
 
 // ── Shared fixtures (same shapes as tests/types/schemas.test.ts) ───────────
 
@@ -242,5 +255,149 @@ describe("capture metadata rejections (14.4)", () => {
         }),
       })
     ).toThrow();
+  });
+});
+
+// ── Schema limits (page-capture-fixes, 6.6 to 6.9) ─────────────────────────
+// The schema literals are separate from the capture constants (lib/types must not
+// import lib/capture). These tests tie the two together at the boundary.
+
+const MAX_TEXT_SCHEMA = 1_000;
+const MAX_ELIGIBLE_COUNT = 10_000_000;
+
+function elementWith(patch: Record<string, unknown>) {
+  return { ...validElement, ...patch };
+}
+
+function metaWith(patch: Record<string, unknown>) {
+  return { ...validMetaWithoutImages, ...patch };
+}
+
+function itemsOf(count: number) {
+  return Array.from({ length: count }, (_, i) => ({ offsetY: i * 800, width: 1280, height: 800 }));
+}
+
+describe("element limits (6.6, 6.7)", () => {
+  const limits: [string, string, number][] = [
+    ["id", "id", MAX_ELEMENT_ID_CHARS],
+    ["tag", "tag", MAX_TAG_CHARS],
+    ["role", "role", MAX_ROLE_CHARS],
+    ["text", "text", MAX_TEXT_SCHEMA],
+    ["color", "color", MAX_STYLE_CHARS],
+    ["backgroundColor", "backgroundColor", MAX_STYLE_CHARS],
+    ["fontSize", "fontSize", MAX_STYLE_CHARS],
+    ["opacity", "opacity", MAX_STYLE_CHARS],
+    ["display", "display", MAX_STYLE_CHARS],
+    ["visibility", "visibility", MAX_STYLE_CHARS],
+    ["position", "position", MAX_STYLE_CHARS],
+  ];
+
+  it.each(limits)("accepts %s at the limit and rejects one over", (_name, key, limit) => {
+    expect(ElementSnapshotSchema.safeParse(elementWith({ [key]: "a".repeat(limit) })).success).toBe(true);
+    expect(ElementSnapshotSchema.safeParse(elementWith({ [key]: "a".repeat(limit + 1) })).success).toBe(false);
+  });
+
+  it("uses the capture constants for id, tag, role and style strings", () => {
+    expect(MAX_ELEMENT_ID_CHARS).toBe(2_048);
+    expect(MAX_TAG_CHARS).toBe(64);
+    expect(MAX_ROLE_CHARS).toBe(64);
+    expect(MAX_STYLE_CHARS).toBe(64);
+  });
+
+  it("accepts 32 attributes and rejects 33", () => {
+    const make = (count: number) =>
+      Object.fromEntries(Array.from({ length: count }, (_, i) => [`aria-a${i}`, "v"]));
+    expect(ElementSnapshotSchema.safeParse(elementWith({ attributes: make(MAX_ATTRS_PER_ELEMENT) })).success).toBe(true);
+    expect(ElementSnapshotSchema.safeParse(elementWith({ attributes: make(MAX_ATTRS_PER_ELEMENT + 1) })).success).toBe(false);
+  });
+
+  it("accepts an attribute name of 64 characters and rejects 65", () => {
+    const at = { ["n".repeat(MAX_ATTR_NAME_CHARS)]: "v" };
+    const over = { ["n".repeat(MAX_ATTR_NAME_CHARS + 1)]: "v" };
+    expect(ElementSnapshotSchema.safeParse(elementWith({ attributes: at })).success).toBe(true);
+    expect(ElementSnapshotSchema.safeParse(elementWith({ attributes: over })).success).toBe(false);
+  });
+
+  it("accepts an attribute value of 200 characters and rejects 201", () => {
+    const at = { "aria-label": "v".repeat(MAX_ATTR_CHARS) };
+    const over = { "aria-label": "v".repeat(MAX_ATTR_CHARS + 1) };
+    expect(ElementSnapshotSchema.safeParse(elementWith({ attributes: at })).success).toBe(true);
+    expect(ElementSnapshotSchema.safeParse(elementWith({ attributes: over })).success).toBe(false);
+  });
+});
+
+describe("snapshot limits (6.6)", () => {
+  it("accepts 1,500 elements and rejects 1,501", () => {
+    const make = (count: number) => ({
+      ...validBaseSnapshot,
+      elements: Array.from({ length: count }, (_, i) => ({ ...validElement, id: `el-${i}` })),
+    });
+    expect(BaseSnapshotSchema.safeParse(make(MAX_ELEMENTS)).success).toBe(true);
+    expect(BaseSnapshotSchema.safeParse(make(MAX_ELEMENTS + 1)).success).toBe(false);
+  });
+
+  it("accepts a url of 8,192 characters and rejects 8,193", () => {
+    const prefix = "https://example.com/";
+    const make = (length: number) => ({ ...validBaseSnapshot, url: prefix + "a".repeat(length - prefix.length) });
+    expect(BaseSnapshotSchema.safeParse(make(MAX_HOP_URL_LENGTH)).success).toBe(true);
+    expect(BaseSnapshotSchema.safeParse(make(MAX_HOP_URL_LENGTH + 1)).success).toBe(false);
+  });
+
+  it("applies the limits inside afterReload and secondSample", () => {
+    const bad = { ...validBaseSnapshot, elements: [elementWith({ tag: "t".repeat(MAX_TAG_CHARS + 1) })] };
+    expect(PageSnapshotSchema.safeParse({ ...validBaseSnapshot, afterReload: bad }).success).toBe(false);
+    expect(PageSnapshotSchema.safeParse({ ...validBaseSnapshot, secondSample: bad }).success).toBe(false);
+  });
+});
+
+describe("capture metadata limits (6.8)", () => {
+  it("accepts devicePixelRatio 16 and rejects above 16", () => {
+    expect(CaptureMetaSchema.safeParse(metaWith({ devicePixelRatio: 16 })).success).toBe(true);
+    expect(CaptureMetaSchema.safeParse(metaWith({ devicePixelRatio: 16.01 })).success).toBe(false);
+  });
+
+  it("accepts layoutWidth 100,000 and rejects 100,001", () => {
+    expect(CaptureMetaSchema.safeParse(metaWith({ layoutWidth: 100_000 })).success).toBe(true);
+    expect(CaptureMetaSchema.safeParse(metaWith({ layoutWidth: 100_001 })).success).toBe(false);
+  });
+
+  it("accepts a missing layoutWidth and a positive one", () => {
+    expect(CaptureMetaSchema.safeParse(validMetaWithoutImages).success).toBe(true);
+    expect(CaptureMetaSchema.safeParse(metaWith({ layoutWidth: 1265 })).success).toBe(true);
+  });
+
+  it.each([0, -1])("rejects layoutWidth %s", (layoutWidth) => {
+    expect(CaptureMetaSchema.safeParse(metaWith({ layoutWidth })).success).toBe(false);
+  });
+
+  it("keeps layoutWidth in the parsed output", () => {
+    expect(CaptureMetaSchema.parse(metaWith({ layoutWidth: 1265 })).layoutWidth).toBe(1265);
+  });
+
+  it("accepts 10 image items and rejects 11", () => {
+    const images = (count: number) => ({ mode: "tiled" as const, truncated: false, items: itemsOf(count) });
+    expect(CaptureMetaSchema.safeParse(metaWith({ images: images(MAX_TILES) })).success).toBe(true);
+    expect(CaptureMetaSchema.safeParse(metaWith({ images: images(MAX_TILES + 1) })).success).toBe(false);
+  });
+
+  it("accepts an eligible count of 10,000,000 and rejects one more", () => {
+    expect(CaptureMetaSchema.safeParse(metaWith({ eligibleElementCount: MAX_ELIGIBLE_COUNT })).success).toBe(true);
+    expect(CaptureMetaSchema.safeParse(metaWith({ eligibleElementCount: MAX_ELIGIBLE_COUNT + 1 })).success).toBe(false);
+  });
+
+  it("still rejects a devicePixelRatio of 0", () => {
+    expect(CaptureMetaSchema.safeParse(metaWith({ devicePixelRatio: 0 })).success).toBe(false);
+  });
+});
+
+describe("old shapes still parse (6.9)", () => {
+  it("parses a snapshot with the old capture metadata and no layoutWidth", () => {
+    const parsed = PageSnapshotSchema.parse(withCapture(validMetaWithImages));
+    expect(parsed.capture?.layoutWidth).toBeUndefined();
+  });
+
+  it("parses an element with long but allowed text from an older fixture", () => {
+    const element = elementWith({ text: "x".repeat(300), attributes: { type: "checkbox" } });
+    expect(ElementSnapshotSchema.safeParse(element).success).toBe(true);
   });
 });

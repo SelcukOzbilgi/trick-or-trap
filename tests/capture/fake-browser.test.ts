@@ -2,12 +2,24 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import type { CollectOptions } from "@/lib/capture/types";
+import { COLLECT_LIMITS } from "@/lib/capture/constants";
 import { CaptureFailure } from "@/lib/capture/types";
 import type { PageGuards, SessionRequest } from "@/lib/capture/seam";
 import { createFakeBrowser, createRawPageRead } from "./helpers/fake-browser";
 
-const request: SessionRequest = { timeoutMinutes: 2, proxy: "off", viewport: { width: 1280, height: 800 } };
-const collectOptions: CollectOptions = { maxElements: 10, maxTextChars: 30, maxAttrChars: 20, attributeNames: "full" };
+const request: SessionRequest = {
+  timeoutMinutes: 2,
+  proxy: "off",
+  viewport: { width: 1280, height: 800 },
+  captureId: "capture-id-sentinel",
+};
+const collectOptions: CollectOptions = {
+  maxElements: 10,
+  maxTextChars: 30,
+  maxAttrChars: 20,
+  attributeNames: "full",
+  limits: COLLECT_LIMITS,
+};
 
 async function isPending(promise: Promise<unknown>): Promise<boolean> {
   const settled = Symbol("settled");
@@ -22,17 +34,23 @@ async function openPage(fake = createFakeBrowser()) {
   return { fake, handle, page };
 }
 
-function guardsAllowing(allowed: string[]) {
+function guardsAllowing(allowed: string[], refusedBySyntax: string[] = []) {
   const reported: unknown[] = [];
+  const calls: string[] = [];
   const guards: PageGuards = {
-    async allowNavigation(url) {
+    checkSyntax(url) {
+      calls.push(`syntax ${url}`);
+      return refusedBySyntax.includes(url) ? { allowed: false, reason: "url-scheme-blocked" } : { allowed: true };
+    },
+    async checkHost(url) {
+      calls.push(`host ${url}`);
       return allowed.includes(url) ? { allowed: true } : { allowed: false, reason: "url-address-blocked" };
     },
     report(event) {
       reported.push(event);
     },
   };
-  return { guards, reported };
+  return { guards, reported, calls };
 }
 
 describe("fake browser counters", () => {
@@ -173,22 +191,37 @@ describe("fake browser scrolling and screenshots", () => {
 });
 
 describe("fake browser guards and hops", () => {
-  it("checks every hop of goto and returns the last one as the final URL", async () => {
+  it("checks every hop of goto with checkSyntax and then checkHost, and returns the last one as the final URL", async () => {
     const { fake, page } = await openPage(createFakeBrowser({ hops: ["https://a.example/", "https://b.example/"] }));
-    const { guards, reported } = guardsAllowing(["https://a.example/", "https://b.example/"]);
+    const { guards, reported, calls } = guardsAllowing(["https://a.example/", "https://b.example/"]);
     await page.installGuards(guards);
     expect(await page.goto("https://a.example/", { timeoutMs: 1 })).toEqual({ finalUrl: "https://b.example/" });
+    expect(calls).toEqual([
+      "syntax https://a.example/",
+      "host https://a.example/",
+      "syntax https://b.example/",
+      "host https://b.example/",
+    ]);
     expect(reported).toEqual([]);
     expect(await page.reload({ timeoutMs: 1 })).toEqual({ finalUrl: "https://b.example/" });
     expect(fake.guards).toBe(guards);
   });
 
-  it("reports a blocked hop and fails the navigation", async () => {
+  it("reports a hop refused by checkHost as a main-frame request-blocked and fails the navigation", async () => {
     const { page } = await openPage(createFakeBrowser({ hops: ["https://a.example/", "http://10.0.0.1/"] }));
     const { guards, reported } = guardsAllowing(["https://a.example/"]);
     await page.installGuards(guards);
     await expect(page.goto("https://a.example/", { timeoutMs: 1 })).rejects.toBeInstanceOf(CaptureFailure);
-    expect(reported).toEqual([{ kind: "request-blocked", reason: "url-address-blocked" }]);
+    expect(reported).toEqual([{ kind: "request-blocked", reason: "url-address-blocked", mainFrame: true }]);
+  });
+
+  it("reports a hop refused by checkSyntax without asking checkHost", async () => {
+    const { page } = await openPage(createFakeBrowser({ hops: ["ftp://a.example/"] }));
+    const { guards, reported, calls } = guardsAllowing([], ["ftp://a.example/"]);
+    await page.installGuards(guards);
+    await expect(page.goto("https://a.example/", { timeoutMs: 1 })).rejects.toBeInstanceOf(CaptureFailure);
+    expect(reported).toEqual([{ kind: "request-blocked", reason: "url-scheme-blocked", mainFrame: true }]);
+    expect(calls).toEqual(["syntax ftp://a.example/"]);
   });
 
   it("lets a test emit guard events", async () => {
@@ -197,6 +230,20 @@ describe("fake browser guards and hops", () => {
     await page.installGuards(guards);
     fake.emit({ kind: "download-refused" });
     expect(reported).toEqual([{ kind: "download-refused" }]);
+  });
+});
+
+describe("fake browser secrets", () => {
+  it("has a handle that lists no secrets by default", async () => {
+    const fake = createFakeBrowser();
+    const handle = await fake.provider.createSession(request);
+    expect(handle.secrets()).toEqual([]);
+  });
+
+  it("returns the secrets of the script", async () => {
+    const fake = createFakeBrowser({ secrets: ["key-sentinel", "id-sentinel"] });
+    const handle = await fake.provider.createSession(request);
+    expect(handle.secrets()).toEqual(["key-sentinel", "id-sentinel"]);
   });
 });
 

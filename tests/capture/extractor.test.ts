@@ -1,14 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { buildSample, collectInPage } from "@/lib/capture/extractor";
+import { buildSample, collectInPage, snapshotBytes } from "@/lib/capture/extractor";
 import {
+  BROWSER_VIEWPORT,
   MAX_ATTR_CHARS,
+  MAX_ATTR_NAME_CHARS,
+  MAX_ATTRS_PER_ELEMENT,
+  MAX_ELEMENT_ID_CHARS,
   MAX_ELEMENTS,
   MAX_ELEMENTS_LIGHT,
+  MAX_PATH_DEPTH,
+  MAX_PATH_INDEX,
+  MAX_ROLE_CHARS,
+  MAX_SNAPSHOT_BYTES,
+  MAX_STYLE_CHARS,
+  MAX_TAG_CHARS,
   MAX_TEXT_CHARS,
   MAX_TEXT_CHARS_LIGHT,
+  RAW_SCAN_FACTOR,
 } from "@/lib/capture/constants";
-import type { RawElement, RawPageRead } from "@/lib/capture/types";
+import { CaptureFailure, type RawElement, type RawPageRead } from "@/lib/capture/types";
 import { BaseSnapshotSchema } from "@/lib/types";
+import { FORBIDDEN_NAME_SAMPLES, TEST_ID_ATTRIBUTE } from "./helpers/forbidden-attribute";
 
 const CAPTURED_AT = "2025-10-31T12:00:00.000Z";
 const URL_ = "https://shop.example.com/page";
@@ -84,7 +96,8 @@ describe("buildSample: ids and boxes", () => {
     const snap = buildSample(raw, full);
     expect(snap.elements[0]?.boundingBox).toEqual({ x: 0, y: 1.23, width: 0, height: 0 });
     expect(snap.viewportWidth).toBe(1280.46);
-    expect(snap.fullHeight).toBe(0);
+    // A document height that is not finite becomes the viewport height, never 0.
+    expect(snap.fullHeight).toBe(BROWSER_VIEWPORT.height);
   });
 });
 
@@ -161,7 +174,6 @@ describe("buildSample: attributes", () => {
             disabled: "",
             "aria-label": "Sign up",
             "aria-checked": "true",
-            "data-testid": "nl",
             href: "/x",
             for: "nl",
             placeholder: "Email",
@@ -179,7 +191,6 @@ describe("buildSample: attributes", () => {
       [
         "aria-checked",
         "aria-label",
-        "data-testid",
         "disabled",
         "for",
         "href",
@@ -191,7 +202,7 @@ describe("buildSample: attributes", () => {
     );
   });
 
-  it("keeps only type, name, disabled and data-testid in a light sample", () => {
+  it("keeps only type, name and disabled in a light sample", () => {
     const snap = buildSample(
       rawPage([
         rawEl({
@@ -200,7 +211,7 @@ describe("buildSample: attributes", () => {
             type: "checkbox",
             name: "n",
             disabled: "",
-            "data-testid": "t",
+            [TEST_ID_ATTRIBUTE]: "t",
             "aria-label": "x",
             href: "/x",
             value: "v",
@@ -211,7 +222,36 @@ describe("buildSample: attributes", () => {
       ]),
       light
     );
-    expect(Object.keys(snap.elements[0]?.attributes ?? {}).sort()).toEqual(["data-testid", "disabled", "name", "type"]);
+    expect(Object.keys(snap.elements[0]?.attributes ?? {}).sort()).toEqual(["disabled", "name", "type"]);
+  });
+
+  it.each([
+    ["full", full],
+    ["light", light],
+  ] as const)("drops the test-id attribute and outcome names in a %s sample", (_label, params) => {
+    const attrs: Record<string, string> = {
+      [TEST_ID_ATTRIBUTE]: "cart-insurance-sneaked",
+      "aria-label": "Sign up",
+    };
+    for (const name of FORBIDDEN_NAME_SAMPLES) attrs[name] = "flag";
+    const snap = buildSample(rawPage([rawEl({ tag: "input", attrs })]), params);
+    const expected = params.light ? {} : { "aria-label": "Sign up" };
+    expect(snap.elements[0]?.attributes).toEqual(expected);
+  });
+
+  it("drops an aria name that holds an outcome fragment, in any case", () => {
+    const attrs = { "aria-label": "x", "ARIA-Verdict": "1", "aria-no-flag": "1", "aria-lookalike": "1" };
+    const snap = buildSample(rawPage([rawEl({ attrs })]), full);
+    expect(snap.elements[0]?.attributes).toEqual({ "aria-label": "x" });
+  });
+
+  it("never lets the test-id attribute through in the snapshot JSON", () => {
+    const attrs = { [TEST_ID_ATTRIBUTE]: "x", type: "text" };
+    const json = JSON.stringify([
+      buildSample(rawPage([rawEl({ tag: "input", attrs })]), full),
+      buildSample(rawPage([rawEl({ tag: "input", attrs })]), light),
+    ]);
+    expect(json.toLowerCase()).not.toContain(TEST_ID_ATTRIBUTE);
   });
 
   it("cuts attribute values at 200 characters", () => {
@@ -425,10 +465,211 @@ describe("buildSample: schema", () => {
     expect(BaseSnapshotSchema.safeParse(buildSample(raw, light)).success).toBe(true);
   });
 
-  it("leaves a zero devicePixelRatio so that validation can reject it", () => {
+  it("replaces a zero devicePixelRatio with 1 so that validation accepts the sample", () => {
     const snap = buildSample(rawPage([rawEl()], { devicePixelRatio: 0 }), full);
-    expect(snap.capture?.devicePixelRatio).toBe(0);
-    expect(BaseSnapshotSchema.safeParse(snap).success).toBe(false);
+    expect(snap.capture?.devicePixelRatio).toBe(1);
+    expect(BaseSnapshotSchema.safeParse(snap).success).toBe(true);
+  });
+});
+
+describe("buildSample: bounds on hostile page data", () => {
+  const hostileStyle = {
+    color: "c".repeat(1_000_000),
+    backgroundColor: "b".repeat(1_000_000),
+    fontSize: "f".repeat(1_000_000),
+    opacity: "o".repeat(1_000_000),
+    display: "d".repeat(1_000_000),
+    visibility: "v".repeat(1_000_000),
+    position: "p".repeat(1_000_000),
+  };
+  const hostileAttrs = (): Record<string, string> => {
+    const attrs: Record<string, string> = {};
+    for (let i = 0; i < 2_000; i++) attrs[`aria-x${i}`] = "v".repeat(1_000);
+    attrs[`aria-${"n".repeat(100)}`] = "long name";
+    return attrs;
+  };
+  const hostile = (i: number): RawElement =>
+    rawEl({
+      path: [i],
+      tag: "t".repeat(10_000),
+      role: "r".repeat(1_000_000),
+      text: "x".repeat(5_000),
+      style: hostileStyle,
+      attrs: hostileAttrs(),
+    });
+
+  it("keeps 20 hostile elements within every cap and the snapshot under MAX_SNAPSHOT_BYTES", () => {
+    const snap = buildSample(rawPage(Array.from({ length: 20 }, (_, i) => hostile(i))), full);
+    expect(snap.elements).toHaveLength(20);
+    for (const el of snap.elements) {
+      expect(el.tag).toHaveLength(MAX_TAG_CHARS);
+      expect(el.role).toHaveLength(MAX_ROLE_CHARS);
+      expect(el.text).toHaveLength(MAX_TEXT_CHARS);
+      for (const value of [el.color, el.backgroundColor, el.fontSize, el.opacity, el.display, el.visibility, el.position]) {
+        expect(value).toHaveLength(MAX_STYLE_CHARS);
+      }
+      const names = Object.keys(el.attributes ?? {});
+      expect(names).toHaveLength(MAX_ATTRS_PER_ELEMENT);
+      for (const name of names) {
+        expect(name.length).toBeLessThanOrEqual(MAX_ATTR_NAME_CHARS);
+        expect(el.attributes?.[name]?.length).toBeLessThanOrEqual(MAX_ATTR_CHARS);
+      }
+    }
+    expect(snapshotBytes(snap)).toBeLessThan(MAX_SNAPSHOT_BYTES);
+    expect(BaseSnapshotSchema.safeParse(snap).success).toBe(true);
+  });
+
+  it("cuts the tag, role and style strings of a light sample too", () => {
+    const snap = buildSample(rawPage([hostile(0)]), light);
+    expect(snap.elements[0]?.tag).toHaveLength(MAX_TAG_CHARS);
+    expect(snap.elements[0]?.role).toHaveLength(MAX_ROLE_CHARS);
+    expect(snap.elements[0]?.color).toHaveLength(MAX_STYLE_CHARS);
+    expect(BaseSnapshotSchema.safeParse(snap).success).toBe(true);
+  });
+
+  it("keeps the first allowed attributes up to the limit and drops a name over 64 characters", () => {
+    const attrs: Record<string, string> = { [`aria-${"n".repeat(100)}`]: "x" };
+    for (let i = 0; i < 40; i++) attrs[`aria-a${String(i).padStart(2, "0")}`] = String(i);
+    const snap = buildSample(rawPage([rawEl({ attrs })]), full);
+    const names = Object.keys(snap.elements[0]?.attributes ?? {});
+    expect(names).toHaveLength(MAX_ATTRS_PER_ELEMENT);
+    expect(names[0]).toBe("aria-a00");
+    expect(names[MAX_ATTRS_PER_ELEMENT - 1]).toBe("aria-a31");
+  });
+
+  it("drops an element with a path of 10,002 entries and still counts it as eligible", () => {
+    const deep = rawEl({ path: Array.from({ length: 10_002 }, () => 0) });
+    const snap = buildSample(rawPage([deep, rawEl({ path: [5] })], { eligibleCount: 2 }), full);
+    expect(snap.elements.map((e) => e.id)).toEqual(["el-5"]);
+    expect(snap.capture?.elementsTruncated).toBe(true);
+    expect(snap.capture?.eligibleElementCount).toBe(2);
+  });
+
+  it("keeps a path of exactly MAX_PATH_DEPTH entries and drops one of MAX_PATH_DEPTH + 1", () => {
+    const at = rawEl({ path: Array.from({ length: MAX_PATH_DEPTH }, () => 0) });
+    const over = rawEl({ path: Array.from({ length: MAX_PATH_DEPTH + 1 }, () => 0) });
+    const kept = buildSample(rawPage([at]), full);
+    expect(kept.elements).toHaveLength(1);
+    expect(kept.elements[0]?.id.length).toBeLessThanOrEqual(MAX_ELEMENT_ID_CHARS);
+    expect(kept.capture?.elementsTruncated).toBe(false);
+
+    const dropped = buildSample(rawPage([over], { eligibleCount: 1 }), full);
+    expect(dropped.elements).toHaveLength(0);
+    expect(dropped.capture?.elementsTruncated).toBe(true);
+    expect(dropped.capture?.eligibleElementCount).toBe(1);
+  });
+
+  it("drops an element with a path index above MAX_PATH_INDEX and still counts it", () => {
+    const atLimit = rawEl({ path: [MAX_PATH_INDEX] });
+    const over = rawEl({ path: [MAX_PATH_INDEX + 1] });
+    expect(buildSample(rawPage([atLimit]), full).elements).toHaveLength(1);
+    const snap = buildSample(rawPage([over], { eligibleCount: 1 }), full);
+    expect(snap.elements).toHaveLength(0);
+    expect(snap.capture?.elementsTruncated).toBe(true);
+    expect(snap.capture?.eligibleElementCount).toBe(1);
+  });
+
+  it("counts a bounds drop as eligible even when the page reported no count", () => {
+    const over = rawEl({ path: [MAX_PATH_INDEX + 1] });
+    const snap = buildSample(rawPage([over], { eligibleCount: 0 }), full);
+    expect(snap.capture?.elementsTruncated).toBe(true);
+    expect(snap.capture?.eligibleElementCount).toBe(1);
+  });
+
+  it("examines at most RAW_SCAN_FACTOR times the cap of raw entries", () => {
+    const scanLimit = RAW_SCAN_FACTOR * MAX_ELEMENTS;
+    const invalid = { ...rawEl(), tag: 5 } as unknown as RawElement;
+    const entries: RawElement[] = Array.from({ length: scanLimit - 1 }, () => invalid);
+    // Entry number `scanLimit` (index scanLimit - 1) is examined; the one after it is not.
+    entries.push(rawEl({ path: [1] }), rawEl({ path: [2] }));
+    const snap = buildSample(rawPage(entries, { eligibleCount: entries.length }), full);
+    expect(snap.elements.map((e) => e.id)).toEqual(["el-1"]);
+    expect(snap.capture?.elementsTruncated).toBe(true);
+  });
+
+  it("examines at most twice the light cap in a light sample", () => {
+    const scanLimit = RAW_SCAN_FACTOR * MAX_ELEMENTS_LIGHT;
+    const invalid = { ...rawEl(), tag: 5 } as unknown as RawElement;
+    const entries: RawElement[] = Array.from({ length: scanLimit }, () => invalid);
+    entries.push(rawEl({ path: [1] }));
+    expect(buildSample(rawPage(entries), light).elements).toHaveLength(0);
+  });
+
+  it.each([null, undefined, "text", 5])("throws page-read-failed when the raw read is %s", (value) => {
+    expect(() => buildSample(value as unknown as RawPageRead, full)).toThrowError(CaptureFailure);
+    try {
+      buildSample(value as unknown as RawPageRead, full);
+    } catch (error) {
+      expect(error).toMatchObject({ code: "page-read-failed" });
+    }
+  });
+
+  it.each([undefined, null, "list", { length: 1 }])("throws page-read-failed when elements is %s", (elements) => {
+    const raw = { ...rawPage([]), elements } as unknown as RawPageRead;
+    try {
+      buildSample(raw, full);
+      expect.unreachable("buildSample should have thrown");
+    } catch (error) {
+      expect(error).toBeInstanceOf(CaptureFailure);
+      expect(error).toMatchObject({ code: "page-read-failed" });
+    }
+  });
+});
+
+describe("snapshotBytes", () => {
+  it("counts UTF-8 bytes of the JSON text, not characters", () => {
+    expect(snapshotBytes("a")).toBe(3); // "a" with quotes
+    expect(snapshotBytes("é")).toBe(4); // 2-byte character
+    expect(snapshotBytes("€")).toBe(5); // 3-byte character
+    expect(snapshotBytes({ a: "😀" })).toBe(12); // 4-byte character
+  });
+
+  it("returns 0 for a value that has no JSON text", () => {
+    expect(snapshotBytes(undefined)).toBe(0);
+  });
+});
+
+describe("buildSample: layout width and page metrics", () => {
+  it.each([
+    ["full", full],
+    ["light", light],
+  ] as const)("records capture.layoutWidth in a %s sample", (_label, params) => {
+    const snap = buildSample(rawPage([rawEl()], { layoutWidth: 1265, innerWidth: 1280 }), params);
+    expect(snap.capture?.layoutWidth).toBe(1265);
+  });
+
+  it("uses innerWidth when layoutWidth is absent", () => {
+    const snap = buildSample(rawPage([rawEl()], { innerWidth: 1100 }), full);
+    expect(snap.capture?.layoutWidth).toBe(1100);
+  });
+
+  it("replaces an implausible layoutWidth with the viewport width", () => {
+    const snap = buildSample(rawPage([rawEl()], { layoutWidth: Number.NaN }), full);
+    expect(snap.capture?.layoutWidth).toBe(BROWSER_VIEWPORT.width);
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, 0, -2, 9, 1e9])("gives ratio 1 for a devicePixelRatio of %s", (ratio) => {
+    const snap = buildSample(rawPage([rawEl()], { devicePixelRatio: ratio }), full);
+    expect(snap.capture?.devicePixelRatio).toBe(1);
+  });
+
+  it("keeps a plausible devicePixelRatio", () => {
+    expect(buildSample(rawPage([rawEl()], { devicePixelRatio: 2 }), full).capture?.devicePixelRatio).toBe(2);
+    expect(buildSample(rawPage([rawEl()], { devicePixelRatio: 8 }), full).capture?.devicePixelRatio).toBe(8);
+  });
+
+  it("replaces implausible viewport and document sizes and still validates", () => {
+    const snap = buildSample(
+      rawPage([rawEl()], { innerWidth: 0, innerHeight: Number.NaN, scrollWidth: -1, scrollHeight: Number.POSITIVE_INFINITY }),
+      full
+    );
+    expect(snap).toMatchObject({
+      viewportWidth: BROWSER_VIEWPORT.width,
+      viewportHeight: BROWSER_VIEWPORT.height,
+      fullWidth: BROWSER_VIEWPORT.width,
+      fullHeight: BROWSER_VIEWPORT.height,
+    });
+    expect(BaseSnapshotSchema.safeParse(snap).success).toBe(true);
   });
 });
 

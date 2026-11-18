@@ -6,13 +6,14 @@ import {
   SESSION_TIMEOUT_MIN_MINUTES,
 } from "@/lib/capture/constants";
 import type { CaptureError } from "@/lib/capture/types";
+import { checkUrlSyntax } from "@/lib/capture/url-check";
 
 export type CaptureConfig = Readonly<{
   browserMode: string; // default "remote"
   apiKey: string | null;
   proxy: "on" | "off"; // default "off"
-  sessionTimeoutMinutes: number; // integer 1..5, default 2
-  allowOrigin: string | null; // parsed once from NEXT_PUBLIC_APP_URL
+  sessionTimeoutMinutes: number; // integer 1..5, default 1
+  allowOrigin: string | null; // parsed once from NEXT_PUBLIC_APP_URL; bypasses no check
 }>;
 
 export type ConfigResult = { ok: true; config: CaptureConfig } | { ok: false; error: CaptureError };
@@ -37,6 +38,15 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+/**
+ * False for an origin whose host is a blocked name or a blocked address. Other syntax
+ * codes (for example a non-default port) do not reject it: the origin bypasses nothing.
+ */
+function hasPublicHost(origin: string): boolean {
+  const result = checkUrlSyntax(origin);
+  return result.ok || (result.code !== "url-host-blocked" && result.code !== "url-address-blocked");
+}
+
 // Issue paths are the environment variable names, so a failure can be reported by name only.
 const EnvSchema = z
   .object({
@@ -53,6 +63,7 @@ const EnvSchema = z
       .string()
       .refine(isHttpUrl)
       .transform((value) => new URL(value).origin)
+      .refine(hasPublicHost)
       .optional(),
   });
 

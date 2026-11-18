@@ -4,6 +4,7 @@ vi.mock("server-only", () => ({}));
 
 import { capturePage, type CaptureDeps } from "@/lib/capture/capture";
 import type { CaptureConfig } from "@/lib/capture/config";
+import { COLLECT_LIMITS } from "@/lib/capture/constants";
 import type { GetBrowserResult } from "@/lib/capture/seam";
 import { CaptureFailure } from "@/lib/capture/types";
 import type { CaptureResult, RawElement, RawPageRead } from "@/lib/capture/types";
@@ -11,6 +12,7 @@ import type { Resolver } from "@/lib/capture/url-check";
 import { BaseSnapshotSchema, PageSnapshotSchema } from "@/lib/types";
 import { createFakeBrowser, createRawPageRead, type FakeBrowser, type FakeScript } from "./helpers/fake-browser";
 import { createManualClock, type ManualClock } from "./helpers/manual-clock";
+import { TEST_ID_ATTRIBUTE } from "./helpers/forbidden-attribute";
 
 const URL_OK = "https://shop.example.com/";
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
@@ -50,7 +52,7 @@ function element(path: number[], text: string): RawElement {
     },
     checked: false,
     selected: false,
-    attrs: { "data-testid": "t", href: "/x", type: "text" },
+    attrs: { [TEST_ID_ATTRIBUTE]: "t", href: "/x", type: "text" },
   };
 }
 
@@ -110,13 +112,22 @@ describe("capturePage: reload sample", () => {
     await tick();
     clock.advance(500); // first settle
     await tick();
-    expect(fake.calls).toEqual(["createSession", "connect", "installGuards", "goto", "collect", "screenshot", "reload"]);
+    expect(fake.calls).toEqual([
+      "createSession",
+      "connect",
+      "installGuards",
+      "goto",
+      "collect",
+      "screenshot",
+      "collect", // the layout drift re-read, before the reload
+      "reload",
+    ]);
 
-    // The settle after the reload: no second read before 500 ms have passed.
+    // The settle after the reload: no light read of the reload before 500 ms have passed.
     await tick();
     clock.advance(499);
     await tick();
-    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(1);
+    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(2);
     clock.advance(1);
     await tick();
 
@@ -129,13 +140,22 @@ describe("capturePage: reload sample", () => {
       "goto",
       "collect",
       "screenshot",
+      "collect",
       "reload",
       "collect",
       "stop",
     ]);
+    const light = {
+      maxElements: 750,
+      maxTextChars: 120,
+      maxAttrChars: 200,
+      attributeNames: ["type", "name", "disabled"],
+      limits: COLLECT_LIMITS,
+    };
     expect(fake.collectOptions).toEqual([
-      { maxElements: 1_500, maxTextChars: 300, maxAttrChars: 200, attributeNames: "full" },
-      { maxElements: 750, maxTextChars: 120, maxAttrChars: 200, attributeNames: ["type", "name", "disabled", "data-testid"] },
+      { maxElements: 1_500, maxTextChars: 300, maxAttrChars: 200, attributeNames: "full", limits: COLLECT_LIMITS },
+      light, // the layout drift re-read
+      light, // the reload sample
     ]);
     expect(fake.screenshotRequests).toHaveLength(1);
     expect(fake.scrollRequests).toEqual([]);
@@ -160,8 +180,9 @@ describe("capturePage: reload sample", () => {
     expect(after.elements.map((item) => item.id)).toEqual(["el-1-0-3", "el-1-2"]);
     expect(after.elements.every((item) => item.outsideImage === undefined)).toBe(true);
     // Light attributes only.
-    expect(after.elements[0].attributes).toEqual({ "data-testid": "t", type: "text" });
+    expect(after.elements[0].attributes).toEqual({ type: "text" });
     expect(result.snapshot.elements[0].attributes).toMatchObject({ href: "/x" });
+    expect(result.snapshot.elements[0].attributes).not.toHaveProperty(TEST_ID_ATTRIBUTE);
     expect(result.snapshot.capture?.light).toBe(false);
     expect(result.snapshot.secondSample).toBeUndefined();
     expect(result.snapshot.capture?.images).toBeDefined();
@@ -211,7 +232,8 @@ describe("capturePage: reload sample", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(fake.calls).not.toContain("reload");
-    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(1);
+    // The first read and the layout drift re-read (3,000 ms or more remain); no reload read.
+    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(2);
     expect(result.snapshot.afterReload).toBeUndefined();
     expect(result.snapshot.secondSample).toBeUndefined();
     expect(warningCodes(result)).toEqual(["reload-skipped"]);
@@ -303,7 +325,7 @@ describe("capturePage: a failing reload is only a warning", () => {
     const { fake, deps } = setup(
       {
         reload: () => {
-          holder.fake?.emit({ kind: "request-blocked", reason: "url-address-blocked" });
+          holder.fake?.emit({ kind: "request-blocked", reason: "url-address-blocked", mainFrame: true });
           return new CaptureFailure("navigation-failed");
         },
       },
@@ -325,12 +347,13 @@ describe("capturePage: a failing reload is only a warning", () => {
   });
 
   it("when the whole deadline ends during the reload", async () => {
-    // 12,000 ms remain; the reload answers, then the second read never does.
+    // 12,000 ms remain; the reload answers, then the second read never does. Read 1 is the
+    // first read, read 2 the layout drift re-read, read 3 the reload sample.
     const { result, fake } = await expectReloadFailed((clock) => ({
       screenshot: slowScreenshot(clock, 32_500),
-      collect: (n) => (n === 1 ? rawWithElements() : "hang"),
+      collect: (n) => (n <= 2 ? rawWithElements() : "hang"),
     }));
-    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(2);
+    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(3);
     expect(result.ok).toBe(true);
   });
 
@@ -339,22 +362,30 @@ describe("capturePage: a failing reload is only a warning", () => {
       screenshot: slowScreenshot(clock, 32_500),
       reload: "hang",
     }));
-    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(1);
+    // The first read and the layout drift re-read; the reload never answers.
+    expect(fake.calls.filter((call) => call === "collect")).toHaveLength(2);
   });
 
   it("when the second read throws", async () => {
-    await expectReloadFailed({ collect: (n) => (n === 1 ? rawWithElements() : new Error("evaluate failed")) });
+    await expectReloadFailed({ collect: (n) => (n <= 2 ? rawWithElements() : new Error("evaluate failed")) });
   });
 
   it("when the second read throws a CaptureFailure", async () => {
-    await expectReloadFailed({ collect: (n) => (n === 1 ? rawWithElements() : new CaptureFailure("page-read-failed")) });
+    await expectReloadFailed({
+      collect: (n) => (n <= 2 ? rawWithElements() : new CaptureFailure("page-read-failed")),
+    });
   });
 
   it("when the sample fails BaseSnapshotSchema", async () => {
-    // devicePixelRatio 0 is not positive, so the light sample is invalid.
-    await expectReloadFailed({
-      collect: (n) => (n === 1 ? rawWithElements() : rawWithElements({ devicePixelRatio: 0 })),
-    });
+    // An implausible page metric is replaced and no longer invalid, so the failure is forced.
+    const spy = vi
+      .spyOn(BaseSnapshotSchema, "safeParse")
+      .mockReturnValueOnce({ success: false, error: { issues: [{ path: ["capture", "light"] }] } } as never);
+    try {
+      await expectReloadFailed({ collect: () => rawWithElements() });
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("never lets a reload failure change the first capture", async () => {
