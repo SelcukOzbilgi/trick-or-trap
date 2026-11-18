@@ -17,10 +17,10 @@ Rules for every task:
   - [x] 1.4 Run `npx vitest run tests/capture/fake-guard-browser.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9_
 
-- [ ] 2. Guard reason codes and the `guard-lost` error
-  - [ ] 2.1 Extend `tests/capture/types.test.ts` first: 25 error codes with `guard-lost` and its fixed message (different from `connect-failed`); `GuardReasonCode` values; `CaptureWarning.reason` accepts `service-worker-blocked`.
-  - [ ] 2.2 Edit `lib/capture/types.ts` (`GuardReasonCode`, `guard-lost`, the internal-only comment on `CaptureError.detail`), `lib/capture/guard-types.ts` (reasons become `GuardReasonCode`) and `lib/capture/capture.ts` (type of the first refused reason).
-  - [ ] 2.3 Run `types.test.ts`, `capture-guards.test.ts`, then `npx tsc --noEmit`.
+- [x] 2. Guard reason codes and the `guard-lost` error
+  - [x] 2.1 Extend `tests/capture/types.test.ts` first: 25 error codes with `guard-lost` and its fixed message (different from `connect-failed`); `GuardReasonCode` values; `CaptureWarning.reason` accepts `service-worker-blocked`.
+  - [x] 2.2 Edit `lib/capture/types.ts` (`GuardReasonCode`, `guard-lost`, the internal-only comment on `CaptureError.detail`), `lib/capture/guard-types.ts` (reasons become `GuardReasonCode`) and `lib/capture/capture.ts` (type of the first refused reason).
+  - [x] 2.3 Run `types.test.ts`, `capture-guards.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 4.11, 14.6_
 
 - [ ] 3. Public "could not scan" outcome

@@ -2,13 +2,13 @@
  * Types of the request guard. Types only, no code. `seam.ts` and `request-guard.ts`
  * both import from here, so neither imports the other.
  */
-import type { UrlErrorCode } from "./types";
+import type { GuardReasonCode } from "./types";
 
-export type GuardVerdict = { allowed: true } | { allowed: false; reason: UrlErrorCode };
+export type GuardVerdict = { allowed: true } | { allowed: false; reason: GuardReasonCode };
 
 export type RequestGuardEvent =
   /** A request was refused. `mainFrame` is true only for a document request of the main frame. */
-  | { kind: "request-blocked"; reason: UrlErrorCode; mainFrame: boolean }
+  | { kind: "request-blocked"; reason: GuardReasonCode; mainFrame: boolean }
   /** A non-document request named a new host after `MAX_REQUEST_HOSTS` hosts had been seen. */
   | { kind: "request-host-limit" };
 

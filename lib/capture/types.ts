@@ -17,6 +17,17 @@ export type UrlErrorCode =
   | "url-address-blocked"
   | "dns-failed";
 
+/**
+ * Why the request guard refused one request. A warning reason, never a capture error:
+ * the four extra codes are not in `CaptureErrorCode`.
+ */
+export type GuardReasonCode =
+  | UrlErrorCode
+  | "service-worker-blocked"
+  | "host-limit-reached"
+  | "response-too-large"
+  | "response-rewrite-failed";
+
 export type CaptureErrorCode =
   | UrlErrorCode
   | "config-invalid"
@@ -34,7 +45,8 @@ export type CaptureErrorCode =
   | "snapshot-invalid"
   | "snapshot-too-large"
   | "capture-timeout"
-  | "internal-error";
+  | "internal-error"
+  | "guard-lost";
 
 export type CaptureWarningCode =
   | "session-stop-failed"
@@ -76,6 +88,7 @@ export const ERROR_MESSAGES: Record<CaptureErrorCode, string> = {
   "snapshot-too-large": "The captured page data is too large.",
   "capture-timeout": "The capture took too long.",
   "internal-error": "An internal error occurred during the capture.",
+  "guard-lost": "The safety check on the remote browser stopped working, so the capture was ended.",
 };
 
 /** Fixed text per warning code. The only source of `CaptureWarning.message`. */
@@ -95,15 +108,15 @@ export const WARNING_MESSAGES: Record<CaptureWarningCode, string> = {
 };
 
 /**
- * `detail` may contain text controlled by the page or by target URLs. It is for
- * server logs only and must never be shown to a user.
+ * Internal. `detail` may contain text controlled by the page or by target URLs. It is
+ * for server logs only: never show it to a user and never put it in a public outcome.
  */
 export type CaptureError = { code: CaptureErrorCode; message: string; detail?: string };
 /** `reason` and `count` are set on `request-blocked`. No warning field holds a URL or host. */
 export type CaptureWarning = {
   code: CaptureWarningCode;
   message: string;
-  reason?: UrlErrorCode;
+  reason?: GuardReasonCode;
   count?: number;
 };
 

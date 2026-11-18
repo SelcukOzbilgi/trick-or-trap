@@ -52,6 +52,7 @@ import {
   type CaptureWarning,
   type CaptureWarningCode,
   type CollectOptions,
+  type GuardReasonCode,
   type UrlErrorCode,
 } from "./types";
 import { checkUrl, checkUrlSyntax, type Resolver, type UrlCheckResult } from "./url-check";
@@ -81,7 +82,7 @@ type CaptureContext = {
   /** Set when a guard refused a main-frame navigation request. */
   navigationBlocked: boolean;
   /** Refused requests of this capture: how many, and the reason of the first. */
-  blocked: { count: number; reason?: UrlErrorCode };
+  blocked: { count: number; reason?: GuardReasonCode };
 };
 
 type CaptureSuccess = { snapshot: PageSnapshot; images: CaptureImage[] };
