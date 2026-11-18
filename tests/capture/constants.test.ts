@@ -80,6 +80,12 @@ describe("capture constants", () => {
     expect(constants.MAX_SNAPSHOT_BYTES).toBe(1_500_000);
   });
 
+  it("has the HTTP status and reload comparison values", () => {
+    expect(constants.HTTP_ERROR_STATUS_MIN).toBe(400);
+    expect(constants.RELOAD_ELEMENT_MIN_COUNT).toBe(50);
+    expect(constants.RELOAD_ELEMENT_RATIO_MAX).toBe(3);
+  });
+
   it("has the layout and plausibility values", () => {
     expect(constants.LAYOUT_DRIFT_PX).toBe(4);
     expect(constants.MAX_PLAUSIBLE_DPR).toBe(8);

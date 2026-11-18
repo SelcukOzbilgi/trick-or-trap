@@ -531,6 +531,81 @@ describe("capturePage: validation", () => {
   });
 });
 
+describe("capturePage: HTTP status of the main document", () => {
+  const codes = (result: CaptureResult): string[] => result.warnings.map((warning) => warning.code);
+
+  it("records a 404 in capture.httpStatus and adds http-error-status", async () => {
+    const { clock, deps } = setup({ gotoStatus: 404 });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.capture?.httpStatus).toBe(404);
+    expect(codes(result)).toContain("http-error-status");
+    const warning = result.warnings.find((item) => item.code === "http-error-status");
+    expect(Object.keys(warning ?? {}).sort()).toEqual(["code", "message"]);
+    expect(PageSnapshotSchema.safeParse(result.snapshot).success).toBe(true);
+  });
+
+  it("adds http-error-status at exactly 400 and not at 399", async () => {
+    const at = setup({ gotoStatus: 400 });
+    const below = setup({ gotoStatus: 399 });
+    const a = await drive(capturePage(URL_OK, at.deps), at.clock);
+    const b = await drive(capturePage(URL_OK, below.deps), below.clock);
+
+    expect(codes(a)).toContain("http-error-status");
+    expect(codes(b)).not.toContain("http-error-status");
+    expect(b.ok && b.snapshot.capture?.httpStatus).toBe(399);
+  });
+
+  it("records a 200 and adds no warning", async () => {
+    const { clock, deps } = setup({ gotoStatus: 200 });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.capture?.httpStatus).toBe(200);
+    expect(codes(result)).toEqual([]);
+  });
+
+  it("leaves httpStatus out and adds no warning when the status is absent", async () => {
+    const { clock, deps } = setup();
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.capture).not.toHaveProperty("httpStatus");
+    expect(codes(result)).toEqual([]);
+  });
+
+  it("records the reload status in the reload sample", async () => {
+    const { clock, deps } = setup({ gotoStatus: 200, reloadStatus: 200 });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.afterReload?.capture?.httpStatus).toBe(200);
+  });
+
+  it("does not use a status outside 100 to 599 and does not fail the capture", async () => {
+    const { clock, deps } = setup({ gotoStatus: 600 });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.snapshot.capture).not.toHaveProperty("httpStatus");
+    expect(codes(result)).not.toContain("http-error-status");
+  });
+
+  it("keeps http-error-status in the result of a capture that fails later", async () => {
+    const { clock, deps } = setup({ gotoStatus: 503, collect: new CaptureFailure("page-read-failed") });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(false);
+    expect(codes(result)).toContain("http-error-status");
+  });
+});
+
 describe("capturePage: logging", () => {
   it("calls no console method on success or on failure", async () => {
     const spies = (["log", "info", "warn", "error", "debug", "trace"] as const).map((method) =>

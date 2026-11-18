@@ -61,6 +61,8 @@ const WARNING_CODES: CaptureWarningCode[] = [
   "request-blocked",
   "request-host-limit",
   "layout-shifted",
+  "http-error-status",
+  "reload-differs",
 ];
 
 function expectSafeText(text: string): void {
@@ -134,8 +136,8 @@ describe("GuardReasonCode", () => {
 });
 
 describe("WARNING_MESSAGES", () => {
-  it("has exactly the 12 warning codes", () => {
-    expect(WARNING_CODES).toHaveLength(12);
+  it("has exactly the 14 warning codes", () => {
+    expect(WARNING_CODES).toHaveLength(14);
     expect(Object.keys(WARNING_MESSAGES).sort()).toEqual([...WARNING_CODES].sort());
   });
 
@@ -146,6 +148,14 @@ describe("WARNING_MESSAGES", () => {
   it("has distinct messages for the new warning codes", () => {
     expect(WARNING_MESSAGES["request-host-limit"]).not.toBe(WARNING_MESSAGES["request-blocked"]);
     expect(WARNING_MESSAGES["layout-shifted"]).toBeTruthy();
+  });
+
+  it("has distinct fixed messages for http-error-status and reload-differs", () => {
+    expect(WARNING_MESSAGES["http-error-status"]).toBeTruthy();
+    expect(WARNING_MESSAGES["reload-differs"]).toBeTruthy();
+    expect(WARNING_MESSAGES["http-error-status"]).not.toBe(WARNING_MESSAGES["reload-differs"]);
+    const all = Object.values(WARNING_MESSAGES);
+    expect(new Set(all).size).toBe(all.length);
   });
 });
 

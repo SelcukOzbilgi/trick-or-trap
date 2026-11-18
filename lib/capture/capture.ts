@@ -20,6 +20,7 @@ import {
   BROWSER_VIEWPORT,
   CAPTURE_TIMEOUT_MS,
   COLLECT_LIMITS,
+  HTTP_ERROR_STATUS_MIN,
   MAX_ATTR_CHARS,
   MAX_ELEMENTS,
   MAX_ELEMENTS_LIGHT,
@@ -28,6 +29,8 @@ import {
   MAX_TEXT_CHARS,
   MAX_TEXT_CHARS_LIGHT,
   NAVIGATION_TIMEOUT_MS,
+  RELOAD_ELEMENT_MIN_COUNT,
+  RELOAD_ELEMENT_RATIO_MAX,
   RELOAD_MIN_REMAINING_MS,
   SETTLE_DELAY_MS,
   STOP_TIMEOUT_MS,
@@ -41,7 +44,7 @@ import { createGuardPolicy } from "./guard-policy";
 import { redactText, toDetail } from "./redact";
 import { createDnsResolver } from "./resolver";
 import { captureImages } from "./screenshots";
-import type { BrowserProvider, BrowserSessionHandle, GetBrowserResult } from "./seam";
+import type { BrowserProvider, BrowserSessionHandle, GetBrowserResult, NavigationOutcome } from "./seam";
 import {
   CaptureFailure,
   ERROR_MESSAGES,
@@ -115,6 +118,28 @@ function sleep(clock: Clock, ms: number): Promise<void> {
 }
 
 function ignore(): void {}
+
+/** The status of a navigation as a number the snapshot schema accepts, or `undefined`. */
+function validStatus(status: number | undefined): number | undefined {
+  return typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599 ? status : undefined;
+}
+
+/**
+ * Whether the reload sample shows another page than the first read: another final URL,
+ * an error status on the reload, or element counts that differ by more than
+ * `RELOAD_ELEMENT_RATIO_MAX` when the larger count reaches `RELOAD_ELEMENT_MIN_COUNT`.
+ */
+function reloadDiffers(first: BaseSnapshot, second: BaseSnapshot): boolean {
+  if (first.url !== second.url) return true;
+  const status = second.capture?.httpStatus;
+  if (status !== undefined && status >= HTTP_ERROR_STATUS_MIN) return true;
+  const a = first.capture?.eligibleElementCount;
+  const b = second.capture?.eligibleElementCount;
+  if (a === undefined || b === undefined) return false;
+  const larger = Math.max(a, b);
+  const smaller = Math.min(a, b);
+  return larger >= RELOAD_ELEMENT_MIN_COUNT && larger > RELOAD_ELEMENT_RATIO_MAX * smaller;
+}
 
 /** Passes a promise to `deps.waitUntil`. A missing or throwing `waitUntil` changes nothing. */
 function handOff(deps: Partial<CaptureDeps>, promise: Promise<unknown>): void {
@@ -355,7 +380,7 @@ async function runCapture(
   await step(() => page.installGuards(policy), "connect-failed");
 
   // 5. Navigation, then the same checks on where the browser ended up.
-  let navigation: { finalUrl: string };
+  let navigation: NavigationOutcome;
   try {
     navigation = await step(() => page.goto(requested.url, { timeoutMs: NAVIGATION_TIMEOUT_MS }), "navigation-failed", {
       ms: NAVIGATION_TIMEOUT_MS,
@@ -369,6 +394,8 @@ async function runCapture(
   const landed = await step(() => inspect(navigation.finalUrl, MAX_HOP_URL_LENGTH));
   if (!landed.ok) throw new CaptureFailure("navigation-blocked");
   if (landed.url !== requested.url) ctx.warnings.add("redirected");
+  const firstStatus = validStatus(navigation.status);
+  if (firstStatus !== undefined && firstStatus >= HTTP_ERROR_STATUS_MIN) ctx.warnings.add("http-error-status");
 
   // 6. Settle, 7. one read of the page.
   await step(() => sleep(clock, SETTLE_DELAY_MS));
@@ -423,6 +450,8 @@ async function runCapture(
         url: reloadedAt.url,
         capturedAt: new Date(clock.now()).toISOString(),
       });
+      const reloadStatus = validStatus(reloaded.status);
+      if (reloadStatus !== undefined && second.capture) second.capture.httpStatus = reloadStatus;
       const checked = BaseSnapshotSchema.safeParse(second);
       if (!checked.success) throw new CaptureFailure("snapshot-invalid");
       return checked.data;
@@ -434,6 +463,7 @@ async function runCapture(
     }
   };
   const sample = buildSample(raw, { light: false, url: landed.url, capturedAt, images: shots.meta });
+  if (firstStatus !== undefined && sample.capture) sample.capture.httpStatus = firstStatus;
   if (sample.capture?.elementsTruncated) ctx.warnings.add("elements-truncated");
 
   /**
@@ -468,6 +498,8 @@ async function runCapture(
     assembled = sample;
     ctx.warnings.add("reload-failed");
   }
+  // Only a reload sample that stays in the snapshot is compared with the first read.
+  if (afterReload && assembled !== sample && reloadDiffers(sample, afterReload)) ctx.warnings.add("reload-differs");
   if (snapshotBytes(assembled) > MAX_SNAPSHOT_BYTES) throw new CaptureFailure("snapshot-too-large");
   const parsed = PageSnapshotSchema.safeParse(assembled);
   if (!parsed.success) {

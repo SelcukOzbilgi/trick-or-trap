@@ -60,7 +60,9 @@ export type CaptureWarningCode =
   | "popup-closed"
   | "request-blocked"
   | "request-host-limit"
-  | "layout-shifted";
+  | "layout-shifted"
+  | "http-error-status"
+  | "reload-differs";
 
 /** Fixed text per error code. The only source of `CaptureError.message`. */
 export const ERROR_MESSAGES: Record<CaptureErrorCode, string> = {
@@ -105,6 +107,8 @@ export const WARNING_MESSAGES: Record<CaptureWarningCode, string> = {
   "request-blocked": "A navigation request was blocked by a safety check.",
   "request-host-limit": "The page contacted more hosts than the limit, so further requests to new hosts were blocked.",
   "layout-shifted": "The page layout moved while it was captured, so markers may be off.",
+  "http-error-status": "The page answered with an error status, so what was captured may be an error page.",
+  "reload-differs": "The page after the reload differs from the first load, so comparing the two reads may mislead.",
 };
 
 /**

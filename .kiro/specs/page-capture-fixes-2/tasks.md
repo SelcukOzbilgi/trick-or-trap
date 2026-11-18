@@ -86,10 +86,10 @@ Rules for every task:
   - [x] 12.3 Run `remote-browser.test.ts`, `fake-browser.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 12.1, 12.2, 12.3_
 
-- [ ] 13. Status warning, `httpStatus` and the reload check
-  - [ ] 13.1 Extend first: `tests/types/capture-meta.test.ts` (`httpStatus` absent, 100, 599 accepted; 99, 600, 200.5 rejected), `tests/capture/types.test.ts` (14 warning codes), `capture.test.ts` (404 gives `http-error-status` and `capture.httpStatus` 404; 200 and absent give none) and `capture-reload.test.ts` (URL change, reload 500, 11 against 750 give `reload-differs` with `afterReload` kept; 40 against 10 and 100 against 300 give none).
-  - [ ] 13.2 Edit `lib/types/index.ts`, `lib/capture/types.ts`, `lib/capture/capture.ts`, `constants.ts` with `constants.test.ts`.
-  - [ ] 13.3 Run the four test files, `constants.test.ts`, `npx vitest run tests/types/schemas.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+- [x] 13. Status warning, `httpStatus` and the reload check
+  - [x] 13.1 Extend first: `tests/types/capture-meta.test.ts` (`httpStatus` absent, 100, 599 accepted; 99, 600, 200.5 rejected), `tests/capture/types.test.ts` (14 warning codes), `capture.test.ts` (404 gives `http-error-status` and `capture.httpStatus` 404; 200 and absent give none) and `capture-reload.test.ts` (URL change, reload 500, 11 against 750 give `reload-differs` with `afterReload` kept; 40 against 10 and 100 against 300 give none).
+  - [x] 13.2 Edit `lib/types/index.ts`, `lib/capture/types.ts`, `lib/capture/capture.ts`, `constants.ts` with `constants.test.ts`.
+  - [x] 13.3 Run the four test files, `constants.test.ts`, `npx vitest run tests/types/schemas.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 12.4, 12.5, 12.6, 12.7, 12.8, 13.1, 13.2, 13.3, 13.4, 13.5_
 
 - [ ] 14. Fixture page builders

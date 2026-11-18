@@ -55,6 +55,13 @@ export const LAYOUT_DRIFT_PX = 4;
 export const MAX_PLAUSIBLE_DPR = 8;
 export const MAX_PLAUSIBLE_PX = 1_000_000;
 
+/** A main-document status at or above this value gives the warning `http-error-status`. */
+export const HTTP_ERROR_STATUS_MIN = 400;
+/** The reload sample is compared by element count only when the larger count reaches this value. */
+export const RELOAD_ELEMENT_MIN_COUNT = 50;
+/** The larger eligible element count of the two samples may be at most this many times the smaller. */
+export const RELOAD_ELEMENT_RATIO_MAX = 3;
+
 /** Limits the in-page collector applies, so less data crosses CDP. */
 export const COLLECT_LIMITS: CollectLimits = {
   maxTagChars: MAX_TAG_CHARS,
