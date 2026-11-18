@@ -73,11 +73,11 @@ Rules for every task:
   - [x] 10.3 Run `collector-dom.test.ts`, `extractor.test.ts`, `cdp.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7_
 
-- [ ] 11. Session listing with `filterBy=active` and paging
-  - [ ] 11.1 Edit `tests/capture/browser-use-api.test.ts` first: replace the pinned `?status=active` URL (now wrong, named here) with the exact URLs of 10.1 and 10.2; paging stops on empty `items`, on `n × 100 >= totalItems`, on a missing `totalItems` and at `SESSION_LIST_MAX_PAGES`; no stop before the last page; a failing page keeps earlier selections; the counts cover all pages and hold no id; the existing never-reject and untagged cases stay.
-  - [ ] 11.2 In `tests/capture/remote-browser.test.ts`, change the reclaim expectation from `?status=active` to the 10.1 URL (named here).
-  - [ ] 11.3 Edit `lib/capture/browser-use-api.ts` (`activeSessionsUrl`, paging) and `constants.ts` with `constants.test.ts`.
-  - [ ] 11.4 Run `browser-use-api.test.ts`, `remote-browser.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
+- [x] 11. Session listing with `filterBy=active` and paging
+  - [x] 11.1 Edit `tests/capture/browser-use-api.test.ts` first: replace the pinned `?status=active` URL (now wrong, named here) with the exact URLs of 10.1 and 10.2; paging stops on empty `items`, on `n × 100 >= totalItems`, on a missing `totalItems` and at `SESSION_LIST_MAX_PAGES`; no stop before the last page; a failing page keeps earlier selections; the counts cover all pages and hold no id; the existing never-reject and untagged cases stay.
+  - [x] 11.2 In `tests/capture/remote-browser.test.ts`, change the reclaim expectation from `?status=active` to the 10.1 URL (named here).
+  - [x] 11.3 Edit `lib/capture/browser-use-api.ts` (`activeSessionsUrl`, paging) and `constants.ts` with `constants.test.ts`.
+  - [x] 11.4 Run `browser-use-api.test.ts`, `remote-browser.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 10.10, 10.11_
 
 - [ ] 12. HTTP status through the seam

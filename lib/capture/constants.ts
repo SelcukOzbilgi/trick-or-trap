@@ -87,6 +87,10 @@ export const HARDENING_CSP = "connect-src http: https: data: blob:";
 export const STOP_TIMEOUT_MS = 10_000;
 /** A tagged session older than this is stopped by the sweep helper. */
 export const STALE_SESSION_AGE_MS = 120_000;
+/** Sessions per list call: the vendor's largest page size. */
+export const SESSION_LIST_PAGE_SIZE = 100;
+/** Most pages one sweep reads, so 2,000 sessions at most. */
+export const SESSION_LIST_MAX_PAGES = 20;
 
 /**
  * Attribute names that name an outcome. A name that holds one of these fragments is

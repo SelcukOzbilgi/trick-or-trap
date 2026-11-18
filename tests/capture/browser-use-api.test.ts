@@ -3,13 +3,19 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import {
+  activeSessionsUrl,
   createSession,
   proxyBodyFields,
   reclaimSession,
   stopSession,
   sweepStaleSessions,
 } from "@/lib/capture/browser-use-api";
-import { API_FETCH_TIMEOUT_MS, STALE_SESSION_AGE_MS } from "@/lib/capture/constants";
+import {
+  API_FETCH_TIMEOUT_MS,
+  SESSION_LIST_MAX_PAGES,
+  SESSION_LIST_PAGE_SIZE,
+  STALE_SESSION_AGE_MS,
+} from "@/lib/capture/constants";
 import { CaptureFailure } from "@/lib/capture/types";
 import { createManualClock } from "./helpers/manual-clock";
 
@@ -26,7 +32,11 @@ const REQUEST = {
   captureId: CAPTURE_ID,
 };
 
-const LIST_URL = "https://api.browser-use.com/api/v4/browsers?status=active";
+const LIST_BASE = "https://api.browser-use.com/api/v4/browsers?filterBy=active&metadata=app%3Dtrick-or-trap";
+/** The sweep's list URL for page `n` (requirement 10.2). */
+const sweepUrl = (n: number): string => `${LIST_BASE}&pageSize=100&pageNumber=${n}`;
+/** Reclaim's list URL for `capture-id-sentinel` (requirement 10.1). */
+const RECLAIM_URL = `${LIST_BASE}&metadata=captureId%3Dcapture-id-sentinel&pageSize=100&pageNumber=1`;
 
 type FetchCall = { url: string; init: RequestInit };
 
@@ -380,7 +390,7 @@ describe("reclaimSession", () => {
 
     await reclaimSession({ fetch, clock, apiKey: API_KEY }, CAPTURE_ID);
 
-    expect(calls[0].url).toBe(LIST_URL);
+    expect(calls[0].url).toBe(RECLAIM_URL);
     expect(calls[0].init.method).toBe("GET");
     expect((calls[0].init.headers as Record<string, string>)["X-Browser-Use-API-Key"]).toBe(API_KEY);
     expect(patchedIds(calls)).toEqual(["mine"]);
@@ -508,7 +518,7 @@ describe("sweepStaleSessions", () => {
 
     const result = await sweepStaleSessions({ fetch, clock, apiKey: API_KEY, now: () => NOW });
 
-    expect(calls[0].url).toBe(LIST_URL);
+    expect(calls[0].url).toBe(sweepUrl(1));
     expect(patchedIds(calls).sort()).toEqual(["stale-created", "stale-started"]);
     expect(result).toEqual({ listed: 9, stopped: 2, failed: 0 });
   });
@@ -563,6 +573,256 @@ describe("sweepStaleSessions", () => {
       stopped: 0,
       failed: 0,
     });
+  });
+});
+
+describe("activeSessionsUrl", () => {
+  it("builds the sweep URL without a capture id", () => {
+    expect(activeSessionsUrl(1)).toBe(sweepUrl(1));
+    expect(activeSessionsUrl(7)).toBe(sweepUrl(7));
+  });
+
+  it("builds the reclaim URL with the capture id as a second metadata filter", () => {
+    expect(activeSessionsUrl(1, CAPTURE_ID)).toBe(
+      `${LIST_BASE}&metadata=captureId%3D${CAPTURE_ID}&pageSize=100&pageNumber=1`,
+    );
+  });
+
+  it("encodes the whole captureId=value pair", () => {
+    expect(activeSessionsUrl(1, "a b&c=d")).toContain("&metadata=captureId%3Da%20b%26c%3Dd&");
+  });
+
+  it("filters with filterBy and never with the parameter status", () => {
+    for (const url of [activeSessionsUrl(1), activeSessionsUrl(2, CAPTURE_ID)]) {
+      const params = new URL(url).searchParams;
+      expect(params.get("filterBy")).toBe("active");
+      expect(params.has("status")).toBe(false);
+      expect(params.get("pageSize")).toBe(String(SESSION_LIST_PAGE_SIZE));
+    }
+  });
+});
+
+describe("the session list constants", () => {
+  it("uses the vendor's largest page and a bounded page count", () => {
+    expect(SESSION_LIST_PAGE_SIZE).toBe(100);
+    expect(SESSION_LIST_MAX_PAGES).toBe(20);
+  });
+});
+
+describe("paging of the list calls", () => {
+  const NOW = Date.parse("2026-01-01T12:00:00.000Z");
+  const OLD = new Date(NOW - 10 * STALE_SESSION_AGE_MS).toISOString();
+  const TAG = { app: "trick-or-trap" };
+
+  type PageScript = { status?: number; body?: unknown; throws?: boolean };
+
+  /**
+   * A fetch whose list answer depends on the `pageNumber` of the URL. A page with no
+   * script answers with an empty `items` list. Every PATCH answers 200.
+   */
+  function createPagedFetch(pages: Record<number, PageScript>) {
+    return createFakeFetch(async (call) => {
+      if (call.init.method !== "GET") return jsonResponse({});
+      const n = Number(new URL(call.url).searchParams.get("pageNumber"));
+      const script = pages[n] ?? { body: { items: [], totalItems: 0 } };
+      if (script.throws) throw new Error(`list failed ${API_KEY}`);
+      return jsonResponse(script.body, script.status ?? 200);
+    });
+  }
+
+  const staleItem = (id: string) => listItem(id, TAG, { startedAt: OLD });
+  const getUrls = (calls: FetchCall[]) => calls.filter((call) => call.init.method === "GET").map((call) => call.url);
+  const sweep = (fetch: typeof globalThis.fetch) =>
+    sweepStaleSessions({ fetch, clock: createManualClock(), apiKey: API_KEY, now: () => NOW });
+
+  it("reads pages 1, 2 and 3 for 250 sessions and stops after the third", async () => {
+    const { fetch, calls } = createPagedFetch({
+      1: { body: { items: [staleItem("a")], totalItems: 250 } },
+      2: { body: { items: [staleItem("b")], totalItems: 250 } },
+      3: { body: { items: [staleItem("c")], totalItems: 250 } },
+      4: { body: { items: [staleItem("never")], totalItems: 250 } },
+    });
+
+    const result = await sweep(fetch);
+
+    expect(getUrls(calls)).toEqual([sweepUrl(1), sweepUrl(2), sweepUrl(3)]);
+    expect(patchedIds(calls).sort()).toEqual(["a", "b", "c"]);
+    expect(result).toEqual({ listed: 3, stopped: 3, failed: 0 });
+  });
+
+  it("stops paging when n times the page size reaches totalItems exactly", async () => {
+    const { fetch, calls } = createPagedFetch({
+      1: { body: { items: [staleItem("a")], totalItems: 200 } },
+      2: { body: { items: [staleItem("b")], totalItems: 200 } },
+      3: { body: { items: [staleItem("never")], totalItems: 200 } },
+    });
+
+    await sweep(fetch);
+
+    expect(getUrls(calls)).toEqual([sweepUrl(1), sweepUrl(2)]);
+  });
+
+  it("reads a second page when totalItems is one above the first page", async () => {
+    const { fetch, calls } = createPagedFetch({
+      1: { body: { items: [staleItem("a")], totalItems: 101 } },
+      2: { body: { items: [staleItem("b")], totalItems: 101 } },
+    });
+
+    await sweep(fetch);
+
+    expect(getUrls(calls)).toEqual([sweepUrl(1), sweepUrl(2)]);
+  });
+
+  it("stops paging on an empty items list", async () => {
+    const { fetch, calls } = createPagedFetch({
+      1: { body: { items: [staleItem("a")], totalItems: 900 } },
+      2: { body: { items: [], totalItems: 900 } },
+      3: { body: { items: [staleItem("never")], totalItems: 900 } },
+    });
+
+    const result = await sweep(fetch);
+
+    expect(getUrls(calls)).toEqual([sweepUrl(1), sweepUrl(2)]);
+    expect(patchedIds(calls)).toEqual(["a"]);
+    expect(result).toEqual({ listed: 1, stopped: 1, failed: 0 });
+  });
+
+  it.each([
+    ["missing", { items: [staleItem("a")] }],
+    ["not a number", { items: [staleItem("a")], totalItems: "900" }],
+    ["null", { items: [staleItem("a")], totalItems: null }],
+  ])("stops after the first page when totalItems is %s", async (_label, body) => {
+    const { fetch, calls } = createPagedFetch({
+      1: { body },
+      2: { body: { items: [staleItem("never")], totalItems: 900 } },
+    });
+
+    await sweep(fetch);
+
+    expect(getUrls(calls)).toEqual([sweepUrl(1)]);
+    expect(patchedIds(calls)).toEqual(["a"]);
+  });
+
+  it("stops after SESSION_LIST_MAX_PAGES pages however large totalItems is", async () => {
+    const { fetch, calls } = createFakeFetch(async (call) => {
+      if (call.init.method !== "GET") return jsonResponse({});
+      const n = Number(new URL(call.url).searchParams.get("pageNumber"));
+      return jsonResponse({ items: [staleItem(`s${n}`)], totalItems: 1_000_000 });
+    });
+
+    const result = await sweep(fetch);
+
+    const urls = getUrls(calls);
+    expect(urls).toHaveLength(SESSION_LIST_MAX_PAGES);
+    expect(urls[0]).toBe(sweepUrl(1));
+    expect(urls[SESSION_LIST_MAX_PAGES - 1]).toBe(sweepUrl(SESSION_LIST_MAX_PAGES));
+    expect(result).toEqual({ listed: SESSION_LIST_MAX_PAGES, stopped: SESSION_LIST_MAX_PAGES, failed: 0 });
+  });
+
+  it("sends the first stop only after the last page was read", async () => {
+    const { fetch, calls } = createPagedFetch({
+      1: { body: { items: [staleItem("a")], totalItems: 250 } },
+      2: { body: { items: [staleItem("b")], totalItems: 250 } },
+      3: { body: { items: [staleItem("c")], totalItems: 250 } },
+    });
+
+    await sweep(fetch);
+
+    const methods = calls.map((call) => call.init.method);
+    expect(methods).toEqual(["GET", "GET", "GET", "PATCH", "PATCH", "PATCH"]);
+  });
+
+  it("keeps the sessions selected on earlier pages when a later page answers with an HTTP error", async () => {
+    const { fetch, calls } = createPagedFetch({
+      1: { body: { items: [staleItem("a")], totalItems: 500 } },
+      2: { status: 500, body: {} },
+      3: { body: { items: [staleItem("never")], totalItems: 500 } },
+    });
+
+    const result = await sweep(fetch);
+
+    expect(getUrls(calls)).toEqual([sweepUrl(1), sweepUrl(2)]);
+    expect(patchedIds(calls)).toEqual(["a"]);
+    expect(result).toEqual({ listed: 1, stopped: 1, failed: 0 });
+  });
+
+  it("keeps the sessions selected on earlier pages when a later page call fails", async () => {
+    const { fetch, calls } = createPagedFetch({
+      1: { body: { items: [staleItem("a")], totalItems: 500 } },
+      2: { throws: true },
+    });
+
+    const result = await sweep(fetch);
+
+    expect(getUrls(calls)).toEqual([sweepUrl(1), sweepUrl(2)]);
+    expect(patchedIds(calls)).toEqual(["a"]);
+    expect(result).toEqual({ listed: 1, stopped: 1, failed: 0 });
+  });
+
+  it("keeps the sessions selected on earlier pages when a later page body cannot be read", async () => {
+    const { fetch, calls } = createFakeFetch(async (call) => {
+      if (call.init.method !== "GET") return jsonResponse({});
+      const n = Number(new URL(call.url).searchParams.get("pageNumber"));
+      if (n === 1) return jsonResponse({ items: [staleItem("a")], totalItems: 500 });
+      return new Response("<html>", { status: 200 });
+    });
+
+    await sweep(fetch);
+
+    expect(getUrls(calls)).toEqual([sweepUrl(1), sweepUrl(2)]);
+    expect(patchedIds(calls)).toEqual(["a"]);
+  });
+
+  it("stops nothing when the first page fails", async () => {
+    const { fetch, calls } = createPagedFetch({ 1: { status: 503, body: {} } });
+
+    const result = await sweep(fetch);
+
+    expect(calls).toHaveLength(1);
+    expect(result).toEqual({ listed: 0, stopped: 0, failed: 0 });
+  });
+
+  it("counts listed, stopped and failed over all pages and holds no session id", async () => {
+    const fresh = listItem("fresh-one", TAG, { startedAt: new Date(NOW - 1_000).toISOString() });
+    const { fetch } = createFakeFetch(async (call) => {
+      if (call.init.method === "GET") {
+        const n = Number(new URL(call.url).searchParams.get("pageNumber"));
+        return jsonResponse(
+          n === 1
+            ? { items: [staleItem("page-one-stale"), fresh], totalItems: 150 }
+            : { items: [staleItem("page-two-stale"), staleItem("page-two-fails")], totalItems: 150 },
+        );
+      }
+      return jsonResponse({}, call.url.endsWith("page-two-fails") ? 500 : 200);
+    });
+
+    const result = await sweep(fetch);
+
+    expect(result).toEqual({ listed: 4, stopped: 2, failed: 1 });
+    expect(JSON.stringify(result)).not.toContain("page-");
+  });
+
+  it("stops a session that appears on two pages only once", async () => {
+    const { fetch, calls } = createPagedFetch({
+      1: { body: { items: [staleItem("same")], totalItems: 150 } },
+      2: { body: { items: [staleItem("same")], totalItems: 150 } },
+    });
+
+    await sweep(fetch);
+
+    expect(patchedIds(calls)).toEqual(["same"]);
+  });
+
+  it("makes the reclaim read one page only, however large totalItems is", async () => {
+    const { fetch, calls } = createPagedFetch({
+      1: { body: { items: [listItem("mine", { captureId: CAPTURE_ID })], totalItems: 5_000 } },
+      2: { body: { items: [listItem("never", { captureId: CAPTURE_ID })], totalItems: 5_000 } },
+    });
+
+    await reclaimSession({ fetch, clock: createManualClock(), apiKey: API_KEY }, CAPTURE_ID);
+
+    expect(getUrls(calls)).toEqual([RECLAIM_URL]);
+    expect(patchedIds(calls)).toEqual(["mine"]);
   });
 });
 

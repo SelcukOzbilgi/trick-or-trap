@@ -1425,7 +1425,7 @@ describe("capture id and reclaim", () => {
     await provider.reclaim?.("capture-id-sentinel");
 
     expect(calls.map((call) => `${call.method} ${call.url}`)).toEqual([
-      "GET https://api.browser-use.com/api/v4/browsers?status=active",
+      "GET https://api.browser-use.com/api/v4/browsers?filterBy=active&metadata=app%3Dtrick-or-trap&metadata=captureId%3Dcapture-id-sentinel&pageSize=100&pageNumber=1",
       "PATCH https://api.browser-use.com/api/v4/browsers/mine",
     ]);
   });

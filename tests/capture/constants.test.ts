@@ -62,6 +62,11 @@ describe("capture constants", () => {
     expect(constants.STALE_SESSION_AGE_MS).toBe(120_000);
   });
 
+  it("has the session list paging values", () => {
+    expect(constants.SESSION_LIST_PAGE_SIZE).toBe(100);
+    expect(constants.SESSION_LIST_MAX_PAGES).toBe(20);
+  });
+
   it("has the size bounds for page data", () => {
     expect(constants.MAX_TAG_CHARS).toBe(64);
     expect(constants.MAX_ROLE_CHARS).toBe(64);
