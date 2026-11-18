@@ -78,14 +78,14 @@ Rules for every task:
   - [x] 6.6 Run `npx vitest run tests/detectors/fake-urgency.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 2.1, 2.5, 2.6, 2.7, 3.4, 3.5, 3.8, 7.16, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.10, 8.11, 8.14, 8.15, 8.16, 8.17, 8.18, 8.19, 14.5_
 
-- [ ] 7. fake-scarcity detector
+- [x] 7. fake-scarcity detector
   - Uses: tasks 2 to 4 helpers (`tokenise`, `findPhrases`, `buildSamplePair`, `findCounterpart`, `finaliseFindings`).
   - Files: creates `lib/detectors/data/scarcity-words.ts` and `tests/detectors/fake-scarcity.test.ts`; edits `lib/detectors/fake-scarcity.ts`.
-  - [ ] 7.1 Create `tests/detectors/fake-scarcity.test.ts` first, reload rows: a differing qualified pair gives S1 high; a coinciding pair gives S3 medium; no reload never gives S1 or S2; a bare "3 left" equal in both samples gives nothing; a bare count that changes gives S2; evidence holds both numbers and the gap; English and Turkish for each.
-  - [ ] 7.2 In the same file, text rows and look-alikes: "supported" by number ≤ 10, "!", an urgency word or a second claim (S3), else S4; look-alikes ("2 items in your cart", "120 reviews", "$5 left for free shipping", "sepetinizde 2 ürün") give nothing; unquantified wording ("Selling fast", "Tükenmek üzere") gives S5 low; Spanish "¡Solo quedan 2!" gives nothing; empty and non-object inputs give `[]`.
-  - [ ] 7.3 Create `lib/detectors/data/scarcity-words.ts` with the lists of design section 9.2.
-  - [ ] 7.4 Replace the stub in `lib/detectors/fake-scarcity.ts` with `detectFakeScarcity`, wrapped in `try`/`catch` returning `[]`.
-  - [ ] 7.5 Run `npx vitest run tests/detectors/fake-scarcity.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+  - [x] 7.1 Create `tests/detectors/fake-scarcity.test.ts` first, reload rows: a differing qualified pair gives S1 high; a coinciding pair gives S3 medium; no reload never gives S1 or S2; a bare "3 left" equal in both samples gives nothing; a bare count that changes gives S2; evidence holds both numbers and the gap; English and Turkish for each.
+  - [x] 7.2 In the same file, text rows and look-alikes: "supported" by number ≤ 10, "!", an urgency word or a second claim (S3), else S4; look-alikes ("2 items in your cart", "120 reviews", "$5 left for free shipping", "sepetinizde 2 ürün") give nothing; unquantified wording ("Selling fast", "Tükenmek üzere") gives S5 low; Spanish "¡Solo quedan 2!" gives nothing; empty and non-object inputs give `[]`.
+  - [x] 7.3 Create `lib/detectors/data/scarcity-words.ts` with the lists of design section 9.2.
+  - [x] 7.4 Replace the stub in `lib/detectors/fake-scarcity.ts` with `detectFakeScarcity`, wrapped in `try`/`catch` returning `[]`.
+  - [x] 7.5 Run `npx vitest run tests/detectors/fake-scarcity.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 3.4, 3.5, 3.8, 7.15, 7.16, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 14.5_
 
 - [ ] 8. fake-activity detector
