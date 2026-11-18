@@ -36,7 +36,12 @@ export interface BrowserSessionHandle {
   secrets(): readonly string[];
 }
 
-export type GuardEvent = RequestGuardEvent | { kind: "download-refused" } | { kind: "popup-closed" };
+export type GuardEvent =
+  | RequestGuardEvent
+  | { kind: "download-refused" }
+  | { kind: "popup-closed" }
+  /** The guard session or the browser connection is gone: the capture must end. Never a warning. */
+  | { kind: "guard-lost" };
 
 /** Assignable to `RequestPolicy`: the request guard takes it as its policy. */
 export interface PageGuards {

@@ -231,6 +231,19 @@ describe("fake browser guards and hops", () => {
     fake.emit({ kind: "download-refused" });
     expect(reported).toEqual([{ kind: "download-refused" }]);
   });
+
+  it("lets a test lose the guard with one call", async () => {
+    const { fake, page } = await openPage();
+    const { guards, reported } = guardsAllowing([]);
+    await page.installGuards(guards);
+    fake.loseGuard();
+    expect(reported).toEqual([{ kind: "guard-lost" }]);
+  });
+
+  it("does nothing when the guard is lost before guards are installed", async () => {
+    const fake = createFakeBrowser();
+    expect(() => fake.loseGuard()).not.toThrow();
+  });
 });
 
 describe("fake browser secrets", () => {

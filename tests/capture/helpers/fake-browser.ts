@@ -61,6 +61,8 @@ export interface FakeBrowser {
   guards: PageGuards | undefined;
   /** Sends a guard event to the installed guards. */
   emit(event: GuardEvent): void;
+  /** Reports the loss of the guard, as the adapter does when the guard session closes. */
+  loseGuard(): void;
 }
 
 export function createRawPageRead(overrides: Partial<RawPageRead> = {}): RawPageRead {
@@ -206,6 +208,9 @@ export function createFakeBrowser(script: FakeScript = {}): FakeBrowser {
     guards: undefined,
     emit(event) {
       fake.guards?.report(event);
+    },
+    loseGuard() {
+      fake.guards?.report({ kind: "guard-lost" });
     },
   };
   return fake;

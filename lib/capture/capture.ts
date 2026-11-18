@@ -83,6 +83,13 @@ type CaptureContext = {
   navigationBlocked: boolean;
   /** Refused requests of this capture: how many, and the reason of the first. */
   blocked: { count: number; reason?: GuardReasonCode };
+  /** Set when the guard was lost while the capture ran. From then on nothing is used and the capture fails. */
+  lost: boolean;
+  /** Rejects with `guard-lost` at the moment of the loss. Every stage races against it. */
+  whenLost: Promise<never>;
+  rejectLost: (error: CaptureFailure) => void;
+  /** The one stop of this capture, once it has started (by a loss or by the clean-up). */
+  stopping?: Promise<void>;
 };
 
 type CaptureSuccess = { snapshot: PageSnapshot; images: CaptureImage[] };
@@ -186,6 +193,19 @@ async function stopSafely(handle: BrowserSessionHandle, clock: Clock, warnings: 
 }
 
 /**
+ * Starts the one stop of the capture, or returns the stop already running. The promise
+ * goes to the platform as well, so a frozen function still finishes the stop. Without a
+ * session handle there is nothing to stop and the result is `undefined`.
+ */
+function startStop(ctx: CaptureContext, clock: Clock, deps: Partial<CaptureDeps>): Promise<void> | undefined {
+  if (ctx.stopping) return ctx.stopping;
+  if (!ctx.handle) return undefined;
+  ctx.stopping = stopSafely(ctx.handle, clock, ctx.warnings);
+  handOff(deps, ctx.stopping);
+  return ctx.stopping;
+}
+
+/**
  * One clean-up attempt after a create call that may have left a session behind. It is
  * bounded by `STOP_TIMEOUT_MS`, handed to `waitUntil` and never throws; a failure or a
  * timeout changes nothing in the result.
@@ -212,15 +232,32 @@ async function runCapture(
   ctx: CaptureContext,
 ): Promise<CaptureSuccess> {
   const deadline = createDeadline(clock, CAPTURE_TIMEOUT_MS);
+  /** Fails with `guard-lost` once the guard is lost. A shared constructor so every path gives the same error. */
+  const lostFailure = (): CaptureFailure => new CaptureFailure("guard-lost");
+  /**
+   * Races `op` against the loss of the guard. When the guard is lost, `op` is not
+   * waited for: its later outcome is absorbed. A result that arrives at the moment of
+   * the loss is not used either.
+   */
+  const guarded = async <T>(op: Promise<T>): Promise<T> => {
+    if (ctx.lost) {
+      op.then(ignore, ignore);
+      throw lostFailure();
+    }
+    const value = await Promise.race([op, ctx.whenLost]);
+    if (ctx.lost) throw lostFailure();
+    return value;
+  };
   /**
    * Runs one step inside the whole-capture budget, or inside `limit` when that is
    * shorter. A synchronous throw becomes a rejection. An error that is not a
    * `CaptureFailure` gets `code`; without a `code` it stays as it is and ends up as
-   * `internal-error`.
+   * `internal-error`. A lost guard ends the step at once with `guard-lost`.
    */
   const step = async <T>(call: () => Promise<T>, code?: CaptureErrorCode, limit?: StageLimit): Promise<T> => {
+    if (ctx.lost) throw lostFailure();
     try {
-      return await deadline.run((async () => call())(), limit);
+      return await guarded(deadline.run((async () => call())(), limit));
     } catch (error) {
       if (code === undefined) throw error;
       throw asStageFailure(error, code, ctx.secrets);
@@ -316,6 +353,15 @@ async function runCapture(
       return verdict.ok ? { allowed: true } : { allowed: false, reason: verdict.code };
     },
     report(event) {
+      if (event.kind === "guard-lost") {
+        // Not a warning: the capture ends. Start the stop now, reject the running stage,
+        // and ignore a loss that arrives once the stop has begun (the capture's own stop).
+        if (ctx.lost || ctx.stopping) return;
+        ctx.lost = true;
+        ctx.rejectLost(lostFailure());
+        void startStop(ctx, clock, deps);
+        return;
+      }
       if (event.kind === "request-blocked") {
         // Only a refused main-frame request can fail the navigation as a block. The
         // warning carries the count and the first reason, never a URL or a host.
@@ -337,7 +383,7 @@ async function runCapture(
     });
   } catch (error) {
     // A guard that aborted the request makes the browser fail the navigation.
-    if (ctx.navigationBlocked) throw new CaptureFailure("navigation-blocked");
+    if (ctx.navigationBlocked && !ctx.lost) throw new CaptureFailure("navigation-blocked");
     throw error;
   }
   const landed = await step(() => inspect(navigation.finalUrl, MAX_HOP_URL_LENGTH));
@@ -363,7 +409,9 @@ async function runCapture(
   // the image boxes to flag elements outside every image.
   let shots: Awaited<ReturnType<typeof captureImages>>;
   try {
-    shots = await captureImages(page, raw, deadline);
+    // The screenshot calls count against the whole budget inside `captureImages`; the
+    // race here only adds the loss of the guard.
+    shots = await guarded(captureImages(page, raw, deadline));
   } catch (error) {
     throw asStageFailure(error, "screenshot-failed", ctx.secrets);
   }
@@ -399,6 +447,8 @@ async function runCapture(
       if (!checked.success) throw new CaptureFailure("snapshot-invalid");
       return checked.data;
     } catch {
+      // A lost guard is not a failed reload: the capture ends.
+      if (ctx.lost) throw lostFailure();
       ctx.warnings.add("reload-failed");
       return undefined;
     }
@@ -423,7 +473,8 @@ async function runCapture(
       const second = buildSample(again, { light: true, url: landed.url, capturedAt });
       if (maxBoxDrift(sample.elements, second.elements) > LAYOUT_DRIFT_PX) ctx.warnings.add("layout-shifted");
     } catch {
-      // The check is optional.
+      // The check is optional, but a lost guard is not: the capture ends.
+      if (ctx.lost) throw lostFailure();
     }
   };
   await checkLayoutDrift();
@@ -459,26 +510,35 @@ async function runCapture(
  */
 export async function capturePage(url: string, deps: Partial<CaptureDeps> = {}): Promise<CaptureResult> {
   const clock = deps.clock ?? createSystemClock();
+  let rejectLost: (error: CaptureFailure) => void = ignore;
+  const whenLost = new Promise<never>((_resolve, reject) => {
+    rejectLost = reject;
+  });
+  // Nothing may wait on it for a rejection to be handled: a capture that never loses the guard never settles it.
+  whenLost.catch(ignore);
   const ctx: CaptureContext = {
     secrets: [],
     warnings: new Set<CaptureWarningCode>(),
     navigationBlocked: false,
     blocked: { count: 0 },
+    lost: false,
+    whenLost,
+    rejectLost,
   };
 
   let outcome: CaptureOutcome;
   try {
-    outcome = { ok: true, success: await runCapture(url, deps, clock, ctx) };
+    const success = await runCapture(url, deps, clock, ctx);
+    // A guard lost after the last stage still ends the capture: nothing read since is used.
+    if (ctx.lost) throw new CaptureFailure("guard-lost");
+    outcome = { ok: true, success };
   } catch (error) {
     outcome = { ok: false, error };
   } finally {
-    // Stop the session exactly once on every path, with its own deadline. The promise
-    // goes to the platform as well, so a frozen function still finishes the stop.
-    if (ctx.handle) {
-      const stopping = stopSafely(ctx.handle, clock, ctx.warnings);
-      handOff(deps, stopping);
-      await stopping;
-    }
+    // Stop the session exactly once on every path, with its own deadline. A loss of the
+    // guard has already started the stop; this reuses it. The promise goes to the
+    // platform as well, so a frozen function still finishes the stop.
+    await startStop(ctx, clock, deps);
   }
 
   return finalise(outcome, ctx);

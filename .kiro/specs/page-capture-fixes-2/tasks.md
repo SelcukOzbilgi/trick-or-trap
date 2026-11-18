@@ -35,10 +35,10 @@ Rules for every task:
   - [x] 4.3 Run `browser-guard.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 1.3, 1.4, 1.7, 1.8, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 2.11, 3.1, 3.2, 3.4, 5.1, 5.2, 5.3, 5.4, 5.5, 11.10_
 
-- [ ] 5. Orchestrator fails closed on `guard-lost`
-  - [ ] 5.1 Create `tests/capture/capture-guard-lost.test.ts` first, with the fake browser and manual clock: `guard-lost` emitted during `goto` (hanging), `collect`, screenshots, the drift re-read and the reload sample each gives `ok: false`, `guard-lost`, no snapshot or images, without waiting for the hanging stage; the stop starts before the stage settles and is called once; a loss after the last stage still gives `guard-lost`; earlier warning codes are kept; `guard-lost` is not a warning code.
-  - [ ] 5.2 Edit `lib/capture/seam.ts` (`guard-lost` in `GuardEvent`), `tests/capture/helpers/fake-browser.ts` and `lib/capture/capture.ts` (lost promise raced in `step`, immediate shared stop, rethrow in `takeReloadSample` and `checkLayoutDrift`, final flag check).
-  - [ ] 5.3 Run `capture-guard-lost.test.ts`, `capture-stop.test.ts`, `capture-reload.test.ts`, `fake-browser.test.ts`, then `npx tsc --noEmit`.
+- [x] 5. Orchestrator fails closed on `guard-lost`
+  - [x] 5.1 Create `tests/capture/capture-guard-lost.test.ts` first, with the fake browser and manual clock: `guard-lost` emitted during `goto` (hanging), `collect`, screenshots, the drift re-read and the reload sample each gives `ok: false`, `guard-lost`, no snapshot or images, without waiting for the hanging stage; the stop starts before the stage settles and is called once; a loss after the last stage still gives `guard-lost`; earlier warning codes are kept; `guard-lost` is not a warning code.
+  - [x] 5.2 Edit `lib/capture/seam.ts` (`guard-lost` in `GuardEvent`), `tests/capture/helpers/fake-browser.ts` and `lib/capture/capture.ts` (lost promise raced in `step`, immediate shared stop, rethrow in `takeReloadSample` and `checkLayoutDrift`, final flag check).
+  - [x] 5.3 Run `capture-guard-lost.test.ts`, `capture-stop.test.ts`, `capture-reload.test.ts`, `fake-browser.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.12_
 
 - [ ] 6. Remote adapter on the browser-level guard; child code removed
