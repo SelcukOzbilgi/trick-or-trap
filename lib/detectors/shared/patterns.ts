@@ -20,3 +20,19 @@ export const SAFE_PATTERNS: Readonly<{
   px: /^(\d{1,6}|\d{1,6}\.\d{1,4})px$/,
   digits: /^\d{1,300}$/,
 });
+
+/**
+ * The only calls of regular expression methods under lib/detectors/: other
+ * files ask these functions and never call `.test` themselves. The input is
+ * cut to its cap by the caller.
+ */
+
+/** True when the text is a strict UTC time of the form of `SAFE_PATTERNS.isoUtc`. */
+export function isIsoUtcText(value: string): boolean {
+  return SAFE_PATTERNS.isoUtc.test(value);
+}
+
+/** True when the text is a computed pixel size of the form of `SAFE_PATTERNS.px`. */
+export function isPxText(value: string): boolean {
+  return SAFE_PATTERNS.px.test(value);
+}

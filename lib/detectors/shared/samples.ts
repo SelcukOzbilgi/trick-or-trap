@@ -5,7 +5,7 @@ import {
 } from "@/lib/detectors/shared/constants";
 import { buildIndex } from "@/lib/detectors/shared/elements";
 import type { ElementIndex, IndexedElement } from "@/lib/detectors/shared/elements";
-import { SAFE_PATTERNS } from "@/lib/detectors/shared/patterns";
+import { isIsoUtcText } from "@/lib/detectors/shared/patterns";
 import { maskDigits, normaliseText } from "@/lib/detectors/shared/text";
 
 /**
@@ -36,7 +36,7 @@ const DATE_TIME_PREFIX = 19;
  */
 export function parseCapturedAt(value: unknown): number | null {
   if (typeof value !== "string" || value.length > MAX_TIME_TEXT) return null;
-  if (!SAFE_PATTERNS.isoUtc.test(value)) return null;
+  if (!isIsoUtcText(value)) return null;
   const ms = new Date(value).getTime();
   if (!Number.isFinite(ms)) return null;
   const roundTrip = new Date(ms).toISOString().slice(0, DATE_TIME_PREFIX);

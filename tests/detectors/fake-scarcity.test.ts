@@ -236,7 +236,7 @@ describe("fake-scarcity: text rows", () => {
 
   it("S3: another scarcity claim elsewhere on the page supports a qualified claim", () => {
     const findings = detectFakeScarcity(
-      snap([raw("el-1-0", "Only 25 left"), raw("el-1-1", "Selling fast")])
+      snap([raw("el-1-0", "Only 25 left"), raw("el-1-1", "Selling out fast")])
     );
     expect(findings.map((f) => f.confidence)).toEqual(["medium", "low"]);
   });
@@ -268,8 +268,8 @@ describe("fake-scarcity: text rows", () => {
 
   it("S5: unquantified wording gives a low finding, in English and Turkish", () => {
     for (const text of [
-      "Selling fast",
-      "Almost gone",
+      "Selling out fast",
+      "Almost sold out",
       "Low stock",
       "Tükenmek üzere",
       "Çok satıyor",
@@ -284,9 +284,9 @@ describe("fake-scarcity: text rows", () => {
   });
 
   it("S5 does not use the reload sample", () => {
-    const f = only(run("Selling fast", "Selling fast"));
+    const f = only(run("Selling out fast", "Selling out fast"));
     expect(f.confidence).toBe("low");
-    expect(f.evidence.text).toBe('Text "Selling fast".');
+    expect(f.evidence.text).toBe('Text "Selling out fast".');
   });
 
   it("look-alikes give nothing, in English and Turkish", () => {
@@ -297,7 +297,7 @@ describe("fake-scarcity: text rows", () => {
       "Only 2 left for free shipping",
       "Sepetinizde 2 ürün",
       "Ücretsiz kargo için son 5 ürün",
-      "Selling fast, 120 reviews",
+      "Selling out fast, 120 reviews",
       "4.8 ratings",
     ]) {
       expect(run(text)).toEqual([]);
@@ -353,7 +353,7 @@ describe("fake-scarcity: shared contract", () => {
       null,
       "x",
       raw("el-1-0", "Only 2 left!", { display: "none" }),
-      raw("el-1-1", "Selling fast", { boundingBox: { x: 0, y: 0, width: 0, height: 0 } }),
+      raw("el-1-1", "Selling out fast", { boundingBox: { x: 0, y: 0, width: 0, height: 0 } }),
     ];
     expect(detectFakeScarcity(snap(elements))).toEqual([]);
   });
@@ -361,15 +361,15 @@ describe("fake-scarcity: shared contract", () => {
   it("two calls give deep-equal results, also with another snapshot in between", () => {
     const a = snap(one("Only 2 left!"), one("Only 6 left!"));
     const first = detectFakeScarcity(a);
-    detectFakeScarcity(snap(one("Selling fast")));
+    detectFakeScarcity(snap(one("Selling out fast")));
     expect(detectFakeScarcity(a)).toEqual(first);
     expect(first).toHaveLength(1);
   });
 
   it("returns findings in document order, whatever the array order", () => {
     const elements = [
-      raw("el-1-2", "Almost gone"),
-      raw("el-1-0", "Selling fast"),
+      raw("el-1-2", "Almost sold out"),
+      raw("el-1-0", "Selling out fast"),
       raw("el-1-1", "Low stock"),
     ];
     const ids = detectFakeScarcity(snap(elements)).map((f) => f.elementIds[0]);
@@ -377,7 +377,7 @@ describe("fake-scarcity: shared contract", () => {
   });
 
   it("keeps 20 findings and says how many were left out", () => {
-    const elements = Array.from({ length: 25 }, (_, i) => raw(`el-1-${i}`, "Selling fast"));
+    const elements = Array.from({ length: 25 }, (_, i) => raw(`el-1-${i}`, "Selling out fast"));
     const findings = detectFakeScarcity(snap(elements));
     expect(findings).toHaveLength(20);
     const last = findings[19];
@@ -388,7 +388,7 @@ describe("fake-scarcity: shared contract", () => {
   it("adds the truncation and outside-screenshot sentences", () => {
     const f = only(
       detectFakeScarcity(
-        snap([raw("el-1-0", "Selling fast", { outsideImage: true })], null, {
+        snap([raw("el-1-0", "Selling out fast", { outsideImage: true })], null, {
           extra: { capture: { elementsTruncated: true } },
         })
       )
@@ -405,7 +405,7 @@ describe("fake-scarcity: shared contract", () => {
       ...run("Only 2 left!"),
       ...run("Only 25 left"),
       ...run("3 left", "5 left"),
-      ...run("Selling fast"),
+      ...run("Selling out fast"),
     ];
     expect(findings).toHaveLength(5);
     for (const f of findings) {
@@ -417,7 +417,7 @@ describe("fake-scarcity: shared contract", () => {
 
   it("never reads secondSample", () => {
     const f = detectFakeScarcity(
-      snap(one("Selling fast"), null, {
+      snap(one("Selling out fast"), null, {
         extra: { secondSample: sample(timeAfter(30), [raw("el-1-0", "Only 2 left!")]) },
       })
     );

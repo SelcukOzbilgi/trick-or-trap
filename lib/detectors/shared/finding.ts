@@ -4,7 +4,7 @@ import {
   MAX_STYLE_READ,
 } from "@/lib/detectors/shared/constants";
 import type { IndexedElement } from "@/lib/detectors/shared/elements";
-import { SAFE_PATTERNS } from "@/lib/detectors/shared/patterns";
+import { isIsoUtcText } from "@/lib/detectors/shared/patterns";
 import { normaliseText } from "@/lib/detectors/shared/text";
 import { FindingSchema } from "@/lib/types";
 import type { Confidence, Finding } from "@/lib/types";
@@ -134,7 +134,7 @@ export function detectedAtFrom(snapshot: unknown): DetectedAt {
   if (typeof value !== "string" || value.length > MAX_STYLE_READ) {
     return UNKNOWN_TIME;
   }
-  if (!SAFE_PATTERNS.isoUtc.test(value)) return UNKNOWN_TIME;
+  if (!isIsoUtcText(value)) return UNKNOWN_TIME;
 
   const date = new Date(value);
   const ms = date.getTime();

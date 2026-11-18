@@ -11,7 +11,7 @@ import {
   MAX_TEXT_READ,
   RELOAD_TEXT_CAP,
 } from "@/lib/detectors/shared/constants";
-import { SAFE_PATTERNS } from "@/lib/detectors/shared/patterns";
+import { isPxText } from "@/lib/detectors/shared/patterns";
 import { tokenise } from "@/lib/detectors/shared/text";
 import type { Token } from "@/lib/detectors/shared/text";
 
@@ -231,7 +231,7 @@ function readOpacity(raw: unknown): number {
 function readFontSizePx(raw: unknown): number | null {
   if (typeof raw !== "string") return null;
   const text = cut(raw, MAX_STYLE_READ).trim();
-  if (!SAFE_PATTERNS.px.test(text)) return null;
+  if (!isPxText(text)) return null;
   const value = Number.parseFloat(text);
   return Number.isFinite(value) ? value : null;
 }

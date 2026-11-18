@@ -40,8 +40,8 @@ export const BARE_STOCK_TEMPLATES: WordList = Object.freeze({
 /** Scarcity wording without a number. */
 export const UNQUANTIFIED_SCARCITY: WordList = Object.freeze({
   en: Object.freeze([
-    "selling fast",
-    "almost gone",
+    "selling out fast",
+    "almost sold out",
     "low stock",
     "high demand",
     "going fast",
