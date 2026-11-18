@@ -20,7 +20,7 @@ import {
   type CreatedSession,
 } from "./browser-use-api";
 import { installBrowserGuard, type BrowserGuard } from "./browser-guard";
-import { STOP_TIMEOUT_MS } from "./constants";
+import { MAX_REWRITE_BODY_BYTES, STOP_TIMEOUT_MS } from "./constants";
 import { collectInPage } from "./extractor";
 import { sanitiseMetrics } from "./geometry";
 import type { GuardBrowser, GuardSession } from "./guard-types";
@@ -88,6 +88,8 @@ type SessionLinks = {
   isStopping(): boolean;
   /** Hands over the running guard, so `stop()` can stop its loss reporting first. */
   setGuard(guard: BrowserGuard): void;
+  /** Present unless the configuration turned the WebSocket hardening off. */
+  hardening: { maxBodyBytes: number } | undefined;
 };
 
 function noop(): void {}
@@ -177,6 +179,8 @@ function createCapturePage(
         const guard = await installBrowserGuard(toGuardBrowser(links.browser), guards, {
           clock,
           mainFrameId,
+          // Absent setting means on: the guard never gets weaker by a missing variable.
+          ...(links.hardening ? { hardening: links.hardening } : {}),
           onLost: () => {
             // The capture's own stop closes the connection too; that is never a loss.
             if (links.isStopping()) return;
@@ -306,6 +310,7 @@ function createHandle(session: CreatedSession, config: CaptureConfig, deps: Remo
         return createCapturePage(page, context, cdp, secrets, deps.clock, {
           browser,
           isStopping: () => state.stopped,
+          hardening: config.websocketHardening === "off" ? undefined : { maxBodyBytes: MAX_REWRITE_BODY_BYTES },
           setGuard: (guard) => {
             state.guard = guard;
             // The stop may have started while the guard was being installed.

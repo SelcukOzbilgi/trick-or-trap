@@ -29,10 +29,10 @@ describe("parseCaptureConfig: defaults and mode", () => {
     expect(config.allowOrigin).toBeNull();
   });
 
-  it("returns a config with exactly the five fields", () => {
+  it("returns a config with exactly the six fields", () => {
     const config = expectOk({ BROWSER_USE_API_KEY: "k" });
     expect(Object.keys(config).sort()).toEqual(
-      ["allowOrigin", "apiKey", "browserMode", "proxy", "sessionTimeoutMinutes"].sort()
+      ["allowOrigin", "apiKey", "browserMode", "proxy", "sessionTimeoutMinutes", "websocketHardening"].sort()
     );
   });
 
@@ -77,6 +77,47 @@ describe("parseCaptureConfig: proxy", () => {
   it.each(["ON", "maybe", "true", "1"])("rejects %s", (value) => {
     const error = expectInvalid({ BROWSER_USE_API_KEY: "k", BROWSER_USE_PROXY: value });
     expect(error.message).toContain("BROWSER_USE_PROXY");
+  });
+});
+
+describe("parseCaptureConfig: WebSocket hardening", () => {
+  it("turns hardening on when the variable is unset", () => {
+    expect(expectOk({ BROWSER_USE_API_KEY: "k" }).websocketHardening).toBe("on");
+  });
+
+  it.each(["", "   ", "\t"])("turns hardening on when the variable is empty or blank (%j)", (blank) => {
+    expect(expectOk({ BROWSER_USE_API_KEY: "k", CAPTURE_WEBSOCKET_HARDENING: blank }).websocketHardening).toBe("on");
+  });
+
+  it.each(["on", "off"])("accepts %s", (value) => {
+    const config = expectOk({ BROWSER_USE_API_KEY: "k", CAPTURE_WEBSOCKET_HARDENING: value });
+    expect(config.websocketHardening).toBe(value);
+  });
+
+  it("trims the value like the other variables", () => {
+    expect(expectOk({ BROWSER_USE_API_KEY: "k", CAPTURE_WEBSOCKET_HARDENING: " off " }).websocketHardening).toBe("off");
+  });
+
+  it.each(["yes", "ON", "true", "1", "disabled"])("rejects %s and names only the variable", (value) => {
+    const error = expectInvalid({ BROWSER_USE_API_KEY: "k", CAPTURE_WEBSOCKET_HARDENING: value });
+    expect(error.message).toBe("Invalid capture environment: CAPTURE_WEBSOCKET_HARDENING");
+  });
+
+  it("never echoes a rejected value", () => {
+    const error = expectInvalid({ BROWSER_USE_API_KEY: "k", CAPTURE_WEBSOCKET_HARDENING: "hardening-sentinel-value" });
+    expect(JSON.stringify(error)).not.toContain("hardening-sentinel-value");
+    expect(error.detail).toBeUndefined();
+  });
+
+  it("lists the variable among the others at fault, in the fixed order", () => {
+    const error = expectInvalid({ BROWSER_USE_PROXY: "maybe", CAPTURE_WEBSOCKET_HARDENING: "yes" });
+    expect(error.message).toContain("BROWSER_USE_PROXY");
+    expect(error.message).toContain("CAPTURE_WEBSOCKET_HARDENING");
+  });
+
+  it("offers no setting that allows service-worker scripts", () => {
+    const config = expectOk({ BROWSER_USE_API_KEY: "k" });
+    expect(Object.keys(config).filter((key) => /service/i.test(key))).toEqual([]);
   });
 });
 
@@ -242,6 +283,7 @@ describe(".env.example", () => {
     "BROWSER_USE_PROXY",
     "BROWSER_USE_SESSION_TIMEOUT_MINUTES",
     "CAPTURE_BROWSER_MODE",
+    "CAPTURE_WEBSOCKET_HARDENING",
   ])("lists %s with an empty value and a comment line before it", (name) => {
     const index = lines.findIndex((line) => line.startsWith(`${name}=`));
     expect(index).toBeGreaterThan(0);
@@ -255,6 +297,14 @@ describe(".env.example", () => {
     expect(comment("BROWSER_USE_PROXY")).toContain("off");
     expect(comment("BROWSER_USE_SESSION_TIMEOUT_MINUTES")).toContain("default: 1");
     expect(comment("BROWSER_USE_SESSION_TIMEOUT_MINUTES")).not.toContain("default: 2");
+    expect(comment("CAPTURE_WEBSOCKET_HARDENING")).toContain("default: on");
+  });
+
+  it("describes CAPTURE_WEBSOCKET_HARDENING in exactly one comment line", () => {
+    const index = lines.findIndex((line) => line.startsWith("CAPTURE_WEBSOCKET_HARDENING="));
+    expect(lines[index - 1].startsWith("#")).toBe(true);
+    expect(lines[index - 2]).toBe("");
+    expect(lines.filter((line) => line.includes("CAPTURE_WEBSOCKET_HARDENING"))).toHaveLength(1);
   });
 
   it("gives every NAME= line an empty value", () => {

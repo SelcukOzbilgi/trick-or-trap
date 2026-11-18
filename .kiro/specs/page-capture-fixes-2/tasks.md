@@ -55,10 +55,10 @@ Rules for every task:
   - [x] 7.4 Run `fake-guard-browser.test.ts`, `response-hardening.test.ts`, `browser-guard.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.15, 18.1, 18.2, 18.3, 18.4, 18.5, 18.6_
 
-- [ ] 8. Hardening switch in configuration and adapter
-  - [ ] 8.1 Extend `tests/capture/config.test.ts` first (unset and empty give `on`; `on` and `off` accepted; `yes` gives `config-invalid` naming only the variable; `.env.example` has the line and a comment stating `on`) and `remote-browser.test.ts` (patterns follow the setting; absent setting means on).
-  - [ ] 8.2 Edit `lib/capture/config.ts` (optional `websocketHardening`), `lib/capture/remote-browser.ts` and `.env.example` (add only the new line and its comment).
-  - [ ] 8.3 Run `config.test.ts`, `remote-browser.test.ts`, then `npx tsc --noEmit`.
+- [x] 8. Hardening switch in configuration and adapter
+  - [x] 8.1 Extend `tests/capture/config.test.ts` first (unset and empty give `on`; `on` and `off` accepted; `yes` gives `config-invalid` naming only the variable; `.env.example` has the line and a comment stating `on`) and `remote-browser.test.ts` (patterns follow the setting; absent setting means on).
+  - [x] 8.2 Edit `lib/capture/config.ts` (optional `websocketHardening`), `lib/capture/remote-browser.ts` and `.env.example` (add only the new line and its comment).
+  - [x] 8.3 Run `config.test.ts`, `remote-browser.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 3.3, 7.1, 7.2, 7.3, 7.4, 7.5_
 
 - [ ] 9. Host and DNS budget, capped verdict cache

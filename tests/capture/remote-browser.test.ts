@@ -10,6 +10,7 @@ import {
   COLLECT_LIMITS,
   GUARD_HEARTBEAT_INTERVAL_MS,
   MAX_PLAUSIBLE_PX,
+  MAX_REWRITE_BODY_BYTES,
   STOP_TIMEOUT_MS,
 } from "@/lib/capture/constants";
 import { createRemoteBrowser, DISCONNECT_TIMEOUT_MS } from "@/lib/capture/remote-browser";
@@ -75,6 +76,13 @@ const RAW_READ: RawPageRead = {
 type AnyFn = (...args: never[]) => unknown;
 
 const MAIN_FRAME_ID = "main-frame-1";
+
+/** The `Fetch.enable` patterns with the WebSocket hardening on: request stage plus two response-stage patterns. */
+const HARDENING_ON_PATTERNS = [
+  { urlPattern: "*", requestStage: "Request" },
+  { urlPattern: "*", resourceType: "Document", requestStage: "Response" },
+  { urlPattern: "*", resourceType: "Other", requestStage: "Response" },
+];
 
 /** Every fake page session and guard browser made in a test; `afterEach` checks that none broke the protocol. */
 const fakes: Array<{ cdp: ReturnType<typeof createFakeCdp>; guard: FakeGuardBrowser }> = [];
@@ -298,12 +306,13 @@ type Harness = {
 async function openSession(
   playwright: FakePlaywrightOptions = {},
   fetchOptions: { stopStatus?: number; stopError?: Error; stopHangs?: boolean; stopDelayMs?: number } = {},
+  config: CaptureConfig = CONFIG,
 ): Promise<Harness> {
   const events: string[] = [];
   const fake = createFakePlaywright({ ...playwright, events });
   const clock = createManualClock();
   const fetchFake = createFakeFetch({ ...fetchOptions, events, clock });
-  const provider = createRemoteBrowser(CONFIG, {
+  const provider = createRemoteBrowser(config, {
     fetch: fetchFake.fetch,
     clock,
     loadPlaywright: fake.loadPlaywright,
@@ -314,6 +323,16 @@ async function openSession(
 
 async function connectedPage(playwright: FakePlaywrightOptions = {}): Promise<Harness & { page: CapturePage }> {
   const harness = await openSession(playwright);
+  const page = await harness.handle.connect({ timeoutMs: 15_000 });
+  return { ...harness, page };
+}
+
+/** A connected page for a configuration with the given hardening setting (absent: the field is not set). */
+async function connectedPageWith(
+  websocketHardening: "on" | "off" | undefined,
+): Promise<Harness & { page: CapturePage }> {
+  const config: CaptureConfig = websocketHardening === undefined ? CONFIG : { ...CONFIG, websocketHardening };
+  const harness = await openSession({}, {}, config);
   const page = await harness.handle.connect({ timeoutMs: 15_000 });
   return { ...harness, page };
 }
@@ -515,8 +534,13 @@ describe("guards", () => {
     expect(fake.browser.newBrowserCDPSession).toHaveBeenCalledTimes(1);
     expect(fake.guard.openCalls).toBe(1);
     expect(fake.guard.callsOf("Fetch.enable")).toHaveLength(1);
+    // The configuration does not set the hardening, which means on: the two response-stage patterns follow.
     expect(fake.guard.callsOf("Fetch.enable")[0].params).toEqual({
-      patterns: [{ urlPattern: "*", requestStage: "Request" }],
+      patterns: [
+        { urlPattern: "*", requestStage: "Request" },
+        { urlPattern: "*", resourceType: "Document", requestStage: "Response" },
+        { urlPattern: "*", resourceType: "Other", requestStage: "Response" },
+      ],
     });
   });
 
@@ -571,6 +595,54 @@ describe("guards", () => {
     expect(settled).toBe(false);
     // `capturePage` calls goto only after installGuards resolved, so goto has not run here.
     expect(fake.firstPage.goto).not.toHaveBeenCalled();
+  });
+
+  it("enables the response-stage patterns when the configuration says on", async () => {
+    const { fake, page } = await connectedPageWith("on");
+    await page.installGuards(createGuards({ allowed: true }).guards);
+    expect(fake.guard.callsOf("Fetch.enable")).toHaveLength(1);
+    expect(fake.guard.callsOf("Fetch.enable")[0].params).toEqual({ patterns: HARDENING_ON_PATTERNS });
+  });
+
+  it("enables the same patterns when the configuration does not set the hardening", async () => {
+    const { fake, page } = await connectedPageWith(undefined);
+    await page.installGuards(createGuards({ allowed: true }).guards);
+    expect(fake.guard.callsOf("Fetch.enable")[0].params).toEqual({ patterns: HARDENING_ON_PATTERNS });
+  });
+
+  it("enables only the request-stage pattern when the configuration says off", async () => {
+    const { fake, page } = await connectedPageWith("off");
+    await page.installGuards(createGuards({ allowed: true }).guards);
+    expect(fake.guard.callsOf("Fetch.enable")).toHaveLength(1);
+    expect(fake.guard.callsOf("Fetch.enable")[0].params).toEqual({
+      patterns: [{ urlPattern: "*", requestStage: "Request" }],
+    });
+  });
+
+  it("passes MAX_REWRITE_BODY_BYTES to the hardening: a document response one byte over is refused", async () => {
+    const { fake, page } = await connectedPageWith("on");
+    const { guards, events } = createGuards({ allowed: true });
+    await page.installGuards(guards);
+
+    const paused = fake.guard.emitPaused({
+      url: "https://shop.example.com/big",
+      resourceType: "Document",
+      frameId: MAIN_FRAME_ID,
+      response: {
+        status: 200,
+        headers: [
+          { name: "Content-Type", value: "text/html" },
+          { name: "Content-Length", value: String(MAX_REWRITE_BODY_BYTES + 1) },
+        ],
+      },
+    });
+    await paused.handled;
+
+    expect(fake.guard.callsOf("Fetch.getResponseBody")).toEqual([]);
+    expect(fake.guard.callsOf("Fetch.failRequest").map((call) => call.params)).toEqual([
+      { requestId: paused.requestId, errorReason: "BlockedByClient" },
+    ]);
+    expect(events).toEqual([{ kind: "request-blocked", reason: "response-too-large", mainFrame: true }]);
   });
 
   it("starts the guard heartbeat on the guard session", async () => {

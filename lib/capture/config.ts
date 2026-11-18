@@ -14,6 +14,11 @@ export type CaptureConfig = Readonly<{
   proxy: "on" | "off"; // default "off"
   sessionTimeoutMinutes: number; // integer 1..5, default 1
   allowOrigin: string | null; // parsed once from NEXT_PUBLIC_APP_URL; bypasses no check
+  /**
+   * WebSocket hardening of the request guard. The parser always sets it, default "on".
+   * Optional so that a hand-built config (a test, a caller) without it means "on".
+   */
+  websocketHardening?: "on" | "off";
 }>;
 
 export type ConfigResult = { ok: true; config: CaptureConfig } | { ok: false; error: CaptureError };
@@ -24,6 +29,7 @@ const ENV_NAMES = [
   "BROWSER_USE_PROXY",
   "BROWSER_USE_SESSION_TIMEOUT_MINUTES",
   "NEXT_PUBLIC_APP_URL",
+  "CAPTURE_WEBSOCKET_HARDENING",
 ] as const;
 
 const MAX_MODE_LENGTH = 32;
@@ -65,6 +71,7 @@ const EnvSchema = z
       .transform((value) => new URL(value).origin)
       .refine(hasPublicHost)
       .optional(),
+    CAPTURE_WEBSOCKET_HARDENING: z.enum(["on", "off"]).optional(),
   });
 
 /** Trims every known value; an empty or whitespace-only string counts as unset. */
@@ -112,6 +119,7 @@ export function parseCaptureConfig(env: Readonly<Record<string, string | undefin
       proxy: value.BROWSER_USE_PROXY ?? "off",
       sessionTimeoutMinutes: value.BROWSER_USE_SESSION_TIMEOUT_MINUTES ?? SESSION_TIMEOUT_DEFAULT_MINUTES,
       allowOrigin: value.NEXT_PUBLIC_APP_URL ?? null,
+      websocketHardening: value.CAPTURE_WEBSOCKET_HARDENING ?? "on",
     },
   };
 }
