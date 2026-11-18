@@ -23,10 +23,10 @@ Rules for every task:
   - [x] 2.3 Run `types.test.ts`, `capture-guards.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 4.11, 14.6_
 
-- [ ] 3. Public "could not scan" outcome
-  - [ ] 3.1 Create `tests/capture/outcome.test.ts` first: a hard-coded list of all 25 error codes equals `Object.keys(ERROR_MESSAGES)` sorted; each maps to `could-not-scan` with its reason and fixed message; a failure whose `detail` holds a sentinel gives JSON without it and no `detail`, `snapshot`, `images` or `findings` key; success maps to `captured`; `expectTypeOf` shows the failure arm has no `detail`.
-  - [ ] 3.2 Add `ScanOutcome` and `CouldNotScanReason` to `lib/capture/types.ts`; create `lib/capture/outcome.ts`.
-  - [ ] 3.3 Run `outcome.test.ts`, then `npx tsc --noEmit`.
+- [x] 3. Public "could not scan" outcome
+  - [x] 3.1 Create `tests/capture/outcome.test.ts` first: a hard-coded list of all 25 error codes equals `Object.keys(ERROR_MESSAGES)` sorted; each maps to `could-not-scan` with its reason and fixed message; a failure whose `detail` holds a sentinel gives JSON without it and no `detail`, `snapshot`, `images` or `findings` key; success maps to `captured`; `expectTypeOf` shows the failure arm has no `detail`.
+  - [x] 3.2 Add `ScanOutcome` and `CouldNotScanReason` to `lib/capture/types.ts`; create `lib/capture/outcome.ts`.
+  - [x] 3.3 Run `outcome.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.7, 14.8_
 
 - [ ] 4. Browser-level guard module (beside the old guard)

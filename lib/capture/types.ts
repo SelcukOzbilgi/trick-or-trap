@@ -120,6 +120,17 @@ export type CaptureWarning = {
   count?: number;
 };
 
+/** Why a capture could not be scanned. The error code itself; see `COULD_NOT_SCAN_REASONS`. */
+export type CouldNotScanReason = CaptureErrorCode;
+
+/**
+ * The public outcome of a capture. The `could-not-scan` arm has no `detail`, no snapshot,
+ * no images and no findings, so it cannot be read as a clean result.
+ */
+export type ScanOutcome =
+  | { status: "captured"; snapshot: PageSnapshot; images: CaptureImage[]; warnings: CaptureWarning[] }
+  | { status: "could-not-scan"; reason: CouldNotScanReason; message: string; warnings: CaptureWarning[] };
+
 /** One JPEG image. All sizes are CSS px (image px equal CSS px with `scale: "css"`). */
 export type CaptureImage = {
   offsetY: number; // document Y of the image's top edge
