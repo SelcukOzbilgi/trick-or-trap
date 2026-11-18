@@ -10,19 +10,8 @@ import { detectFakeScarcity } from "@/lib/detectors/fake-scarcity";
 import { detectFakeUrgency } from "@/lib/detectors/fake-urgency";
 import { detectPreselection } from "@/lib/detectors/preselection";
 import { detectVisualInterference } from "@/lib/detectors/visual-interference";
+import type { StaticPatternId } from "@/lib/detectors/shared/finding";
 import type { PageSnapshot } from "@/lib/types";
-
-/**
- * Pattern ids of the six static detectors.
- * Task 4 of the detectors-static spec moves this type to shared/finding.ts.
- */
-export type StaticPatternId =
-  | "fake-urgency"
-  | "fake-scarcity"
-  | "fake-activity"
-  | "confirmshaming"
-  | "preselection"
-  | "visual-interference";
 
 /** The static detectors, in registration order. */
 export const STATIC_DETECTORS: ReadonlyArray<{

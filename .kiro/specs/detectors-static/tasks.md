@@ -49,13 +49,13 @@ Rules for every task:
   - [x] 3.6 Run the three test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 2.9, 2.10, 2.13, 2.14, 6.1, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 7.10, 7.11, 7.12, 7.16, 15.1, 15.2, 15.3_
 
-- [ ] 4. Finding builder
+- [x] 4. Finding builder
   - Uses: `quote`, `FORBIDDEN_WORDS` (task 2), `IndexedElement`, `ElementIndex` (task 3).
   - Files: creates `lib/detectors/shared/finding.ts` and `tests/detectors/shared/finding.test.ts`; edits `lib/detectors/all.ts`.
-  - [ ] 4.1 Create `tests/detectors/shared/finding.test.ts` first, time and shape: `detectedAtFrom` keeps a valid `Z` time and returns the epoch with `ms: null` for `""`, `"2026-12-01"`, an offset time and a non-string; drafts become findings that pass `FindingSchema`, with `detectorName` equal to `patternId`, a title from `TITLES` starting with "Possible", `explanation` from `EXPLANATIONS`, ids and boxes in draft order, a zero box for an invalid box; `captureTimeUnknown: 1` is set for the epoch case.
-  - [ ] 4.2 In the same file, notes and caps: outside-screenshot and truncation sentences are added; a draft with a forbidden word in its template text is dropped; 25 drafts give 20 findings sorted by element order then `ruleOrder`, and the last says "5 more similar findings were not listed." with `omittedFindings: 5`; `lowerConfidence` maps medium to low and low to low; every title and explanation in `TITLES` and `EXPLANATIONS` has no forbidden word.
-  - [ ] 4.3 Create `lib/detectors/shared/finding.ts` (`StaticPatternId`, `FindingDraft`, `FindingContext`, `detectedAtFrom`, `finaliseFindings`, `lowerConfidence`, `containsForbidden`, `TITLES`, `EXPLANATIONS`) with the titles and explanations of design section 7. Change `lib/detectors/all.ts` to import `StaticPatternId` from it.
-  - [ ] 4.4 Run `npx vitest run tests/detectors/shared/finding.test.ts --maxWorkers=2`, `npx vitest run tests/detectors/all.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+  - [x] 4.1 Create `tests/detectors/shared/finding.test.ts` first, time and shape: `detectedAtFrom` keeps a valid `Z` time and returns the epoch with `ms: null` for `""`, `"2026-12-01"`, an offset time and a non-string; drafts become findings that pass `FindingSchema`, with `detectorName` equal to `patternId`, a title from `TITLES` starting with "Possible", `explanation` from `EXPLANATIONS`, ids and boxes in draft order, a zero box for an invalid box; `captureTimeUnknown: 1` is set for the epoch case.
+  - [x] 4.2 In the same file, notes and caps: outside-screenshot and truncation sentences are added; a draft with a forbidden word in its template text is dropped; 25 drafts give 20 findings sorted by element order then `ruleOrder`, and the last says "5 more similar findings were not listed." with `omittedFindings: 5`; `lowerConfidence` maps medium to low and low to low; every title and explanation in `TITLES` and `EXPLANATIONS` has no forbidden word.
+  - [x] 4.3 Create `lib/detectors/shared/finding.ts` (`StaticPatternId`, `FindingDraft`, `FindingContext`, `detectedAtFrom`, `finaliseFindings`, `lowerConfidence`, `containsForbidden`, `TITLES`, `EXPLANATIONS`) with the titles and explanations of design section 7. Change `lib/detectors/all.ts` to import `StaticPatternId` from it.
+  - [x] 4.4 Run `npx vitest run tests/detectors/shared/finding.test.ts --maxWorkers=2`, `npx vitest run tests/detectors/all.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 2.8, 2.11, 2.12, 2.13, 3.1, 3.2, 3.7, 3.9, 3.10, 3.11, 3.13, 3.15, 3.16, 3.17_
 
 - [ ] 5. Countdown and calendar-date parsers
