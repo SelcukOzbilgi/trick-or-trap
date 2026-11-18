@@ -99,8 +99,8 @@ Rules for every task:
   - [x] 13.3 Do not run the file. Run `npx tsc --noEmit`.
   _Requirements: 14.8, 25.1, 25.2, 25.3, 25.4, 25.5, 25.6, 25.7, 25.8_
 
-- [ ] 14. Steering notes and lint
-  - [ ] 14.1 Read `.kiro/steering/tech.md` and `.kiro/steering/structure.md`. In `tech.md`, in "Page capture (`lib/capture`)": replace the statement that the allowed origin skips the host-name and address checks (it bypasses nothing now); add the CDP request guard (`Fetch` at the request stage on every frame and sub-resource, service workers bypassed, auto-attach for child targets, unverified until the live test), the isolated-world collector, the 1-minute default timeout, and that page text and `detail` are untrusted. Delete only statements these fixes made wrong.
-  - [ ] 14.2 In `structure.md`, add `cdp.ts`, `request-guard.ts` and `guard-types.ts` to the `lib/capture/` listing, and `helpers/fake-cdp.ts`, `helpers/forbidden-attribute.ts`, `collector-dom.test.ts`, `request-guard.test.ts`, `cdp.test.ts`, `capture-guards.test.ts`, `lib-text-rules.test.ts` under `tests/capture/`. Delete nothing.
-  - [ ] 14.3 Run `npm run lint` and fix findings in files this spec created or edited, then `npm run typecheck`.
+- [x] 14. Steering notes and lint
+  - [x] 14.1 Read `.kiro/steering/tech.md` and `.kiro/steering/structure.md`. In `tech.md`, in "Page capture (`lib/capture`)": replace the statement that the allowed origin skips the host-name and address checks (it bypasses nothing now); add the CDP request guard (`Fetch` at the request stage on every frame and sub-resource, service workers bypassed, auto-attach for child targets, unverified until the live test), the isolated-world collector, the 1-minute default timeout, and that page text and `detail` are untrusted. Delete only statements these fixes made wrong.
+  - [x] 14.2 In `structure.md`, add `cdp.ts`, `request-guard.ts` and `guard-types.ts` to the `lib/capture/` listing, and `helpers/fake-cdp.ts`, `helpers/forbidden-attribute.ts`, `collector-dom.test.ts`, `request-guard.test.ts`, `cdp.test.ts`, `capture-guards.test.ts`, `lib-text-rules.test.ts` under `tests/capture/`. Delete nothing.
+  - [x] 14.3 Run `npm run lint` and fix findings in files this spec created or edited, then `npm run typecheck`.
   _Requirements: 26.1, 26.2, 26.3, 26.4, 26.5_

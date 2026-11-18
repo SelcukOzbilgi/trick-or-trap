@@ -54,6 +54,9 @@ trick-or-trap/
 │   │   ├── seam.ts                # browser seam interfaces, no Playwright types
 │   │   ├── browser-use-api.ts     # Browser Use create and stop calls
 │   │   ├── remote-browser.ts      # BrowserProvider over CDP; the only file importing playwright-core
+│   │   ├── cdp.ts                 # CdpSession interface, isolated-world calls, page metrics, scrollbars
+│   │   ├── guard-types.ts         # request guard types: GuardVerdict, RequestGuardEvent, RequestPolicy
+│   │   ├── request-guard.ts       # installRequestGuard: CDP Fetch interception, child targets, host limit
 │   │   ├── geometry.ts            # pure maths: boxes, mode choice, tiles, sizes
 │   │   └── screenshots.ts         # captureImages: single or tiled screenshots
 │   ├── detectors/
@@ -83,7 +86,12 @@ trick-or-trap/
 │   │   └── visual-interference.test.ts
 │   ├── capture/
 │   │   ├── extractor.test.ts
-│   │   ├── helpers/               # fake-browser.ts, manual-clock.ts
+│   │   ├── collector-dom.test.ts  # collectInPage on real DOM (jsdom)
+│   │   ├── request-guard.test.ts  # real guard against a fake CDP session
+│   │   ├── cdp.test.ts            # isolated world, page metrics, scrollbars
+│   │   ├── capture-guards.test.ts # orchestrator: refused requests, warnings, host cache
+│   │   ├── lib-text-rules.test.ts # no forbidden attribute word under lib/capture, tests and specs
+│   │   ├── helpers/               # fake-browser.ts, manual-clock.ts, fake-cdp.ts, forbidden-attribute.ts
 │   │   ├── remote-capture.test.ts # opt-in live test (RUN_REMOTE_CAPTURE=1), skipped by default
 │   │   └── ...                    # one test file per lib/capture file, plus capture-stop, capture-deadlines, capture-reload
 │   ├── walker/
