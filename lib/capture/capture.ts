@@ -37,10 +37,11 @@ import {
 } from "./constants";
 import { buildSample, snapshotBytes } from "./extractor";
 import { maxBoxDrift } from "./geometry";
+import { createGuardPolicy } from "./guard-policy";
 import { redactText, toDetail } from "./redact";
 import { createDnsResolver } from "./resolver";
 import { captureImages } from "./screenshots";
-import type { BrowserProvider, BrowserSessionHandle, GetBrowserResult, PageGuards } from "./seam";
+import type { BrowserProvider, BrowserSessionHandle, GetBrowserResult } from "./seam";
 import {
   CaptureFailure,
   ERROR_MESSAGES,
@@ -53,9 +54,8 @@ import {
   type CaptureWarningCode,
   type CollectOptions,
   type GuardReasonCode,
-  type UrlErrorCode,
 } from "./types";
-import { checkUrl, checkUrlSyntax, type Resolver, type UrlCheckResult } from "./url-check";
+import type { Resolver } from "./url-check";
 
 export interface CaptureDeps {
   config: CaptureConfig;
@@ -276,29 +276,38 @@ async function runCapture(
   if (config.apiKey !== null) ctx.secrets.push(config.apiKey);
 
   const resolver = deps.resolver ?? createDnsResolver();
-  const urlOptions = { resolver };
 
-  // Verdict per origin, so each request on the same origin does not repeat the DNS
-  // lookup. The syntax checks run on every URL; the key is the origin and not the host
-  // because the checks depend on scheme and port. The DNS check is made on the origin
-  // alone, so a long hop URL does not fail it for its length. `maxLength` is the limit
-  // of this URL: the input URL keeps the default, a hop or a final URL gets the hop limit.
-  const verdicts = new Map<string, Promise<UrlErrorCode | null>>();
-  const inspect = async (candidate: string, maxLength?: number): Promise<UrlCheckResult> => {
-    const syntax = checkUrlSyntax(candidate, maxLength === undefined ? undefined : { maxLength });
-    if (!syntax.ok) return syntax;
-    const origin = new URL(syntax.url).origin;
-    let pending = verdicts.get(origin);
-    if (!pending) {
-      pending = checkUrl(`${origin}/`, urlOptions).then((result) => (result.ok ? null : result.code));
-      verdicts.set(origin, pending);
-    }
-    const code = await pending;
-    return code === null ? syntax : { ok: false, code };
-  };
+  // One policy for the whole capture: the input URL, every request of the guard and both
+  // final-URL checks use its syntax checks and its one capped verdict cache.
+  const policy = createGuardPolicy({
+    resolver,
+    report(event) {
+      if (event.kind === "guard-lost") {
+        // Not a warning: the capture ends. Start the stop now, reject the running stage,
+        // and ignore a loss that arrives once the stop has begun (the capture's own stop).
+        if (ctx.lost || ctx.stopping) return;
+        ctx.lost = true;
+        ctx.rejectLost(lostFailure());
+        void startStop(ctx, clock, deps);
+        return;
+      }
+      if (event.kind === "request-blocked") {
+        // Only a refused main-frame request can fail the navigation as a block. The
+        // warning carries the count and the first reason, never a URL or a host.
+        if (event.mainFrame) ctx.navigationBlocked = true;
+        ctx.blocked.count += 1;
+        ctx.blocked.reason ??= event.reason;
+      }
+      ctx.warnings.add(event.kind);
+    },
+  });
+  const inspect = policy.inspect;
 
   const requested = await step(() => inspect(url));
-  if (!requested.ok) throw new CaptureFailure(requested.code);
+  if (!requested.ok) {
+    // The input URL is checked first, so it always fits in the cache; the cap is not reachable here.
+    throw new CaptureFailure(requested.code === "host-limit-reached" ? "internal-error" : requested.code);
+  }
 
   // 2. Browser.
   const getBrowserFor = deps.getBrowser ?? ((c: CaptureConfig) => getBrowser(c, { fetch, clock }));
@@ -343,36 +352,7 @@ async function runCapture(
     ms: CDP_CONNECT_TIMEOUT_MS,
     code: "connect-timeout",
   });
-  const guards: PageGuards = {
-    checkSyntax(candidate) {
-      const syntax = checkUrlSyntax(candidate, { maxLength: MAX_HOP_URL_LENGTH });
-      return syntax.ok ? { allowed: true } : { allowed: false, reason: syntax.code };
-    },
-    async checkHost(candidate) {
-      const verdict = await inspect(candidate, MAX_HOP_URL_LENGTH);
-      return verdict.ok ? { allowed: true } : { allowed: false, reason: verdict.code };
-    },
-    report(event) {
-      if (event.kind === "guard-lost") {
-        // Not a warning: the capture ends. Start the stop now, reject the running stage,
-        // and ignore a loss that arrives once the stop has begun (the capture's own stop).
-        if (ctx.lost || ctx.stopping) return;
-        ctx.lost = true;
-        ctx.rejectLost(lostFailure());
-        void startStop(ctx, clock, deps);
-        return;
-      }
-      if (event.kind === "request-blocked") {
-        // Only a refused main-frame request can fail the navigation as a block. The
-        // warning carries the count and the first reason, never a URL or a host.
-        if (event.mainFrame) ctx.navigationBlocked = true;
-        ctx.blocked.count += 1;
-        ctx.blocked.reason ??= event.reason;
-      }
-      ctx.warnings.add(event.kind);
-    },
-  };
-  await step(() => page.installGuards(guards), "connect-failed");
+  await step(() => page.installGuards(policy), "connect-failed");
 
   // 5. Navigation, then the same checks on where the browser ended up.
   let navigation: { finalUrl: string };

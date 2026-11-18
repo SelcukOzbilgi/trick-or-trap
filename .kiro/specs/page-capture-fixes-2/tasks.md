@@ -61,10 +61,10 @@ Rules for every task:
   - [x] 8.3 Run `config.test.ts`, `remote-browser.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 3.3, 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 9. Host and DNS budget, capped verdict cache
-  - [ ] 9.1 Create `tests/capture/guard-policy.test.ts` first (cache reuse; at `MAX_VERDICT_CACHE_ENTRIES` a new origin is refused with `host-limit-reached` and no resolver call; the input URL check uses the same cache). Extend `browser-guard.test.ts`: documents refused at 300 distinct hosts and non-documents at 100, both with `host-limit-reached`, one `request-host-limit` report; change the case that pins `url-host-blocked` for the limit (named here).
-  - [ ] 9.2 Create `lib/capture/guard-policy.ts` from the policy code in `capture.ts`; edit `capture.ts` to use it, `browser-guard.ts` for the limits, `constants.ts` and `constants.test.ts`.
-  - [ ] 9.3 Run `guard-policy.test.ts`, `browser-guard.test.ts`, `capture-guards.test.ts`, `capture.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
+- [x] 9. Host and DNS budget, capped verdict cache
+  - [x] 9.1 Create `tests/capture/guard-policy.test.ts` first (cache reuse; at `MAX_VERDICT_CACHE_ENTRIES` a new origin is refused with `host-limit-reached` and no resolver call; the input URL check uses the same cache). Extend `browser-guard.test.ts`: documents refused at 300 distinct hosts and non-documents at 100, both with `host-limit-reached`, one `request-host-limit` report; change the case that pins `url-host-blocked` for the limit (named here).
+  - [x] 9.2 Create `lib/capture/guard-policy.ts` from the policy code in `capture.ts`; edit `capture.ts` to use it, `browser-guard.ts` for the limits, `constants.ts` and `constants.test.ts`.
+  - [x] 9.3 Run `guard-policy.test.ts`, `browser-guard.test.ts`, `capture-guards.test.ts`, `capture.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7_
 
 - [ ] 10. Collector against DOM clobbering

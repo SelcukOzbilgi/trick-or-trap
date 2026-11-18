@@ -71,6 +71,10 @@ export const MAX_HOP_URL_LENGTH = 8_192;
 export const GUARD_DECISION_TIMEOUT_MS = 5_000;
 /** Most distinct hosts a capture checks for non-document requests. */
 export const MAX_REQUEST_HOSTS = 100;
+/** Most distinct hosts a capture checks in all, document requests included. */
+export const MAX_LOOKUP_HOSTS = 300;
+/** Most origins the verdict cache holds. Four origins per host are possible for `MAX_LOOKUP_HOSTS` hosts. */
+export const MAX_VERDICT_CACHE_ENTRIES = 1_200;
 /** The guard sends one `Browser.getVersion` on its session this often. */
 export const GUARD_HEARTBEAT_INTERVAL_MS = 2_000;
 /** A heartbeat with no answer after this long counts as a lost guard. */

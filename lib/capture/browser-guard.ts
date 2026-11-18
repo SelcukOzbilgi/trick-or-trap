@@ -66,6 +66,7 @@ import {
   GUARD_DECISION_TIMEOUT_MS,
   GUARD_HEARTBEAT_INTERVAL_MS,
   GUARD_HEARTBEAT_TIMEOUT_MS,
+  MAX_LOOKUP_HOSTS,
   MAX_REQUEST_HOSTS,
 } from "./constants";
 import type { GuardBrowser, GuardLossCause, GuardSession, GuardVerdict, RequestPolicy } from "./guard-types";
@@ -84,6 +85,8 @@ export type BrowserGuardOptions = {
   hardening?: { maxBodyBytes: number };
   /** Distinct hosts accepted for non-document requests. Default `MAX_REQUEST_HOSTS`. */
   maxHosts?: number;
+  /** Distinct hosts accepted in all, document requests included. Default `MAX_LOOKUP_HOSTS`. */
+  maxLookupHosts?: number;
   /** Longest wait for one verdict. Default `GUARD_DECISION_TIMEOUT_MS`. */
   decisionTimeoutMs?: number;
   /** Default: the two heartbeat constants. */
@@ -183,6 +186,7 @@ export async function installBrowserGuard(
 ): Promise<BrowserGuard> {
   const { clock, mainFrameId, onLost, hardening } = options;
   const maxHosts = options.maxHosts ?? MAX_REQUEST_HOSTS;
+  const maxLookupHosts = options.maxLookupHosts ?? MAX_LOOKUP_HOSTS;
   const decisionTimeoutMs = options.decisionTimeoutMs ?? GUARD_DECISION_TIMEOUT_MS;
   const heartbeatIntervalMs = options.heartbeat?.intervalMs ?? GUARD_HEARTBEAT_INTERVAL_MS;
   const heartbeatTimeoutMs = options.heartbeat?.timeoutMs ?? GUARD_HEARTBEAT_TIMEOUT_MS;
@@ -229,16 +233,21 @@ export async function installBrowserGuard(
     if (!syntax.allowed) return syntax;
 
     // Check and add happen with no await in between, so requests that are paused at
-    // the same time cannot push the set past the limit.
+    // the same time cannot push the set past the limit. A new host of a non-document
+    // request counts against `maxHosts`; a new host of any request counts against
+    // `maxLookupHosts`, which bounds the DNS work of the capture. A refused host is not added.
     const host = parsed.hostname.toLowerCase();
-    if (!isDocument && !seenHosts.has(host) && seenHosts.size >= maxHosts) {
-      if (!hostLimitReported) {
-        hostLimitReported = true;
-        await quietly(() => policy.report({ kind: "request-host-limit" }));
+    if (!seenHosts.has(host)) {
+      const limit = isDocument ? maxLookupHosts : maxHosts;
+      if (seenHosts.size >= limit) {
+        if (!hostLimitReported) {
+          hostLimitReported = true;
+          await quietly(() => policy.report({ kind: "request-host-limit" }));
+        }
+        return refuse("host-limit-reached");
       }
-      return refuse("url-host-blocked");
+      seenHosts.add(host);
     }
-    seenHosts.add(host);
     return policy.checkHost(url);
   }
 

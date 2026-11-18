@@ -39,6 +39,14 @@ describe("capture constants", () => {
     expect(constants.MAX_HOP_URL_LENGTH).toBe(8_192);
   });
 
+  it("has the host and DNS budget values", () => {
+    expect(constants.MAX_LOOKUP_HOSTS).toBe(300);
+    expect(constants.MAX_VERDICT_CACHE_ENTRIES).toBe(1_200);
+    // Four origins per host are possible for the 300 hosts of the budget.
+    expect(constants.MAX_VERDICT_CACHE_ENTRIES).toBe(constants.MAX_LOOKUP_HOSTS * 4);
+    expect(constants.MAX_LOOKUP_HOSTS).toBeGreaterThan(constants.MAX_REQUEST_HOSTS);
+  });
+
   it("has the guard heartbeat values", () => {
     expect(constants.GUARD_HEARTBEAT_INTERVAL_MS).toBe(2_000);
     expect(constants.GUARD_HEARTBEAT_TIMEOUT_MS).toBe(5_000);

@@ -6,6 +6,7 @@ import {
   GUARD_DECISION_TIMEOUT_MS,
   GUARD_HEARTBEAT_INTERVAL_MS,
   GUARD_HEARTBEAT_TIMEOUT_MS,
+  MAX_LOOKUP_HOSTS,
   MAX_REQUEST_HOSTS,
 } from "@/lib/capture/constants";
 import type {
@@ -436,7 +437,7 @@ describe("host seen-set and host limit", () => {
     expect(policy.events).toEqual([]);
   });
 
-  it("refuses the 101st distinct non-document host with url-host-blocked and reports the limit once", async () => {
+  it("refuses the 101st distinct non-document host with host-limit-reached and reports the limit once", async () => {
     const { fake, policy } = await setup();
     for (let i = 0; i < MAX_REQUEST_HOSTS; i += 1) {
       await paused(fake, `ok-${i}`, `https://h${i}.example/x.png`, { resourceType: "Image" });
@@ -449,7 +450,7 @@ describe("host seen-set and host limit", () => {
     expect(policy.events.filter((event) => event.kind === "request-host-limit")).toHaveLength(1);
     expect(
       policy.events.filter((event) => event.kind === "request-blocked").map((event) => event.kind === "request-blocked" && event.reason),
-    ).toEqual(["url-host-blocked", "url-host-blocked"]);
+    ).toEqual(["host-limit-reached", "host-limit-reached"]);
     expect(policy.hostCalls).not.toContain("https://extra1.example/x.png");
     // A host seen before the limit is still allowed.
     await paused(fake, "again", "https://h0.example/y.png", { resourceType: "Image" });
@@ -462,11 +463,11 @@ describe("host seen-set and host limit", () => {
     await paused(fake, "r2", "https://b.example/1.png", { resourceType: "Image" });
     expect(policy.events).toEqual([
       { kind: "request-host-limit" },
-      { kind: "request-blocked", reason: "url-host-blocked", mainFrame: false },
+      { kind: "request-blocked", reason: "host-limit-reached", mainFrame: false },
     ]);
   });
 
-  it("never refuses a document request for the host limit", async () => {
+  it("does not refuse a document request for the non-document limit", async () => {
     const { fake, policy } = await setup({ maxHosts: 1 });
     await paused(fake, "r1", "https://a.example/1.png", { resourceType: "Image" });
     await paused(fake, "r2", "https://b.example/", { frameId: "CHILD" });
@@ -495,6 +496,86 @@ describe("host seen-set and host limit", () => {
     );
     expect(fake.callsOf("Fetch.continueRequest")).toHaveLength(2);
     expect(fake.callsOf("Fetch.failRequest")).toHaveLength(2);
+  });
+
+  it("refuses the 301st distinct document host with host-limit-reached and reports the limit once", async () => {
+    const { fake, policy } = await setup();
+    expect(MAX_LOOKUP_HOSTS).toBe(300);
+    for (let i = 0; i < MAX_LOOKUP_HOSTS; i += 1) {
+      await paused(fake, `doc-${i}`, `https://d${i}.example/`, { frameId: "CHILD" });
+    }
+    expect(fake.callsOf("Fetch.failRequest")).toHaveLength(0);
+    await paused(fake, "over-1", "https://extra1.example/");
+    await paused(fake, "over-2", "https://extra2.example/", { frameId: "CHILD" });
+    expect(request(fake, "over-1").state).toBe("failed");
+    expect(request(fake, "over-2").state).toBe("failed");
+    expect(policy.events.filter((event) => event.kind === "request-host-limit")).toHaveLength(1);
+    expect(policy.events.filter((event) => event.kind === "request-blocked")).toEqual([
+      { kind: "request-blocked", reason: "host-limit-reached", mainFrame: true },
+      { kind: "request-blocked", reason: "host-limit-reached", mainFrame: false },
+    ]);
+    expect(policy.hostCalls).not.toContain("https://extra1.example/");
+    // A host seen before the limit is still allowed.
+    await paused(fake, "again", "https://d0.example/next", { frameId: "CHILD" });
+    expect(request(fake, "again").state).toBe("continued");
+  });
+
+  it("applies 100 hosts to non-documents and 300 to documents, with one request-host-limit report", async () => {
+    const { fake, policy } = await setup();
+    for (let i = 0; i < MAX_REQUEST_HOSTS; i += 1) {
+      await paused(fake, `img-${i}`, `https://i${i}.example/x.png`, { resourceType: "Image" });
+    }
+    // 100 hosts are seen: a new non-document host is refused, a new document host is not.
+    await paused(fake, "img-over", "https://more.example/x.png", { resourceType: "Image" });
+    expect(request(fake, "img-over").state).toBe("failed");
+    await paused(fake, "doc-new", "https://doc-100.example/", { frameId: "CHILD" });
+    expect(request(fake, "doc-new").state).toBe("continued");
+    // The non-document limit stays reached; documents go on until 300 hosts are seen.
+    for (let i = 1; i < MAX_LOOKUP_HOSTS - MAX_REQUEST_HOSTS; i += 1) {
+      await paused(fake, `doc-${i}`, `https://doc-${100 + i}.example/`, { frameId: "CHILD" });
+    }
+    expect(fake.callsOf("Fetch.failRequest")).toHaveLength(1);
+    await paused(fake, "doc-over", "https://doc-over.example/", { frameId: "CHILD" });
+    expect(request(fake, "doc-over").state).toBe("failed");
+    expect(policy.events.filter((event) => event.kind === "request-host-limit")).toHaveLength(1);
+    expect(
+      policy.events
+        .filter((event) => event.kind === "request-blocked")
+        .map((event) => (event.kind === "request-blocked" ? event.reason : null)),
+    ).toEqual(["host-limit-reached", "host-limit-reached"]);
+  });
+
+  it("uses the lookup limit of the options for documents", async () => {
+    const { fake, policy } = await setup({ maxLookupHosts: 2 });
+    await paused(fake, "r1", "https://a.example/", { frameId: "CHILD" });
+    await paused(fake, "r2", "https://b.example/", { frameId: "CHILD" });
+    await paused(fake, "r3", "https://c.example/", { frameId: "CHILD" });
+    expect(request(fake, "r2").state).toBe("continued");
+    expect(request(fake, "r3").state).toBe("failed");
+    expect(policy.events).toEqual([
+      { kind: "request-host-limit" },
+      { kind: "request-blocked", reason: "host-limit-reached", mainFrame: false },
+    ]);
+  });
+
+  it("does not add a refused host, so the same host is refused again without a DNS check", async () => {
+    const { fake, policy } = await setup({ maxHosts: 1 });
+    await paused(fake, "r1", "https://a.example/1.png", { resourceType: "Image" });
+    await paused(fake, "r2", "https://b.example/1.png", { resourceType: "Image" });
+    await paused(fake, "r3", "https://b.example/2.png", { resourceType: "Image" });
+    expect(request(fake, "r2").state).toBe("failed");
+    expect(request(fake, "r3").state).toBe("failed");
+    expect(policy.hostCalls).toEqual(["https://a.example/1.png"]);
+    expect(policy.events.filter((event) => event.kind === "request-host-limit")).toHaveLength(1);
+  });
+
+  it("does not count a host that fails the syntax check", async () => {
+    const { fake, policy } = await setup({ maxHosts: 1 });
+    await paused(fake, "r1", "https://badsyntax.example/1.png", { resourceType: "Image" });
+    await paused(fake, "r2", "https://a.example/1.png", { resourceType: "Image" });
+    expect(request(fake, "r1").state).toBe("failed");
+    expect(request(fake, "r2").state).toBe("continued");
+    expect(policy.events.filter((event) => event.kind === "request-host-limit")).toHaveLength(0);
   });
 });
 
