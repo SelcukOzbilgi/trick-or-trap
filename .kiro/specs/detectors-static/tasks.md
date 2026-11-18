@@ -67,15 +67,15 @@ Rules for every task:
   - [x] 5.4 Run both test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 8.1, 8.2, 8.3, 8.12, 8.13_
 
-- [ ] 6. fake-urgency detector
+- [x] 6. fake-urgency detector
   - Uses: `buildSamplePair`, `findCounterpart`, `buildIndex` (task 3), `finaliseFindings`, `detectedAtFrom` (task 4), `parseCountdowns`, `parseCalendarDates` (task 5), text helpers (task 2).
   - Files: creates `lib/detectors/data/urgency-words.ts` and `tests/detectors/fake-urgency.test.ts`; edits `lib/detectors/fake-urgency.ts`.
-  - [ ] 6.1 Create `tests/detectors/fake-urgency.test.ts` first with small hand-built snapshots (generic shop wording, no Boo-tique strings), reload rows: each class of the countdown table in design section 9.1 with a 9 s gap; rows U2, U3 and U5 in English and Turkish; restart without wording gives U4 for `HH:MM:SS` and nothing for `MM:SS`; a countdown with a calendar date in the same element gives U1; no reload gives only low findings; a 2 s, a 200 s and a negative gap behave as no usable gap; evidence states both values and the gap and sets `firstValue`, `reloadValue`, `gapSeconds`.
-  - [ ] 6.2 In the same file, text rows and look-alikes: U6 for "ends at midnight" and "sadece bugün" without a date; future, yearless and ambiguous dates with "ends" give no finding; a date 2 days before `capturedAt` with "ends" gives U7; an unusable `capturedAt` never gives U7; "Order within 2h for next-day delivery" and "aynı gün kargo" give no text finding; a time of day next to a date is not a countdown.
-  - [ ] 6.3 In the same file, shared contract: the same claim in a parent and a child is reported once on the child; an empty snapshot gives `[]`; `null`, a string and an object without `elements` give `[]`; two calls give deep-equal results; findings are in document order.
-  - [ ] 6.4 Create `lib/detectors/data/urgency-words.ts` with the lists of design section 9.1 and the review rule comment at the top.
-  - [ ] 6.5 Replace the stub in `lib/detectors/fake-urgency.ts` with `detectFakeUrgency` as in design section 9.1, wrapped in `try`/`catch` returning `[]`.
-  - [ ] 6.6 Run `npx vitest run tests/detectors/fake-urgency.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
+  - [x] 6.1 Create `tests/detectors/fake-urgency.test.ts` first with small hand-built snapshots (generic shop wording, no Boo-tique strings), reload rows: each class of the countdown table in design section 9.1 with a 9 s gap; rows U2, U3 and U5 in English and Turkish; restart without wording gives U4 for `HH:MM:SS` and nothing for `MM:SS`; a countdown with a calendar date in the same element gives U1; no reload gives only low findings; a 2 s, a 200 s and a negative gap behave as no usable gap; evidence states both values and the gap and sets `firstValue`, `reloadValue`, `gapSeconds`.
+  - [x] 6.2 In the same file, text rows and look-alikes: U6 for "ends at midnight" and "sadece bugün" without a date; future, yearless and ambiguous dates with "ends" give no finding; a date 2 days before `capturedAt` with "ends" gives U7; an unusable `capturedAt` never gives U7; "Order within 2h for next-day delivery" and "aynı gün kargo" give no text finding; a time of day next to a date is not a countdown.
+  - [x] 6.3 In the same file, shared contract: the same claim in a parent and a child is reported once on the child; an empty snapshot gives `[]`; `null`, a string and an object without `elements` give `[]`; two calls give deep-equal results; findings are in document order.
+  - [x] 6.4 Create `lib/detectors/data/urgency-words.ts` with the lists of design section 9.1 and the review rule comment at the top.
+  - [x] 6.5 Replace the stub in `lib/detectors/fake-urgency.ts` with `detectFakeUrgency` as in design section 9.1, wrapped in `try`/`catch` returning `[]`.
+  - [x] 6.6 Run `npx vitest run tests/detectors/fake-urgency.test.ts --maxWorkers=2`, then `npx tsc --noEmit`.
   _Requirements: 2.1, 2.5, 2.6, 2.7, 3.4, 3.5, 3.8, 7.16, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.10, 8.11, 8.14, 8.15, 8.16, 8.17, 8.18, 8.19, 14.5_
 
 - [ ] 7. fake-scarcity detector
