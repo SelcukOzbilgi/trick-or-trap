@@ -52,7 +52,11 @@ export interface PageGuards {
   report(event: GuardEvent): void;
 }
 
-export type NavigationOutcome = { finalUrl: string };
+export type NavigationOutcome = {
+  finalUrl: string;
+  /** HTTP status of the main document, a plain integer from 100 to 599. Absent when unknown. */
+  status?: number;
+};
 
 export type ScreenshotRequest =
   | { kind: "clip"; clip: { x: 0; y: 0; width: number; height: number }; quality: number } // single mode

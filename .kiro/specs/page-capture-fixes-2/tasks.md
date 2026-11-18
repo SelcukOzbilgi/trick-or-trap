@@ -80,10 +80,10 @@ Rules for every task:
   - [x] 11.4 Run `browser-use-api.test.ts`, `remote-browser.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 10.10, 10.11_
 
-- [ ] 12. HTTP status through the seam
-  - [ ] 12.1 Extend `remote-browser.test.ts` first: `goto` and `reload` fakes returning `{ status: () => 404 }`, `null`, `600` and a throwing `status` give `status` 404 or none.
-  - [ ] 12.2 Edit `lib/capture/seam.ts` (optional `status`), `lib/capture/remote-browser.ts` and `tests/capture/helpers/fake-browser.ts` (script option for the status) with `fake-browser.test.ts`.
-  - [ ] 12.3 Run `remote-browser.test.ts`, `fake-browser.test.ts`, then `npx tsc --noEmit`.
+- [x] 12. HTTP status through the seam
+  - [x] 12.1 Extend `remote-browser.test.ts` first: `goto` and `reload` fakes returning `{ status: () => 404 }`, `null`, `600` and a throwing `status` give `status` 404 or none.
+  - [x] 12.2 Edit `lib/capture/seam.ts` (optional `status`), `lib/capture/remote-browser.ts` and `tests/capture/helpers/fake-browser.ts` (script option for the status) with `fake-browser.test.ts`.
+  - [x] 12.3 Run `remote-browser.test.ts`, `fake-browser.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 12.1, 12.2, 12.3_
 
 - [ ] 13. Status warning, `httpStatus` and the reload check

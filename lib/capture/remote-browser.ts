@@ -136,6 +136,25 @@ function isTimeoutError(error: unknown): boolean {
   return error instanceof Error && error.name === "TimeoutError";
 }
 
+/**
+ * The HTTP status of a Playwright response as a plain number, or `undefined`. A missing
+ * response, a missing or throwing `status`, and any value that is not an integer from
+ * 100 to 599 all give `undefined`. Never throws: the status is a hint, not a requirement.
+ */
+function statusOfResponse(response: unknown): number | undefined {
+  try {
+    if (typeof response !== "object" || response === null) return undefined;
+    const read = (response as { status?: unknown }).status;
+    if (typeof read !== "function") return undefined;
+    const status: unknown = read.call(response);
+    return typeof status === "number" && Number.isInteger(status) && status >= 100 && status <= 599
+      ? status
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** Closes a page or download quietly; any failure is ignored. */
 async function quietly(action: () => Promise<unknown>): Promise<void> {
   try {
@@ -159,12 +178,14 @@ function createCapturePage(
     action: () => Promise<unknown>,
     timeoutCode: CaptureErrorCode,
   ): Promise<NavigationOutcome> => {
+    let response: unknown;
     try {
-      await action();
-      return { finalUrl: page.url() };
+      response = await action();
     } catch (error) {
       throw fail(isTimeoutError(error) ? timeoutCode : "navigation-failed", error);
     }
+    const status = statusOfResponse(response);
+    return status === undefined ? { finalUrl: page.url() } : { finalUrl: page.url(), status };
   };
 
   return {

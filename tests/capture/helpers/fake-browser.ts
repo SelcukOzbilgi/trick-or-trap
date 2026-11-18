@@ -27,6 +27,10 @@ export type FakeScript = {
   goto?: FakeStep<NavigationOutcome, [string, { timeoutMs: number }]>;
   /** Default: the last entry of `hops`, else the URL of the last goto. */
   reload?: FakeStep<NavigationOutcome, [{ timeoutMs: number }]>;
+  /** HTTP status of the default `goto` outcome. Default: absent. A scripted `goto` outcome carries its own. */
+  gotoStatus?: number;
+  /** HTTP status of the default `reload` outcome. Default: absent. */
+  reloadStatus?: number;
   collect?: FakeStep<RawPageRead, [CollectOptions]>;
   /** The real `scrollY` read back. Default: the requested `y`, limited by `maxScrollY`. */
   scrollTo?: FakeStep<number, [number]>;
@@ -80,6 +84,11 @@ export function createRawPageRead(overrides: Partial<RawPageRead> = {}): RawPage
   };
 }
 
+/** A navigation outcome; `status` is present only when one is scripted. */
+function withStatus(finalUrl: string, status: number | undefined): NavigationOutcome {
+  return status === undefined ? { finalUrl } : { finalUrl, status };
+}
+
 async function runStep<T, A extends unknown[]>(
   step: FakeStep<T, A> | undefined,
   fallback: () => T,
@@ -130,7 +139,7 @@ export function createFakeBrowser(script: FakeScript = {}): FakeBrowser {
         script.goto,
         () => {
           currentUrl = lastHop() ?? url;
-          return { finalUrl: currentUrl };
+          return withStatus(currentUrl, script.gotoStatus);
         },
         n,
         [url, options],
@@ -139,7 +148,12 @@ export function createFakeBrowser(script: FakeScript = {}): FakeBrowser {
     async reload(options) {
       const n = next("reload");
       await followHops();
-      return runStep(script.reload, () => ({ finalUrl: lastHop() ?? currentUrl }), n, [options]);
+      return runStep(
+        script.reload,
+        () => withStatus(lastHop() ?? currentUrl, script.reloadStatus),
+        n,
+        [options],
+      );
     },
     async collect(options) {
       const n = next("collect");

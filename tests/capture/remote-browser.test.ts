@@ -119,6 +119,10 @@ type FakePlaywrightOptions = {
   /** The `scrollY` the scroll function reports back. */
   scrollY?: unknown;
   finalUrl?: string;
+  /** What `page.goto` resolves with. Default `null` (no main-document response). */
+  gotoResponse?: unknown;
+  /** What `page.reload` resolves with. Default `null`. */
+  reloadResponse?: unknown;
   events?: string[];
 };
 
@@ -175,11 +179,11 @@ function createFakePlaywright(options: FakePlaywrightOptions = {}) {
   const makePage = () => ({
     goto: vi.fn(async (_url: string, _options: unknown) => {
       if (options.gotoError) throw options.gotoError;
-      return null;
+      return "gotoResponse" in options ? options.gotoResponse : null;
     }),
     reload: vi.fn(async (_options: unknown) => {
       if (options.reloadError) throw options.reloadError;
-      return null;
+      return "reloadResponse" in options ? options.reloadResponse : null;
     }),
     // There is deliberately no `evaluate` here: the adapter must read the page through CDP.
     screenshot: vi.fn(async (_options: unknown) => {
@@ -985,6 +989,78 @@ describe("navigation", () => {
     const { page } = await connectedPage({ reloadError: new Error("boom") });
     const failure = await failureOf(page.reload({ timeoutMs: 1000 }));
     expect(failure.code).toBe("navigation-failed");
+  });
+});
+
+describe("navigation status", () => {
+  it("returns the main-document status of goto as a plain number", async () => {
+    const { page } = await connectedPage({ gotoResponse: { status: () => 404 } });
+    const outcome = await page.goto("https://shop.example.com/", { timeoutMs: 12_000 });
+    expect(outcome).toEqual({ finalUrl: "https://shop.example.com/", status: 404 });
+    expect(typeof outcome.status).toBe("number");
+  });
+
+  it("returns the main-document status of reload as a plain number", async () => {
+    const { page } = await connectedPage({ reloadResponse: { status: () => 503 } });
+    const outcome = await page.reload({ timeoutMs: 9_000 });
+    expect(outcome).toEqual({ finalUrl: "https://shop.example.com/", status: 503 });
+  });
+
+  it.each([100, 200, 599])("accepts the status %s at the edges of the range", async (status) => {
+    const { page } = await connectedPage({ gotoResponse: { status: () => status } });
+    const outcome = await page.goto("https://shop.example.com/", { timeoutMs: 1000 });
+    expect(outcome.status).toBe(status);
+  });
+
+  it("leaves status absent when goto has no response", async () => {
+    const { page } = await connectedPage({ gotoResponse: null });
+    const outcome = await page.goto("https://shop.example.com/", { timeoutMs: 1000 });
+    expect(outcome).toEqual({ finalUrl: "https://shop.example.com/" });
+    expect("status" in outcome).toBe(false);
+  });
+
+  it("leaves status absent when reload has no response", async () => {
+    const { page } = await connectedPage({ reloadResponse: null });
+    const outcome = await page.reload({ timeoutMs: 1000 });
+    expect("status" in outcome).toBe(false);
+  });
+
+  it.each([600, 99, 0, -1, 200.5, NaN, Infinity, "404", null, undefined])(
+    "leaves status absent when the response status is %s",
+    async (status) => {
+      const { page } = await connectedPage({
+        gotoResponse: { status: () => status },
+        reloadResponse: { status: () => status },
+      });
+      const first = await page.goto("https://shop.example.com/", { timeoutMs: 1000 });
+      const second = await page.reload({ timeoutMs: 1000 });
+      expect("status" in first).toBe(false);
+      expect("status" in second).toBe(false);
+      expect(first.finalUrl).toBe("https://shop.example.com/");
+    },
+  );
+
+  it("leaves status absent, and does not fail, when reading the status throws", async () => {
+    const throwing = {
+      status: () => {
+        throw new Error(`status unavailable ${API_KEY}`);
+      },
+    };
+    const { page } = await connectedPage({ gotoResponse: throwing, reloadResponse: throwing });
+    const first = await page.goto("https://shop.example.com/", { timeoutMs: 1000 });
+    const second = await page.reload({ timeoutMs: 1000 });
+    expect(first).toEqual({ finalUrl: "https://shop.example.com/" });
+    expect(second).toEqual({ finalUrl: "https://shop.example.com/" });
+    expect("status" in first).toBe(false);
+    expect("status" in second).toBe(false);
+  });
+
+  it("leaves status absent when the response has no status function", async () => {
+    const { page } = await connectedPage({ gotoResponse: {}, reloadResponse: "ok" });
+    const first = await page.goto("https://shop.example.com/", { timeoutMs: 1000 });
+    const second = await page.reload({ timeoutMs: 1000 });
+    expect("status" in first).toBe(false);
+    expect("status" in second).toBe(false);
   });
 });
 
