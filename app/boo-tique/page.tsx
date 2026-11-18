@@ -20,13 +20,17 @@ export default async function BooTiqueHomePage({
 
   return (
     <>
-      {showUrgencyBlock ? (
-        <section className="bt-card" aria-label="Sales">
-          <HeroCountdown />
-          <p data-testid="home-rolling-midnight-text">{ROLLING_MIDNIGHT_TEXT}</p>
-          <p data-testid="home-fixed-date-sale">{FIXED_SALE_TEXT}</p>
-        </section>
-      ) : null}
+      <section className="bt-hero" aria-labelledby="bt-hero-heading">
+        <h1 id="bt-hero-heading">The Boo-tique</h1>
+        <p className="bt-hero-tagline">Gothic goods for living ghouls</p>
+        {showUrgencyBlock ? (
+          <div className="bt-promo">
+            <HeroCountdown />
+            <p data-testid="home-rolling-midnight-text">{ROLLING_MIDNIGHT_TEXT}</p>
+            <p data-testid="home-fixed-date-sale">{FIXED_SALE_TEXT}</p>
+          </div>
+        ) : null}
+      </section>
       <ProductGrid />
       {modal === "exit-intent" ? <ExitIntentModal /> : null}
       {modal === "none" ? <CookieBanner variant={banner} /> : null}

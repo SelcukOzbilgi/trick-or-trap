@@ -4,6 +4,7 @@ import {
   PRODUCTS,
   PRODUCT_PAGE_SLUG,
 } from "@/lib/boo-tique/content";
+import { formatUsd } from "@/lib/boo-tique/cart";
 import { perLoadValues } from "@/lib/boo-tique/per-load";
 import { EQUAL_BUTTON_STYLE } from "@/lib/boo-tique/styles";
 import { Stars, Tile } from "./product-grid";
@@ -11,9 +12,6 @@ import { SoldToast } from "./sold-toast";
 import { StockSignals, VariantRows } from "./stock-signals";
 import { UpsellModal } from "./upsell-modal";
 
-function formatPrice(priceUsd: number): string {
-  return `$${priceUsd.toFixed(2)}`;
-}
 
 function NotAvailable() {
   return (
@@ -44,9 +42,9 @@ export function createProductPage(
     return (
       <>
         <article className="bt-card" aria-labelledby="bt-product-heading">
-          <Tile />
+          <Tile slug={product.slug} />
           <h1 id="bt-product-heading">{product.name}</h1>
-          <p className="bt-price">{formatPrice(product.priceUsd)}</p>
+          <p className="bt-price">{formatUsd(product.priceUsd * 100)}</p>
           <Stars rating={product.rating} />
           <p>A smoky, pepper-scented candle in a black glass jar.</p>
           <StockSignals stockLeft={stockLeft} viewers={viewers} />

@@ -33,7 +33,13 @@ export const PRODUCTS: readonly Product[] = [
 ];
 
 /** Text of `home-fixed-date-sale`. A fixed calendar date, so it is an honest look-alike. */
-export const FIXED_SALE_TEXT = "Halloween sale ends 31 Oct 2026, 23:59 UTC";
+export const FIXED_SALE_TEXT = "Winter sale ends 28 Feb 2027, 23:59 UTC";
+
+/**
+ * Last day the demo's honest fixed-date sale is guaranteed to lie in the future.
+ * A build-time constant that is never compared with the clock.
+ */
+export const DEMO_VALID_UNTIL = "2027-01-31";
 
 /** Text of `home-rolling-midnight-text`. */
 export const ROLLING_MIDNIGHT_TEXT = "Black Friday of the Dead ends at midnight";
@@ -64,6 +70,19 @@ export const PRODUCT_VARIANTS: ReadonlyArray<{
 export const NAV_LINKS: readonly NavLink[] = [
   { label: "Home", href: BOO_TIQUE_BASE_PATH },
   { label: "Cart", href: `${BOO_TIQUE_BASE_PATH}/cart` },
+  { label: "Checkout", href: `${BOO_TIQUE_BASE_PATH}/checkout` },
   { label: "Club", href: `${BOO_TIQUE_BASE_PATH}/club` },
   { label: "Account", href: `${BOO_TIQUE_BASE_PATH}/account/subscription` },
 ];
+
+export type ProductIcon = "candle" | "hoodie" | "mug" | "tote" | "quill";
+
+/** Tile icon per product slug. */
+export const PRODUCT_ICONS: Readonly<Record<string, ProductIcon>> = {
+  "cursed-candle-set": "candle",
+  "phantom-hoodie": "hoodie",
+  "moon-phase-mug": "mug",
+  "crypt-keeper-tote": "tote",
+  "raven-feather-quill-pen": "quill",
+  "ghost-pepper-candle": "candle",
+};

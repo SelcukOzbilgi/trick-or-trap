@@ -84,6 +84,28 @@ describe("BooTiqueShell markup", () => {
     }
   });
 
+  it("lists the nav links in the order Home, Cart, Checkout, Club, Account", () => {
+    const expected = [
+      "/boo-tique",
+      "/boo-tique/cart",
+      "/boo-tique/checkout",
+      "/boo-tique/club",
+      "/boo-tique/account/subscription",
+    ];
+    expect(NAV_LINKS.map((link) => link.href)).toEqual(expected);
+    expect(NAV_LINKS.map((link) => link.label)).toEqual([
+      "Home",
+      "Cart",
+      "Checkout",
+      "Club",
+      "Account",
+    ]);
+    const nav = /<nav\b[\s\S]*?<\/nav>/.exec(render());
+    expect(nav).not.toBeNull();
+    const hrefs = [...(nav?.[0] ?? "").matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1]);
+    expect(hrefs).toEqual(expected);
+  });
+
   it("applies fontClassName to the wrapper", () => {
     const markup = render("font-a font-b");
     const wrapper = /^<div class="([^"]*)"/.exec(markup);

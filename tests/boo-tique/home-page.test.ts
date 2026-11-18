@@ -20,13 +20,112 @@ function render(route: string): Promise<string> {
 }
 
 const PRODUCTS: ReadonlyArray<readonly [string, string]> = [
-  ["Cursed Candle Set", "$24"],
-  ["Phantom Hoodie", "$58"],
-  ["Moon-Phase Mug", "$22"],
-  ["Crypt Keeper Tote", "$26"],
-  ["Raven Feather Quill Pen", "$14"],
-  ["Ghost Pepper Candle", "$18"],
+  ["Cursed Candle Set", "$24.00"],
+  ["Phantom Hoodie", "$58.00"],
+  ["Moon-Phase Mug", "$22.00"],
+  ["Crypt Keeper Tote", "$26.00"],
+  ["Raven Feather Quill Pen", "$14.00"],
+  ["Ghost Pepper Candle", "$18.00"],
 ];
+
+/** Expected tile icon and star rating per card, in grid order (5.6, 5.8). */
+const CARD_ICONS = ["candle", "hoodie", "mug", "tote", "quill", "candle"] as const;
+const CARD_RATINGS = [4, 5, 4, 4, 3, 5] as const;
+
+const HOME_VARIANTS = [
+  "/boo-tique",
+  "/boo-tique?banner=ghost",
+  "/boo-tique?banner=equal",
+  "/boo-tique?modal=exit-intent",
+] as const;
+
+const HERO_OPEN = '<section class="bt-hero" aria-labelledby="bt-hero-heading">';
+const HERO_H1 = '<h1 id="bt-hero-heading">The Boo-tique</h1>';
+const HERO_TAGLINE = '<p class="bt-hero-tagline">Gothic goods for living ghouls</p>';
+
+describe("home page hero and outline", () => {
+  it.each(HOME_VARIANTS)("has one h1 inside the hero, then the tagline, on %s", async (route) => {
+    const markup = await renderRoute(route);
+    expect((markup.match(/<h1\b/g) ?? []).length).toBe(1);
+    const open = markup.indexOf(HERO_OPEN);
+    expect(open).toBeGreaterThan(-1);
+    const close = markup.indexOf("</section>", open);
+    const hero = markup.slice(open, close);
+    expect(hero.startsWith(`${HERO_OPEN}${HERO_H1}${HERO_TAGLINE}`)).toBe(true);
+  });
+
+  it.each(HOME_VARIANTS)("puts the h1 before the products heading on %s", async (route) => {
+    const markup = await renderRoute(route);
+    const h1 = markup.indexOf("<h1");
+    const h2 = markup.indexOf('<h2 id="bt-products-heading">Shop the crypt</h2>');
+    expect(h1).toBeGreaterThan(-1);
+    expect(h2).toBeGreaterThan(h1);
+  });
+
+  it("puts one promo block inside the hero of the default variant, after the tagline", async () => {
+    const markup = await renderRoute("/boo-tique");
+    expect(markup.split('class="bt-promo"').length - 1).toBe(1);
+    const open = markup.indexOf(HERO_OPEN);
+    const close = markup.indexOf("</section>", open);
+    const tagline = markup.indexOf(HERO_TAGLINE);
+    const promo = markup.indexOf('<div class="bt-promo">');
+    expect(promo).toBeGreaterThan(tagline);
+    expect(promo).toBeLessThan(close);
+  });
+
+  it("orders the three urgency entries countdown, midnight, fixed date", async () => {
+    const markup = await renderRoute("/boo-tique");
+    const countdown = markup.indexOf('data-testid="home-hero-countdown-restart"');
+    const midnight = markup.indexOf('data-testid="home-rolling-midnight-text"');
+    const fixed = markup.indexOf('data-testid="home-fixed-date-sale"');
+    expect(countdown).toBeGreaterThan(-1);
+    expect(midnight).toBeGreaterThan(countdown);
+    expect(fixed).toBeGreaterThan(midnight);
+  });
+
+  it.each(HOME_VARIANTS.slice(1))("has no promo block and no urgency id on %s", async (route) => {
+    const markup = await renderRoute(route);
+    expect(markup).not.toContain("bt-promo");
+    for (const id of [
+      "home-hero-countdown-restart",
+      "home-rolling-midnight-text",
+      "home-fixed-date-sale",
+    ]) {
+      expect(countTestId(markup, id), id).toBe(0);
+    }
+  });
+});
+
+describe("home page product tiles and stars", () => {
+  it("gives each card a tile with one svg and the icon of its product", async () => {
+    const markup = await renderRoute("/boo-tique");
+    const tiles = [
+      ...markup.matchAll(
+        /<div class="bt-tile bt-tile--([a-z]+)" aria-hidden="true">([\s\S]*?)<\/div>/g,
+      ),
+    ];
+    expect(tiles).toHaveLength(6);
+    expect(tiles.map((tile) => tile[1])).toEqual([...CARD_ICONS]);
+    for (const tile of tiles) expect((tile[2].match(/<svg\b/g) ?? []).length).toBe(1);
+    expect(new Set(tiles.map((tile) => tile[1])).size).toBe(5);
+  });
+
+  it("uses no img and no external url in a tile", async () => {
+    const markup = await renderRoute("/boo-tique");
+    expect(markup).not.toContain("<img");
+    expect(markup).not.toMatch(/https?:\/\//);
+  });
+
+  it("outputs each star rating as a role=img paragraph", async () => {
+    const markup = await renderRoute("/boo-tique");
+    const stars = [
+      ...markup.matchAll(
+        /<p class="bt-muted" role="img" aria-label="Rated (\d) out of 5">[★☆]{5}<\/p>/g,
+      ),
+    ];
+    expect(stars.map((star) => Number(star[1]))).toEqual([...CARD_RATINGS]);
+  });
+});
 
 describe("home page product grid", () => {
   it("shows the six product names and prices", async () => {
@@ -80,7 +179,7 @@ describe("home page urgency block", () => {
       "Black Friday of the Dead ends at midnight",
     );
     expect(textOf(markup, "home-fixed-date-sale")).toBe(
-      "Halloween sale ends 31 Oct 2026, 23:59 UTC",
+      "Winter sale ends 28 Feb 2027, 23:59 UTC",
     );
   });
 
@@ -110,6 +209,14 @@ describe("home page urgency block", () => {
         "Boo-nanza ends in 04:59:59",
       );
     }
+  });
+});
+
+describe("home page grid adds no unlisted manipulative copy", () => {
+  it("shows no Selling fast text and no bt-badge element", async () => {
+    const markup = await render("/boo-tique");
+    expect(visibleText(markup)).not.toMatch(/selling fast/i);
+    expect(markup).not.toContain("bt-badge");
   });
 });
 
@@ -161,6 +268,63 @@ const URGENCY_IDS = [
   "home-rolling-midnight-text",
   "home-fixed-date-sale",
 ];
+
+const BANNER_TEXT = "We use cookies to remember your basket and to count visits.";
+
+/** Splits a banner into its first paragraph, its actions div and what follows (2.1 to 2.4). */
+function bannerParts(markup: string, id: string) {
+  const tag = openTag(markup, id);
+  const rest = markup.slice(markup.indexOf(tag) + tag.length);
+  const head = `<p>${BANNER_TEXT}</p><div class="bt-banner-actions">`;
+  expect(rest.startsWith(head), "paragraph then actions div").toBe(true);
+  const afterHead = rest.slice(head.length);
+  const actionsEnd = afterHead.indexOf("</div>");
+  expect(actionsEnd).toBeGreaterThan(-1);
+  const actions = afterHead.slice(0, actionsEnd);
+  expect(actions).not.toContain("<div");
+  // The actions div is the last child: the banner root closes right after it.
+  expect(afterHead.slice(actionsEnd + "</div>".length).startsWith("</div>")).toBe(true);
+  const controls = [...actions.matchAll(/<(a|button)\b[^>]*>([\s\S]*?)<\/\1>/g)].map(
+    (match) => ({ tag: match[1], text: match[2].replace(/<[^>]*>/g, "").trim() }),
+  );
+  const leftover = actions.replace(/<(a|button)\b[^>]*>[\s\S]*?<\/\1>/g, "").trim();
+  expect(leftover).toBe("");
+  return { controls, actionsCount: markup.split('class="bt-banner-actions"').length - 1 };
+}
+
+describe("cookie banner structure", () => {
+  it.each([
+    [
+      "/boo-tique",
+      "home-cookie-accept-dominant",
+      [
+        { tag: "a", text: "options" },
+        { tag: "button", text: "Accept all" },
+      ],
+    ],
+    [
+      "/boo-tique?banner=ghost",
+      "home-cookie-ghost-reject",
+      [
+        { tag: "button", text: "Accept all" },
+        { tag: "button", text: "Reject" },
+      ],
+    ],
+    [
+      "/boo-tique?banner=equal",
+      "home-cookie-equal-buttons",
+      [
+        { tag: "button", text: "Accept all" },
+        { tag: "button", text: "Reject all" },
+      ],
+    ],
+  ])("wraps the controls of %s in one actions div", async (route, id, expected) => {
+    const markup = await renderRoute(route);
+    const parts = bannerParts(markup, id);
+    expect(parts.actionsCount).toBe(1);
+    expect(parts.controls).toEqual(expected);
+  });
+});
 
 describe("default cookie banner", () => {
   it("has the entry id once on a bt-banner region", async () => {
@@ -336,6 +500,21 @@ describe("exit-intent newsletter modal", () => {
     const subscribe = style(controlTag(markup, "button", "Subscribe"));
     const decline = style(controlTag(markup, "button", "Not now"));
     expect(decline).toBe(subscribe);
+  });
+
+  it("marks Not now as close only and Subscribe as confirm and close", async () => {
+    const markup = await renderRoute(ROUTE);
+    const decline = controlTag(markup, "button", "Not now");
+    expect(hasAttr(decline, "data-bt-close")).toBe(true);
+    expect(hasAttr(decline, "data-bt-confirm")).toBe(false);
+    const subscribe = controlTag(markup, "button", "Subscribe");
+    expect(hasAttr(subscribe, "data-bt-close")).toBe(true);
+    expect(hasAttr(subscribe, "data-bt-confirm")).toBe(true);
+  });
+
+  it("does not contain the confirmation text before a click", async () => {
+    const markup = await renderRoute(ROUTE);
+    expect(markup).not.toContain("Demo shop: nothing was sent");
   });
 
   it("has a close button", async () => {

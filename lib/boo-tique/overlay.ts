@@ -17,3 +17,26 @@ export function nextFocusIndex(
 export function shouldCloseOnKey(key: string): boolean {
   return key === "Escape";
 }
+
+/** Delay between a confirmed click ("Subscribe") and the dialog closing. */
+export const EXIT_CONFIRM_DELAY_MS = 1500;
+
+/** Text shown in place of the dialog body after a confirmed click. Nothing is sent. */
+export const EXIT_CONFIRM_TEXT = "Demo shop: nothing was sent";
+
+/** The part of a DOM element that `dialogClickAction` needs. */
+export type ClosestNode = { closest(selector: string): unknown } | null;
+
+export type DialogClickAction = "ignore" | "close" | "confirm-then-close";
+
+/**
+ * What a click inside a dialog should do. A clicked node inside `[data-bt-confirm]` confirms and
+ * then closes, even when it is also inside `[data-bt-close]`. A node inside `[data-bt-close]` only
+ * closes. Anything else is ignored.
+ */
+export function dialogClickAction(node: ClosestNode): DialogClickAction {
+  if (node === null) return "ignore";
+  if (node.closest("[data-bt-confirm]") !== null) return "confirm-then-close";
+  if (node.closest("[data-bt-close]") !== null) return "close";
+  return "ignore";
+}

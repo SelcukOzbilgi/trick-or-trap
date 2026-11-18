@@ -31,7 +31,7 @@ export function SoldToast() {
       <span>{SOLD_TOAST_MESSAGES[index]}</span>{" "}
       <button
         type="button"
-        className="bt-toast-dismiss"
+        className="bt-toast-dismiss bt-button bt-button--quiet"
         aria-label="Dismiss"
         onClick={() => setVisible(false)}
       >

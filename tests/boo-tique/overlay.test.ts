@@ -1,5 +1,89 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it, expect } from "vitest";
-import { nextFocusIndex, shouldCloseOnKey } from "@/lib/boo-tique/overlay";
+import {
+  EXIT_CONFIRM_DELAY_MS,
+  EXIT_CONFIRM_TEXT,
+  dialogClickAction,
+  nextFocusIndex,
+  shouldCloseOnKey,
+} from "@/lib/boo-tique/overlay";
+
+/** Fake clicked node: `closest` returns a marker only for the selectors in `matches`. */
+function fakeNode(matches: readonly string[]) {
+  return {
+    closest(selector: string): unknown {
+      return matches.includes(selector) ? { selector } : null;
+    },
+  };
+}
+
+describe("exit confirmation constants", () => {
+  it("has the delay and the text of 6.1", () => {
+    expect(EXIT_CONFIRM_DELAY_MS).toBe(1500);
+    expect(EXIT_CONFIRM_TEXT).toBe("Demo shop: nothing was sent");
+  });
+});
+
+describe("dialogClickAction", () => {
+  it("ignores a null node", () => {
+    expect(dialogClickAction(null)).toBe("ignore");
+  });
+
+  it("ignores a node that matches neither selector", () => {
+    expect(dialogClickAction(fakeNode([]))).toBe("ignore");
+  });
+
+  it("closes when only [data-bt-close] matches", () => {
+    expect(dialogClickAction(fakeNode(["[data-bt-close]"]))).toBe("close");
+  });
+
+  it("confirms then closes when both selectors match", () => {
+    expect(
+      dialogClickAction(fakeNode(["[data-bt-close]", "[data-bt-confirm]"])),
+    ).toBe("confirm-then-close");
+  });
+
+  it("confirms then closes when only [data-bt-confirm] matches", () => {
+    expect(dialogClickAction(fakeNode(["[data-bt-confirm]"]))).toBe(
+      "confirm-then-close",
+    );
+  });
+});
+
+describe("overlay component sources", () => {
+  const root = process.cwd();
+  const dialog = readFileSync(
+    join(root, "components/boo-tique/overlay-dialog.tsx"),
+    "utf8",
+  );
+  const modal = readFileSync(
+    join(root, "components/boo-tique/exit-intent-modal.tsx"),
+    "utf8",
+  );
+
+  it("imports the click helper and the delay from the overlay module", () => {
+    expect(dialog).toContain("dialogClickAction");
+    expect(dialog).toContain("EXIT_CONFIRM_DELAY_MS");
+    expect(dialog).toContain('@/lib/boo-tique/overlay"');
+  });
+
+  it.each([
+    ["overlay-dialog.tsx", dialog],
+    ["exit-intent-modal.tsx", modal],
+  ])("stores and sends nothing in %s", (_name, source) => {
+    for (const word of [
+      "fetch(",
+      "localStorage",
+      "sessionStorage",
+      "document.cookie",
+      "<form",
+      "XMLHttpRequest",
+    ]) {
+      expect(source, word).not.toContain(word);
+    }
+  });
+});
 
 describe("nextFocusIndex", () => {
   it("wraps forward from the last element to the first", () => {

@@ -149,11 +149,15 @@ describe("sold toast", () => {
     expect(text).toContain("Morgan from Ohio just bought the Cursed Candle Set");
   });
 
-  it("has a dismiss button of type button", async () => {
+  it("has a dismiss button of type button with the quiet button classes", async () => {
     const markup = await render();
     const dismiss = buttonTags(markup).filter((tag) => attr(tag, "aria-label") === "Dismiss");
     expect(dismiss).toHaveLength(1);
     expect(attr(dismiss[0], "type")).toBe("button");
+    const classes = (attr(dismiss[0], "class") ?? "").split(/\s+/);
+    for (const name of ["bt-toast-dismiss", "bt-button", "bt-button--quiet"]) {
+      expect(classes, name).toContain(name);
+    }
   });
 
   it("is the same markup for any injected random source", async () => {
@@ -209,6 +213,21 @@ describe("upsell dialog", () => {
     expect(style).toContain("color:#cfc6bc");
   });
 
+  it("gives the bundle button and the tiny close no data-bt-close or data-bt-confirm", async () => {
+    const markup = await render();
+    const buttons = markup.match(/<button\b[^>]*>[^<]*<\/button>/g) ?? [];
+    const bundle = buttons.filter((button) => button.includes("Add crypt keeper bundle"));
+    const closes = buttons.filter((button) => attr(button, "aria-label") === "Close");
+    expect(bundle).toHaveLength(1);
+    expect(closes).toHaveLength(1);
+    for (const button of [...bundle, ...closes]) {
+      expect(hasAttr(button, "data-bt-close"), button).toBe(false);
+      expect(hasAttr(button, "data-bt-confirm"), button).toBe(false);
+    }
+    expect(markup).not.toContain("data-bt-close");
+    expect(markup).not.toContain("data-bt-confirm");
+  });
+
   it("sits inside the dialog, after the backdrop", async () => {
     const markup = await render();
     const backdrop = markup.indexOf('data-testid="bt-backdrop"');
@@ -240,7 +259,24 @@ describe("product page content", () => {
   it("shows the product name and price", async () => {
     const markup = await render();
     expect(markup).toContain("Ghost Pepper Candle");
-    expect(markup).toContain("$18.00");
+    expect(markup).toContain('<p class="bt-price">$18.00</p>');
+  });
+
+  it("renders the candle tile, one h1 and a star rating with a role", async () => {
+    const markup = await render();
+    expect(markup).toContain('<div class="bt-tile bt-tile--candle" aria-hidden="true">');
+    const h1s = markup.match(/<h1\b[^>]*>[^<]*<\/h1>/g) ?? [];
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]?.replace(/<[^>]*>/g, "")).toBe("Ghost Pepper Candle");
+    expect(markup).toContain(
+      '<p class="bt-muted" role="img" aria-label="Rated 5 out of 5">',
+    );
+  });
+
+  it("keeps the 'Only N left!' text with the injected value", async () => {
+    // draw 0.5 -> STOCK_VALUES[floor(0.5 * 7)] = 6
+    const markup = await render(() => 0.5);
+    expect(textOf(markup, "product-low-stock-random")).toBe("Only 6 left!");
   });
 
   it("has an inert 'Add to cart' button of type button", async () => {

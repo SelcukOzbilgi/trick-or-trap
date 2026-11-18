@@ -1,14 +1,25 @@
+import { INVENTORY } from "./content";
+
 export type PerLoadValues = {
-  /** Number in "Only N left!". 2 to 9. */
+  /** Number in "Only N left!". One of STOCK_VALUES (2 to 9, never the real inventory). */
   stockLeft: number;
   /** Number in "N people are viewing this". 8 to 48. */
   viewers: number;
 };
 
 const STOCK_MIN = 2;
-const STOCK_SPAN = 8;
+const STOCK_MAX = 9;
 const VIEWERS_MIN = 8;
 const VIEWERS_SPAN = 41;
+
+/**
+ * The fake stock values: the integers 2 to 9 without the honest twin's real inventory,
+ * so the fake stock can never equal the real "3 left".
+ */
+export const STOCK_VALUES: readonly number[] = Array.from(
+  { length: STOCK_MAX - STOCK_MIN + 1 },
+  (_, i) => STOCK_MIN + i,
+).filter((n) => n !== INVENTORY["travel-tin"]);
 
 /** Maps a draw in [0, 1) to an integer in 0..span-1. A draw outside that range is clamped. */
 function pick(random: () => number, span: number): number {
@@ -22,7 +33,7 @@ function pick(random: () => number, span: number): number {
  * gives the viewers. The result depends only on `random`.
  */
 export function perLoadValues(random: () => number = Math.random): PerLoadValues {
-  const stockLeft = STOCK_MIN + pick(random, STOCK_SPAN);
+  const stockLeft = STOCK_VALUES[pick(random, STOCK_VALUES.length)];
   const viewers = VIEWERS_MIN + pick(random, VIEWERS_SPAN);
   return { stockLeft, viewers };
 }

@@ -27,7 +27,7 @@ export default async function BooTiqueCheckoutPage({
           </label>
         </section>
       ) : null}
-      <button type="button" disabled>
+      <button type="button" disabled className="bt-button">
         Place order
       </button>
     </>

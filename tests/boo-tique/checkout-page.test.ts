@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { renderRoute } from "./helpers/render-route";
 import type { RouteTableEntry } from "./helpers/route-table";
-import { attr, countTestId, hasAttr, openTag, textOf, visibleText } from "./helpers/markup";
+import { attr, countTestId, hasAttr, openTag, visibleText } from "./helpers/markup";
+import { formatUsd, summaryRows } from "@/lib/boo-tique/cart";
 
 /** Local one-entry table, so this test does not depend on ROUTE_TABLE. */
 const TABLE: readonly RouteTableEntry[] = [
@@ -10,13 +11,47 @@ const TABLE: readonly RouteTableEntry[] = [
 
 const DEFAULT_ROUTE = "/boo-tique/checkout";
 const HONEST_ROUTE = "/boo-tique/checkout?flow=honest";
-const PREVIEW_ID = "checkout-handling-fees-drip";
+const DRIP_ID = "checkout-handling-fees-drip";
 const HONEST_ID = "checkout-consistent-shipping-tax";
-const PREVIEW_LABEL = "Static preview of a later flow";
-const WORDS = ["insurance", "handling", "haunting", "phone"];
+const WORDS = ["handling", "haunting", "phone"];
 
 function render(route: string): Promise<string> {
   return renderRoute(route, { table: TABLE });
+}
+
+/** Raw markup of the `<dl>` that carries the test id. */
+function listMarkup(markup: string, id: string): string {
+  const idx = markup.indexOf(`data-testid="${id}"`);
+  expect(idx, id).toBeGreaterThan(-1);
+  const start = markup.lastIndexOf("<dl", idx);
+  const end = markup.indexOf("</dl>", idx);
+  expect(start, `<dl> around ${id}`).toBeGreaterThan(-1);
+  return markup.slice(start, end + "</dl>".length);
+}
+
+/** Attribute names of an opening tag, in order. */
+function attrNames(tag: string): string[] {
+  const nameEnd = /^<[a-zA-Z][a-zA-Z0-9-]*/.exec(tag);
+  const rest = nameEnd ? tag.slice(nameEnd[0].length) : tag;
+  return [...rest.matchAll(/\s([^\s=/>"']+)(?:="[^"]*")?/g)].map((m) => m[1]);
+}
+
+function rowLabels(list: string): string[] {
+  return [...list.matchAll(/<dt>([^<]*)<\/dt>/g)].map((m) => m[1]);
+}
+
+function rowHtml(label: string, price: string): string {
+  return `<div class="bt-variant-row"><dt>${label}</dt><dd class="bt-price">${price}</dd></div>`;
+}
+
+function expectPlaceOrder(markup: string): void {
+  const buttons = markup.match(/<button\b[^>]*>[^<]*<\/button>/g) ?? [];
+  expect(buttons).toHaveLength(1);
+  const button = buttons[0] ?? "";
+  expect(attr(button, "type")).toBe("button");
+  expect(hasAttr(button, "disabled")).toBe(true);
+  expect(attr(button, "class")).toBe("bt-button");
+  expect(button).toContain(">Place order</button>");
 }
 
 describe("checkout page default view", () => {
@@ -34,58 +69,53 @@ describe("checkout page default view", () => {
     expect(label).toBe("Send me the Boo-letter");
   });
 
-  it("has checkout-handling-fees-drip once, as a visible <li> with both fees and the label", async () => {
+  it("has checkout-handling-fees-drip once, on a <dl class=bt-list>", async () => {
     const markup = await render(DEFAULT_ROUTE);
-    expect(countTestId(markup, PREVIEW_ID)).toBe(1);
-    const tag = openTag(markup, PREVIEW_ID);
-    expect(tag.startsWith("<li")).toBe(true);
-    expect(attr(tag, "data-anchor")).toBe("phase-2");
+    expect(countTestId(markup, DRIP_ID)).toBe(1);
+    const tag = openTag(markup, DRIP_ID);
+    expect(tag.startsWith("<dl")).toBe(true);
+    expect(attr(tag, "class")).toBe("bt-list");
     expect(hasAttr(tag, "hidden")).toBe(false);
-    const text = textOf(markup, PREVIEW_ID);
-    expect(text).toContain("Handling $6.99");
-    expect(text).toContain("Haunting fee $3.00");
-    expect(text).toContain(PREVIEW_LABEL);
   });
 
-  it("has no link, button or input inside the preview", async () => {
-    const markup = await render(DEFAULT_ROUTE);
-    const idx = markup.indexOf(`data-testid="${PREVIEW_ID}"`);
-    const start = markup.lastIndexOf("<li", idx);
-    const end = markup.indexOf("</li>", idx);
-    const preview = markup.slice(start, end);
-    expect(preview).not.toContain("<a ");
-    expect(preview).not.toContain("<button");
-    expect(preview).not.toContain("<input");
+  it("lists Items, Extras, Shipping, Insurance, Tax, Handling, Haunting fee, Total in order", async () => {
+    const list = listMarkup(await render(DEFAULT_ROUTE), DRIP_ID);
+    expect(rowLabels(list)).toEqual([
+      "Items",
+      "Extras",
+      "Shipping",
+      "Insurance",
+      "Tax",
+      "Handling",
+      "Haunting fee",
+      "Total",
+    ]);
   });
 
-  it("shows Items $40.00 before the preview and Total $49.99 after it", async () => {
-    const text = visibleText(await render(DEFAULT_ROUTE));
-    const items = text.indexOf("Items $40.00");
-    const preview = text.indexOf("Handling $6.99");
-    const total = text.indexOf("Total $49.99");
-    expect(items).toBeGreaterThan(-1);
-    expect(preview).toBeGreaterThan(items);
-    expect(total).toBeGreaterThan(preview);
+  it("renders the two fees as ordinary summary rows", async () => {
+    const list = listMarkup(await render(DEFAULT_ROUTE), DRIP_ID);
+    expect(list).toContain(rowHtml("Handling", "$6.99"));
+    expect(list).toContain(rowHtml("Haunting fee", "$3.00"));
   });
 
-  it("puts the items line, the preview and the total in one list", async () => {
-    const markup = await render(DEFAULT_ROUTE);
-    const idx = markup.indexOf(`data-testid="${PREVIEW_ID}"`);
-    const listStart = markup.lastIndexOf("<ul", idx);
-    const listEnd = markup.indexOf("</ul>", idx);
-    const list = markup.slice(listStart, listEnd);
-    expect(list).toContain("Items $40.00");
-    expect(list).toContain("Total $49.99");
+  it("has no link, button or input inside the summary list", async () => {
+    const list = listMarkup(await render(DEFAULT_ROUTE), DRIP_ID);
+    expect(list).not.toContain("<a ");
+    expect(list).not.toContain("<a>");
+    expect(list).not.toContain("<button");
+    expect(list).not.toContain("<input");
   });
 
-  it("has a disabled place-order button of type button", async () => {
-    const markup = await render(DEFAULT_ROUTE);
-    const buttons = markup.match(/<button\b[^>]*>/g) ?? [];
-    expect(buttons).toHaveLength(1);
-    const button = buttons[0] ?? "";
-    expect(attr(button, "type")).toBe("button");
-    expect(hasAttr(button, "disabled")).toBe(true);
-    expect(visibleText(markup)).toContain("Place order");
+  it("has the rows of summaryRows(checkout-default) and Total $77.68", async () => {
+    const list = listMarkup(await render(DEFAULT_ROUTE), DRIP_ID);
+    for (const row of summaryRows("checkout-default")) {
+      expect(list).toContain(rowHtml(row.label, formatUsd(row.cents)));
+    }
+    expect(visibleText(list)).toContain("Total $77.68");
+  });
+
+  it("has a disabled place-order button of type button with the bt-button class", async () => {
+    expectPlaceOrder(await render(DEFAULT_ROUTE));
   });
 
   it("has no input other than the newsletter checkbox", async () => {
@@ -97,8 +127,8 @@ describe("checkout page default view", () => {
     expect(markup).not.toContain("<textarea");
   });
 
-  it("has none of insurance, handling, haunting or phone outside the preview", async () => {
-    const text = visibleText(await render(DEFAULT_ROUTE), { exclude: [PREVIEW_ID] }).toLowerCase();
+  it("has none of handling, haunting or phone outside the summary list", async () => {
+    const text = visibleText(await render(DEFAULT_ROUTE), { exclude: [DRIP_ID] }).toLowerCase();
     for (const word of WORDS) expect(text, word).not.toContain(word);
   });
 
@@ -112,20 +142,30 @@ describe("checkout page default view", () => {
 });
 
 describe("checkout page honest view", () => {
-  it("has checkout-consistent-shipping-tax once, as a visible <dl>", async () => {
+  it("has checkout-consistent-shipping-tax once, on a visible <dl class=bt-list>", async () => {
     const markup = await render(HONEST_ROUTE);
     expect(countTestId(markup, HONEST_ID)).toBe(1);
     const tag = openTag(markup, HONEST_ID);
     expect(tag.startsWith("<dl")).toBe(true);
+    expect(attr(tag, "class")).toBe("bt-list");
     expect(hasAttr(tag, "hidden")).toBe(false);
   });
 
-  it("shows items $40.00, shipping $4.00, tax $3.20 and total $47.20 in the summary", async () => {
-    const text = textOf(await render(HONEST_ROUTE), HONEST_ID);
-    expect(text).toContain("Items $40.00");
-    expect(text).toContain("Shipping $4.00");
-    expect(text).toContain("Tax $3.20");
-    expect(text).toContain("Total $47.20");
+  it("has the rows of summaryRows(checkout-honest) and Total $67.69", async () => {
+    const list = listMarkup(await render(HONEST_ROUTE), HONEST_ID);
+    const rows = summaryRows("checkout-honest");
+    expect(rowLabels(list)).toEqual(rows.map((r) => r.label));
+    for (const row of rows) {
+      expect(list).toContain(rowHtml(row.label, formatUsd(row.cents)));
+    }
+    expect(visibleText(list)).toContain("Total $67.69");
+  });
+
+  it("has no link, button or input inside the summary list", async () => {
+    const list = listMarkup(await render(HONEST_ROUTE), HONEST_ID);
+    expect(list).not.toContain("<a ");
+    expect(list).not.toContain("<button");
+    expect(list).not.toContain("<input");
   });
 
   it("has no checked control and no input", async () => {
@@ -136,22 +176,42 @@ describe("checkout page honest view", () => {
     expect(markup).not.toContain('aria-checked="true"');
   });
 
-  it("has no phase-2 preview and no newsletter entry", async () => {
+  it("has no fee entry and no newsletter entry", async () => {
     const markup = await render(HONEST_ROUTE);
-    expect(countTestId(markup, PREVIEW_ID)).toBe(0);
+    expect(countTestId(markup, DRIP_ID)).toBe(0);
     expect(countTestId(markup, "checkout-newsletter-prechecked")).toBe(0);
     expect(markup).not.toContain("phase-2");
   });
 
-  it("has none of insurance, handling, haunting or phone anywhere in its visible text", async () => {
+  it("has none of handling, haunting or phone anywhere in its visible text", async () => {
     const text = visibleText(await render(HONEST_ROUTE)).toLowerCase();
     for (const word of WORDS) expect(text, word).not.toContain(word);
   });
 
-  it("gives every button type=button", async () => {
-    const markup = await render(HONEST_ROUTE);
-    for (const tag of markup.match(/<button\b[^>]*>/g) ?? []) {
-      expect(attr(tag, "type"), tag).toBe("button");
+  it("has a disabled place-order button of type button with the bt-button class", async () => {
+    expectPlaceOrder(await render(HONEST_ROUTE));
+  });
+});
+
+describe("checkout summary list tags", () => {
+  it("gives both summary lists the same attribute names and no other data- attribute", async () => {
+    const honestTag = openTag(await render(HONEST_ROUTE), HONEST_ID);
+    const defaultTag = openTag(await render(DEFAULT_ROUTE), DRIP_ID);
+    expect(attrNames(honestTag)).toEqual(["class", "data-testid"]);
+    expect(attrNames(defaultTag)).toEqual(attrNames(honestTag));
+    for (const name of attrNames(defaultTag)) {
+      if (name.startsWith("data-")) expect(name).toBe("data-testid");
+    }
+  });
+
+  it("has no data- attribute inside either summary list", async () => {
+    for (const [route, id] of [
+      [HONEST_ROUTE, HONEST_ID],
+      [DEFAULT_ROUTE, DRIP_ID],
+    ] as const) {
+      const list = listMarkup(await render(route), id);
+      const inner = list.slice(list.indexOf(">") + 1);
+      expect(inner, id).not.toMatch(/\sdata-/);
     }
   });
 });

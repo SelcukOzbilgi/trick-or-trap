@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { DEMO_NOTICE_TEXT, PRODUCTS } from "@/lib/boo-tique/content";
 import { fixtureRoutes } from "./helpers/fixture";
 import { renderRoute } from "./helpers/render-route";
-import { attr, countTestId, visibleText } from "./helpers/markup";
+import { attr, countTestId, hasAttr, visibleText } from "./helpers/markup";
 import { BRAND_TRIPWIRE } from "./helpers/brand-tripwire";
 
 const ROOT = process.cwd();
@@ -22,11 +22,54 @@ const ALLOWED_USE_CLIENT = [
   "hero-countdown.tsx",
   "overlay-dialog.tsx",
   "sold-toast.tsx",
+  "toggle-switch.tsx",
 ];
 
 const PAYMENT_WORDS = /card|cvc|cvv|iban|expir|payment/i;
 const EXTERNAL_URL = /^(https?:)?\/\//i;
 const FORBIDDEN_ELEMENTS = ["<img", "<iframe", "<script", "<link"];
+const CLASS_ID_WORDS =
+  /urgency|scarcity|activity|shaming|preselect|interference|sneak|drip/i;
+const PHASE2_PREVIEW_FILE = join(ROOT, "components", "boo-tique", "phase2-preview.tsx");
+const PREVIEW_SOURCE_WORDS = [
+  "data-anchor",
+  "Phase2Preview",
+  "PHASE2_PREVIEW_LABEL",
+  "Static preview",
+  "later flow",
+];
+
+const PATTERN_IDS = [
+  "fake-urgency",
+  "fake-scarcity",
+  "fake-activity",
+  "confirmshaming",
+  "preselection",
+  "visual-interference",
+  "sneak-into-basket",
+  "drip-pricing",
+  "hard-to-cancel",
+];
+const VERDICT_WORDS = [
+  "dark pattern",
+  "lookalike",
+  "look-alike",
+  "honest twin",
+  "planted",
+  "not scored",
+];
+/** `.tsx` files that this spec added under components/boo-tique. */
+const NEW_COMPONENT_FILES = ["toggle-switch.tsx", "summary-list.tsx"];
+const FORBIDDEN_NEXT_IMPORTS = ["next/link", "next/image", "next/navigation", "next/font"];
+
+/** Removes block and line comments. A line comment must start the line or follow whitespace, so `https://` survives. */
+function stripComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/(^|\s)\/\/.*$/gm, "$1");
+}
+
+function tsxFiles(): string[] {
+  return SOURCE_DIRS.slice(0, 2).flatMap((dir) => listFiles(dir, /\.tsx$/));
+}
 
 function listFiles(dir: string, pattern: RegExp): string[] {
   const out: string[] = [];
@@ -108,10 +151,43 @@ describe.each(fixtureRoutes())("fake-shop safety of %s", (route) => {
     }
   });
 
+  it("has no phase-2 anchor or preview wording in the markup", async () => {
+    const markup = await renderRoute(route);
+    const lower = markup.toLowerCase();
+    for (const word of ["data-anchor", "phase-2", "later flow", "static preview"]) {
+      expect(lower, word).not.toContain(word);
+    }
+    expect(visibleText(markup)).not.toContain("Static preview of a later flow");
+  });
+
+  it("has no class or id value that names a pattern", async () => {
+    const markup = await renderRoute(route);
+    for (const match of markup.matchAll(/\s(class|id)="([^"]*)"/g)) {
+      expect(match[2], `${match[1]}="${match[2]}"`).not.toMatch(CLASS_ID_WORDS);
+    }
+  });
+
   it("names no real brand in its visible text", async () => {
     const text = visibleText(await renderRoute(route));
     for (const brand of BRAND_TRIPWIRE) {
       expect(text, brand).not.toMatch(wholeWord(brand));
+    }
+  });
+
+  it("never gives a bt-button class to an inline-styled button or link", async () => {
+    const markup = await renderRoute(route);
+    for (const element of ["button", "a"]) {
+      for (const tag of tagsOf(markup, element)) {
+        if (!hasAttr(tag, "style")) continue;
+        expect(attr(tag, "class") ?? "", tag).not.toContain("bt-button");
+      }
+    }
+  });
+
+  it("keeps verdict and pattern vocabulary out of its visible text", async () => {
+    const text = visibleText(await renderRoute(route)).toLowerCase();
+    for (const word of [...PATTERN_IDS, ...VERDICT_WORDS]) {
+      expect(text, word).not.toContain(word);
     }
   });
 });
@@ -190,7 +266,7 @@ describe("source scans", () => {
     }
   });
 
-  it("has use client in exactly the five allowed files", () => {
+  it("has use client in exactly the six allowed files", () => {
     const found = codeFiles()
       .filter((file) => /^\s*["']use client["']/.test(readFileSync(file, "utf8")))
       .map((file) => file.split(sep).pop())
@@ -202,6 +278,67 @@ describe("source scans", () => {
     for (const file of codeFiles()) {
       if (/^\s*["']use client["']/.test(readFileSync(file, "utf8"))) {
         expect(shortName(file).startsWith("components/boo-tique/"), shortName(file)).toBe(true);
+      }
+    }
+  });
+
+  it("has no phase2-preview component file", () => {
+    expect(existsSync(PHASE2_PREVIEW_FILE)).toBe(false);
+  });
+
+  for (const word of PREVIEW_SOURCE_WORDS) {
+    it(`contains no ${word} in the source`, () => {
+      for (const file of codeFiles()) {
+        expect(readFileSync(file, "utf8"), shortName(file)).not.toContain(word);
+      }
+    });
+  }
+
+  it("finds .tsx files to scan under app/boo-tique and components/boo-tique", () => {
+    expect(tsxFiles().length).toBeGreaterThan(0);
+  });
+
+  it("contains no $ followed by a digit in any .tsx file, comments removed", () => {
+    for (const file of tsxFiles()) {
+      expect(stripComments(readFileSync(file, "utf8")), shortName(file)).not.toMatch(/\$\d/);
+    }
+  });
+
+  it("contains no hex colour literal in any .tsx file, comments removed", () => {
+    for (const file of tsxFiles()) {
+      expect(stripComments(readFileSync(file, "utf8")), shortName(file)).not.toMatch(
+        /#[0-9a-fA-F]{3,8}\b/,
+      );
+    }
+  });
+
+  for (const name of NEW_COMPONENT_FILES) {
+    it(`keeps ${name} free of next navigation, link, image and font imports`, () => {
+      const file = join(ROOT, "components", "boo-tique", name);
+      expect(existsSync(file), name).toBe(true);
+      const source = readFileSync(file, "utf8");
+      for (const word of FORBIDDEN_NEXT_IMPORTS) {
+        expect(source, `${word} in ${name}`).not.toContain(word);
+      }
+    });
+
+    it(`gives every button in ${name} type="button"`, () => {
+      const source = stripComments(
+        readFileSync(join(ROOT, "components", "boo-tique", name), "utf8"),
+      );
+      for (const match of source.matchAll(/<button\b[^>]*>/g)) {
+        expect(match[0]).toMatch(/\btype="button"/);
+      }
+    });
+  }
+
+  it("keeps testid out of the detector, judge and capture sources", () => {
+    for (const name of ["detectors", "judge", "capture"]) {
+      const dir = join(ROOT, "lib", name);
+      if (existsSync(dir)) {
+        for (const file of listFiles(dir, /\.(ts|tsx)$/)) {
+          expect(readFileSync(file, "utf8"), shortName(file)).not.toMatch(/testid/i);
+        }
       }
     }
   });

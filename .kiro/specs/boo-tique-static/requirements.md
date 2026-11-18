@@ -263,7 +263,7 @@ Every entry, with the route it is planted on and the criterion that covers it:
 
 8.3. WHEN the default home page is rendered THE SYSTEM SHALL contain `home-rolling-midnight-text` on an element whose text is "Black Friday of the Dead ends at midnight".
 
-8.4. WHEN the default home page is rendered THE SYSTEM SHALL contain `home-fixed-date-sale` on an element whose text is "Halloween sale ends 31 Oct 2026, 23:59 UTC".
+8.4. WHEN the default home page is rendered THE SYSTEM SHALL contain `home-fixed-date-sale` on an element whose text is "Winter sale ends 28 Feb 2027, 23:59 UTC".
 
 8.5. WHEN the default home page is rendered THE SYSTEM SHALL contain `home-cookie-accept-dominant` on a cookie banner that has a large filled "Accept all" button, a small grey "options" link and no reject control.
 
