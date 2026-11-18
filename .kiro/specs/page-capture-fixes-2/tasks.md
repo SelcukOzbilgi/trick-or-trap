@@ -111,10 +111,10 @@ Rules for every task:
   - [x] 16.4 Run `dependencies.test.ts`, `remote-browser.test.ts`, `browser.test.ts`, `constants.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5, 16.6, 16.7, 16.8_
 
-- [ ] 17. Opt-in live test rewrite (written, never run)
-  - [ ] 17.1 Edit `tests/capture/remote-capture.test.ts`: per-case gates of `design.md` instead of the whole-file skip; header comment with every variable and the owner's run command; keep the Boo-tique assertions and the redirect case; drop the half-width alignment case and the `LIVE_IFRAME_TEST_URL` case.
-  - [ ] 17.2 Add the fixture cases of the live-test table: adapter-level guard coverage with a recording wrapper around `createGuardPolicy`, `callWithGesture` for popups, results read from snapshot text; cross-site case; fixture redirect; alignment with `jpeg-js` red-pixel bounds; clobbering; stopped-and-not-listed with a known capture id. Stop every session in a `finally`; print no secret.
-  - [ ] 17.3 Do not run the file. Run `npx tsc --noEmit`.
+- [x] 17. Opt-in live test rewrite (written, never run)
+  - [x] 17.1 Edit `tests/capture/remote-capture.test.ts`: per-case gates of `design.md` instead of the whole-file skip; header comment with every variable and the owner's run command; keep the Boo-tique assertions and the redirect case; drop the half-width alignment case and the `LIVE_IFRAME_TEST_URL` case.
+  - [x] 17.2 Add the fixture cases of the live-test table: adapter-level guard coverage with a recording wrapper around `createGuardPolicy`, `callWithGesture` for popups, results read from snapshot text; cross-site case; fixture redirect; alignment with `jpeg-js` red-pixel bounds; clobbering; stopped-and-not-listed with a known capture id. Stop every session in a `finally`; print no secret.
+  - [x] 17.3 Do not run the file. Run `npx tsc --noEmit`.
   _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7, 17.8, 17.9, 17.10, 17.11, 17.12, 17.13, 17.14, 17.15, 17.16, 17.17, 17.18, 17.19, 17.20_
 
 - [ ] 18. Steering notes, `.env.example` and lint
