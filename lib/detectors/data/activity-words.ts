@@ -47,6 +47,33 @@ export const PURCHASE_TEMPLATES: WordList = Object.freeze({
   ]),
 });
 
+/**
+ * Purchase messages that name a person and a place but use a bare verb:
+ * "Sarah in London purchased a Blue Dress 5 minutes ago". They count as a claim
+ * only when the same element holds a word of PURCHASE_TIME_WORDS, because a
+ * review such as "Sarah from London bought this for her mother" has the same
+ * shape without one. English only.
+ */
+export const TIMED_PURCHASE_TEMPLATES: WordList = Object.freeze({
+  en: Object.freeze([
+    "@ in @ purchased",
+    "@ from @ purchased",
+    "@ in @ bought",
+    "@ from @ bought",
+    "someone in @ purchased",
+    "someone from @ purchased",
+    "someone in @ bought",
+    "someone from @ bought",
+  ]),
+  tr: Object.freeze([]),
+});
+
+/** Time words that turn a TIMED_PURCHASE_TEMPLATES match into a purchase claim. English only. */
+export const PURCHASE_TIME_WORDS: WordList = Object.freeze({
+  en: Object.freeze(["ago", "just now", "recently"]),
+  tr: Object.freeze([]),
+});
+
 /** Wording that marks a message as live. */
 export const ACTIVITY_CONTEXT_WORDS: WordList = Object.freeze({
   en: Object.freeze(["right now"]),

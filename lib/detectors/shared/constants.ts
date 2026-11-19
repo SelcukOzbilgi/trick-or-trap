@@ -51,7 +51,10 @@ export const TOLERANCE_BASE_SECONDS = 2;
 /** Unknown time zone of a page date, in hours. */
 export const DATE_ZONE_SLACK_HOURS = 14;
 
-/** Largest stock number that supports a scarcity claim. */
+/**
+ * Largest stock number that supported a scarcity claim. No rule uses it any
+ * more (requirement 8.1); it stays defined and pinned by its constants test.
+ */
 export const LOW_STOCK_MAX = 10;
 
 /** Size measures. */

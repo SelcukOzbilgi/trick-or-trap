@@ -57,15 +57,15 @@ Rules for every task:
   - [x] 4.4 Run the seven test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 1.11, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 7.10, 7.11, 7.12, 12.2, 12.3, 12.4_
 
-- [ ] 5. Stock calibration and English sales-pop forms
+- [x] 5. Stock calibration and English sales-pop forms
   - Uses: `fake-scarcity.ts` (`isSupported`), `fake-activity.ts`, `data/activity-words.ts`, the corpus.
   - Files: edits `lib/detectors/fake-scarcity.ts`, `fake-activity.ts`, `data/activity-words.ts`, `shared/constants.ts` (doc comment only), `tests/fixtures/real-world-phrases.json`, `tests/detectors/fake-scarcity.test.ts`, `fake-activity.test.ts`, `word-lists.test.ts`.
   - Reads: requirements 1, 8, 10; design 9, 11.
   - Dependent tests to run: `fake-scarcity.test.ts`, `fake-activity.test.ts`, `word-lists.test.ts`, `real-world-phrases.test.ts`, `wording.test.ts`, `hostile-input.test.ts`, `eval/boo-tique-eval.test.ts`.
-  - [ ] 5.1 Tests first: requirements 8.1 to 8.4 and 8.6 in `fake-scarcity.test.ts`; requirements 10.1 to 10.3 in `fake-activity.test.ts` ("Sarah in London purchased a Blue Dress 5 minutes ago" flags, the same without "ago" and "Sarah from London bought this for her mother" do not); add `TIMED_PURCHASE_TEMPLATES` and `PURCHASE_TIME_WORDS` to `MODULES`, with their Turkish arrays in `MAY_BE_EMPTY`.
-  - [ ] 5.2 Remove the `LOW_STOCK_MAX` line from `isSupported`; keep the constant and its pinned test, with a doc comment that no rule uses it. Add the two activity lists and the timed-purchase rule (design 11). Add corpus texts for every new entry.
-  - [ ] 5.3 Change the existing small-number cases from S3 to S4 with a comment naming 8.1; keep S3 where an exclamation mark, a pressure word or another claim is present.
-  - [ ] 5.4 Run the seven test files (one command each), then `npx tsc --noEmit`.
+  - [x] 5.1 Tests first: requirements 8.1 to 8.4 and 8.6 in `fake-scarcity.test.ts`; requirements 10.1 to 10.3 in `fake-activity.test.ts` ("Sarah in London purchased a Blue Dress 5 minutes ago" flags, the same without "ago" and "Sarah from London bought this for her mother" do not); add `TIMED_PURCHASE_TEMPLATES` and `PURCHASE_TIME_WORDS` to `MODULES`, with their Turkish arrays in `MAY_BE_EMPTY`.
+  - [x] 5.2 Remove the `LOW_STOCK_MAX` line from `isSupported`; keep the constant and its pinned test, with a doc comment that no rule uses it. Add the two activity lists and the timed-purchase rule (design 11). Add corpus texts for every new entry.
+  - [x] 5.3 Change the existing small-number cases from S3 to S4 with a comment naming 8.1; keep S3 where an exclamation mark, a pressure word or another claim is present.
+  - [x] 5.4 Run the seven test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 1.11, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 10.1, 10.2, 10.3, 10.4_
 
 - [ ] 6. Turkish word forms by stem

@@ -5,7 +5,7 @@ import {
   SCARCITY_SUPPORT_WORDS,
   UNQUANTIFIED_SCARCITY,
 } from "@/lib/detectors/data/scarcity-words";
-import { LOW_STOCK_MAX, RELOAD_TEXT_CAP } from "@/lib/detectors/shared/constants";
+import { RELOAD_TEXT_CAP } from "@/lib/detectors/shared/constants";
 import type { IndexedElement } from "@/lib/detectors/shared/elements";
 import {
   detectedAtFrom,
@@ -249,14 +249,17 @@ function hasPressureWord(tokens: readonly Token[]): boolean {
   return hasAny(tokens, SUPPORT);
 }
 
-/** True when a qualified claim is "supported": small number, "!", pressure word or another claim. */
+/**
+ * True when a qualified claim is "supported": an exclamation mark, a pressure
+ * word in the element or its parent, or another claim on the page. The size of
+ * the number gives no support (requirement 8.1): "Only 3 left in stock" is the
+ * honest form most shops use.
+ */
 function isSupported(
   pair: SamplePair,
   el: IndexedElement,
-  claim: Claim,
   otherClaim: boolean
 ): boolean {
-  if (claim.value !== null && claim.value <= LOW_STOCK_MAX) return true;
   if (hasExclamation(el.tokens) || hasPressureWord(el.tokens)) return true;
   const parent = pair.first.ancestors(el, 1)[0];
   if (parent !== undefined && hasPressureWord(parent.tokens)) return true;
@@ -297,7 +300,7 @@ function bestRow(
   for (const claim of claims) {
     const reload = compareWithReload(ctx, el, claim);
     const supported =
-      claim.kind === "qualified" && isSupported(ctx.pair, el, claim, otherClaim);
+      claim.kind === "qualified" && isSupported(ctx.pair, el, otherClaim);
     const row = rowFor(claim, reload, supported);
     if (row === null) continue;
     if (best === null || row < best.row) best = { row, claim, reload };

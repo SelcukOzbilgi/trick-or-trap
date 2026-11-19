@@ -4,6 +4,8 @@ import {
   ACTIVITY_LOOKALIKES,
   COUNT_TEMPLATES,
   PURCHASE_TEMPLATES,
+  PURCHASE_TIME_WORDS,
+  TIMED_PURCHASE_TEMPLATES,
 } from "@/lib/detectors/data/activity-words";
 import { detectFakeActivity } from "@/lib/detectors/fake-activity";
 import { MAX_PHRASE_TOKENS } from "@/lib/detectors/shared/constants";
@@ -429,6 +431,79 @@ describe("fake-activity: A2 and A3 without a change", () => {
   });
 });
 
+describe("fake-activity: timed purchase forms (requirement 10)", () => {
+  it("10.1: 'Sarah in London purchased a Blue Dress 5 minutes ago' gives a finding", () => {
+    const f = only(run("Sarah in London purchased a Blue Dress 5 minutes ago"));
+    expect(f.confidence).toBe("low");
+    expect(f.title).toBe(TITLE_MESSAGE);
+    expect(f.evidence.text).toBe('Message "Sarah in London purchased a Blue Dress 5 minutes ago".');
+  });
+
+  it("10.1: the four name-and-place forms need a time word in the same element", () => {
+    for (const text of [
+      "Sarah in London purchased a Blue Dress 5 minutes ago",
+      "Priya from Austin purchased a travel mug just now",
+      "Tom in Denver bought running shoes 2 hours ago",
+      "Emma from Berlin bought a desk lamp recently",
+    ]) {
+      const f = only(run(text));
+      expect(f.title, text).toBe(TITLE_MESSAGE);
+    }
+  });
+
+  it("10.1: the same sentences without a time word give nothing", () => {
+    for (const text of [
+      "Sarah in London purchased a Blue Dress",
+      "Priya from Austin purchased a travel mug",
+      "Tom in Denver bought running shoes",
+      "Emma from Berlin bought a desk lamp",
+    ]) {
+      expect(run(text), text).toEqual([]);
+      expect(run(text, text, { over: STATUS }), text).toEqual([]);
+    }
+  });
+
+  it("10.3: a review text without a time word gives nothing", () => {
+    expect(run("Sarah from London bought this for her mother")).toEqual([]);
+    expect(run("Sarah from London bought this for her mother", undefined, { over: STATUS })).toEqual([]);
+  });
+
+  it("10.2: 'someone in @' and 'someone from @' forms need a time word as well", () => {
+    for (const text of [
+      "Someone in Leeds purchased this 2 hours ago",
+      "Someone from Madrid purchased a wool scarf just now",
+      "Someone in Austin bought a travel mug 10 minutes ago",
+      "Someone from Denver bought running shoes recently",
+    ]) {
+      expect(only(run(text)).title, text).toBe(TITLE_MESSAGE);
+    }
+    expect(run("Someone in Leeds purchased this")).toEqual([]);
+    expect(run("Someone from Madrid bought a wool scarf")).toEqual([]);
+  });
+
+  it("10.4: the old rows apply: a changed message is A1, a live area is A2", () => {
+    const changed = only(
+      run(
+        "Sarah in London purchased a Blue Dress 5 minutes ago",
+        "Tom in Denver bought running shoes 2 hours ago"
+      )
+    );
+    expect(changed.confidence).toBe("high");
+    expect(changed.title).toBe(TITLE_PURCHASE);
+    const live = only(run("Sarah in London purchased a Blue Dress 5 minutes ago", undefined, { over: STATUS }));
+    expect(live.confidence).toBe("medium");
+    expect(live.title).toBe(TITLE_MESSAGE);
+  });
+
+  it("10.1: the time word must be in the same element, not in a neighbour", () => {
+    const elements = [
+      raw("el-1-0", "Sarah in London purchased a Blue Dress"),
+      raw("el-1-1", "5 minutes ago"),
+    ];
+    expect(detectFakeActivity(snap(elements))).toEqual([]);
+  });
+});
+
 describe("fake-activity: look-alikes and other languages", () => {
   it("look-alikes give nothing, in English and Turkish", () => {
     for (const text of [
@@ -586,15 +661,24 @@ describe("fake-activity: word lists", () => {
   const lists: Record<string, WordList> = {
     COUNT_TEMPLATES,
     PURCHASE_TEMPLATES,
+    TIMED_PURCHASE_TEMPLATES,
+    PURCHASE_TIME_WORDS,
     ACTIVITY_CONTEXT_WORDS,
     ACTIVITY_LOOKALIKES,
   };
+
+  /** Requirement 10.1: the timed forms and the time words are English only. */
+  const MAY_BE_EMPTY = new Set(["TIMED_PURCHASE_TEMPLATES.tr", "PURCHASE_TIME_WORDS.tr"]);
 
   it("each list has non-empty, frozen en and tr arrays", () => {
     for (const [name, list] of Object.entries(lists)) {
       expect(Object.isFrozen(list), name).toBe(true);
       for (const language of ["en", "tr"] as const) {
         expect(Object.isFrozen(list[language]), `${name}.${language}`).toBe(true);
+        if (MAY_BE_EMPTY.has(`${name}.${language}`)) {
+          expect(list[language].length, `${name}.${language}`).toBe(0);
+          continue;
+        }
         expect(list[language].length, `${name}.${language}`).toBeGreaterThan(0);
       }
     }

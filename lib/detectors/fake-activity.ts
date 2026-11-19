@@ -3,6 +3,8 @@ import {
   ACTIVITY_LOOKALIKES,
   COUNT_TEMPLATES,
   PURCHASE_TEMPLATES,
+  PURCHASE_TIME_WORDS,
+  TIMED_PURCHASE_TEMPLATES,
 } from "@/lib/detectors/data/activity-words";
 import { GROUP_MAX_LEVELS, RELOAD_TEXT_CAP } from "@/lib/detectors/shared/constants";
 import type { IndexedElement } from "@/lib/detectors/shared/elements";
@@ -39,6 +41,8 @@ import type { Confidence, Finding, PageSnapshot } from "@/lib/types";
 
 const COUNT = compilePhrases(COUNT_TEMPLATES);
 const PURCHASE = compilePhrases(PURCHASE_TEMPLATES);
+const TIMED_PURCHASE = compilePhrases(TIMED_PURCHASE_TEMPLATES);
+const PURCHASE_TIME = compilePhrases(PURCHASE_TIME_WORDS);
 const CONTEXT_WORDS = compilePhrases(ACTIVITY_CONTEXT_WORDS);
 const LOOKALIKES = compilePhrases(ACTIVITY_LOOKALIKES);
 
@@ -163,7 +167,13 @@ function claimsOf(tokens: readonly Token[]): Claim[] {
     const claim = countClaim(tokens, hit);
     if (claim !== null) claims.push(claim);
   }
-  for (const hit of nonOverlapping(findPhrases(tokens, PURCHASE))) {
+  const purchaseHits: PhraseHit[] = [...findPhrases(tokens, PURCHASE)];
+  // A bare purchase verb counts only with a time word in the same token list
+  // (requirement 10.1); a review sentence without one gives no claim (10.3).
+  if (hasAny(tokens, PURCHASE_TIME)) {
+    purchaseHits.push(...findPhrases(tokens, TIMED_PURCHASE));
+  }
+  for (const hit of nonOverlapping(purchaseHits)) {
     claims.push({
       kind: "purchase",
       entry: hit.entry,

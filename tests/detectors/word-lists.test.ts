@@ -78,6 +78,8 @@ const MODULES: Readonly<Record<string, ModuleSpec>> = {
     lists: {
       COUNT_TEMPLATES: "wordlist",
       PURCHASE_TEMPLATES: "wordlist",
+      TIMED_PURCHASE_TEMPLATES: "wordlist",
+      PURCHASE_TIME_WORDS: "wordlist",
       ACTIVITY_CONTEXT_WORDS: "wordlist",
       ACTIVITY_LOOKALIKES: "wordlist",
     },
@@ -118,8 +120,16 @@ const MODULES: Readonly<Record<string, ModuleSpec>> = {
   },
 };
 
-/** Lists the design allows to be empty: Turkish verb endings have no English counterpart. */
-const MAY_BE_EMPTY: ReadonlySet<string> = new Set(["FIRST_PERSON_SUFFIXES.en"]);
+/**
+ * Lists the design allows to be empty: Turkish verb endings have no English
+ * counterpart, and the timed purchase forms and time words are English only
+ * (requirement 10.1: the Turkish forms stay as in requirement 2.5).
+ */
+const MAY_BE_EMPTY: ReadonlySet<string> = new Set([
+  "FIRST_PERSON_SUFFIXES.en",
+  "TIMED_PURCHASE_TEMPLATES.tr",
+  "PURCHASE_TIME_WORDS.tr",
+]);
 
 type ListEntry = {
   readonly where: string;

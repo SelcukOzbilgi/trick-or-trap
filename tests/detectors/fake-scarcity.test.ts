@@ -124,10 +124,55 @@ describe("fake-scarcity: rows with a reload", () => {
     expect(f.evidence.measuredValues).toBeUndefined();
   });
 
-  it("S3 in Turkish with equal numbers", () => {
-    const f = only(run("Son 3 ürün", "Son 3 ürün"));
+  it("S3 in Turkish with equal numbers and an exclamation mark (requirement 8.6)", () => {
+    const f = only(run("Son 3 ürün!", "Son 3 ürün!"));
     expect(f.confidence).toBe("medium");
     expect(f.title).toBe(TITLE_LOW_STOCK);
+  });
+
+  // Requirement 8.1 and 8.6: a small number alone is no longer support. This case
+  // expected S3 medium for "Son 3 ürün" before this spec.
+  it("S4 in Turkish with equal numbers and no other support (requirements 8.1, 8.6)", () => {
+    const f = only(run("Son 3 ürün", "Son 3 ürün"));
+    expect(f.confidence).toBe("low");
+    expect(f.title).toBe(TITLE_LOW_STOCK);
+    expect(f.evidence.text).toBe('Stock message "Son 3 ürün". It showed 3 again after a reload 9 s later.');
+    const same = only(run("Sadece 3 adet kaldı", "Sadece 3 adet kaldı"));
+    expect(same.confidence).toBe("low");
+    expect(same.title).toBe(TITLE_LOW_STOCK);
+  });
+
+  it("S4: honest 'Only 3 left in stock' with the same number on reload gives a low finding (requirement 8.2)", () => {
+    const f = only(run("Only 3 left in stock", "Only 3 left in stock"));
+    expect(f.confidence).toBe("low");
+    expect(f.title).toBe(TITLE_LOW_STOCK);
+    expect(f.evidence.text).toBe(
+      'Stock message "Only 3 left in stock". It showed 3 again after a reload 9 s later.'
+    );
+    expect(only(run("Only 3 left in stock")).confidence).toBe("low");
+  });
+
+  it("S3: 'Hurry! Only 3 left in stock' and 'Only 3 left!' give a medium finding (requirement 8.3)", () => {
+    expect(only(run("Hurry! Only 3 left in stock", "Hurry! Only 3 left in stock")).confidence).toBe(
+      "medium"
+    );
+    expect(only(run("Only 3 left!", "Only 3 left!")).confidence).toBe("medium");
+  });
+
+  it("S3: 'Only 3 left' next to a pressure word in its parent gives a medium finding (requirement 8.1)", () => {
+    const elements = [
+      raw("el-1-0", "Hurry", { tag: "div", role: "region" }),
+      raw("el-1-0-0", "Only 3 left"),
+    ];
+    const f = only(detectFakeScarcity(snap(elements)));
+    expect(f.confidence).toBe("medium");
+    expect(f.elementIds).toEqual(["el-1-0-0"]);
+  });
+
+  it("S1: a qualified claim with a small number that changes still gives a high finding (requirement 8.4)", () => {
+    const f = only(run("Only 3 left in stock", "Only 7 left in stock"));
+    expect(f.confidence).toBe("high");
+    expect(f.title).toBe(TITLE_CHANGED);
   });
 
   it("without a reload sample a qualified claim is never S1 and a bare claim gives nothing", () => {
@@ -218,9 +263,11 @@ describe("fake-scarcity: rows with a reload", () => {
 });
 
 describe("fake-scarcity: text rows", () => {
-  it("S3: a number of 10 or less supports a qualified claim", () => {
+  // Requirement 8.1: a number of 10 or less is no support. This case expected
+  // S3 medium for "Only 10 left in stock" before this spec.
+  it("S4: a number of 10 or less alone does not support a qualified claim (requirement 8.1)", () => {
     const f = only(run("Only 10 left in stock"));
-    expect(f.confidence).toBe("medium");
+    expect(f.confidence).toBe("low");
     expect(f.title).toBe(TITLE_LOW_STOCK);
   });
 
