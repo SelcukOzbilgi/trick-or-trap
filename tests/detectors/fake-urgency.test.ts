@@ -240,6 +240,132 @@ describe("fake-urgency: countdown rows with a reload", () => {
   });
 });
 
+/** A parent container with the given text and one child that holds the claim. */
+function underParent(parentText: string, childText: string): Raw[] {
+  return [
+    raw("el-1-0", parentText, { tag: "div" }),
+    raw("el-1-0-0", childText),
+  ];
+}
+
+describe("fake-urgency: countdown rules narrowed (requirements 7.1 to 7.12)", () => {
+  it("7.5: a one-letter unit is no countdown, in either case", () => {
+    expect(run("Only 5 m left")).toEqual([]);
+    expect(run("Only 1 M left")).toEqual([]);
+    expect(run("Only 5 m left", "Only 5 m left")).toEqual([]);
+  });
+
+  it("7.5 (U5): 'Only 2 days left' still gives a low finding", () => {
+    const f = only(run("Only 2 days left"));
+    expect(f.confidence).toBe("low");
+    expect(f.title).toBe(TITLE_TIMER);
+  });
+
+  it("7.6: ordinary durations next to an offer word give nothing", () => {
+    expect(detectFakeUrgency(snap(underParent("Sale", "Free returns within 30 days")))).toEqual([]);
+    expect(detectFakeUrgency(snap(underParent("Save 10%", "Battery life 12 hours")))).toEqual([]);
+    expect(detectFakeUrgency(snap(underParent("Sale", "Video 12:34")))).toEqual([]);
+    expect(detectFakeUrgency(snap(underParent("Deal of the day", "Ready in 15 min")))).toEqual([]);
+    expect(run("Free returns within 30 days")).toEqual([]);
+    expect(run("Battery life 12 hours Save 10%")).toEqual([]);
+    expect(run("Video 12:34")).toEqual([]);
+    expect(run("Delivery in 2 days · 20% off")).toEqual([]);
+    expect(run("Delivery in 2 days · 20% off", "Delivery in 2 days · 20% off")).toEqual([]);
+  });
+
+  it("7.3: a clock2 or units countdown is worded only by a cue in its own element, not by its parent", () => {
+    const first = underParent("Sale ends in", "09:59");
+    const reload = underParent("Sale ends in", "09:50");
+    expect(detectFakeUrgency(snap(first, reload))).toEqual([]);
+    const days = underParent("Sale ends in", "3 days");
+    expect(detectFakeUrgency(snap(days))).toEqual([]);
+  });
+
+  it("7.3: each cue word makes a clock2 countdown worded", () => {
+    for (const text of [
+      "Sale ends in 09:59",
+      "Offer expires in 09:59",
+      "Cart closes in 09:59",
+      "09:59 left",
+      "09:59 remaining",
+      "Only 09:59",
+      "Hurry 09:59",
+      "Kampanya bitiyor 09:59",
+      "Kampanya sona eriyor 09:59",
+      "09:59 kaldı",
+      "Sepet kapanıyor 09:59",
+    ]) {
+      const f = only(run(text));
+      expect(f.confidence, text).toBe("low");
+      expect(f.title, text).toBe(TITLE_TIMER);
+    }
+  });
+
+  it("7.4: a clock3 countdown keeps the old rule, an offer word in its parent makes it worded", () => {
+    const first = underParent("Sale", "01:59:58");
+    const reload = underParent("Sale", "01:59:59");
+    const f = only(detectFakeUrgency(snap(first, reload)));
+    expect(f.confidence).toBe("high");
+    expect(f.title).toBe(TITLE_RESTART);
+    // An offer word without a cue in its own element is enough for clock3.
+    expect(only(run("Offer 04:59:59")).title).toBe(TITLE_TIMER);
+  });
+
+  it("7.9: restart, unchanged and consistent pairs of a clock3 countdown give the same rows as before", () => {
+    expect(only(run("Offer ends in 02:14:33", "Offer ends in 02:14:59")).confidence).toBe("high");
+    expect(only(run("Offer ends in 02:14:33", "Offer ends in 02:14:33")).confidence).toBe("medium");
+    expect(only(run("Next draw 01:59:58", "Next draw 01:59:59")).confidence).toBe("medium");
+    const consistent = only(run("Offer ends in 02:14:33", "Offer ends in 02:14:24"));
+    expect(consistent.confidence).toBe("low");
+    expect(consistent.title).toBe(TITLE_TIMER);
+  });
+
+  it("7.7: the club timer text has no cue, so a pair of reads gives nothing", () => {
+    expect(run("Join in 09:59 for 20% off")).toEqual([]);
+    expect(run("Join in 09:59 for 20% off", "Join in 09:50 for 20% off")).toEqual([]);
+    expect(run("Join in 09:59 for 20% off", "Join in 09:59 for 20% off")).toEqual([]);
+  });
+
+  it("7.8: a shipping cut-off in hours and minutes still gives nothing", () => {
+    expect(run("Order within 2h 15m for next-day delivery")).toEqual([]);
+    expect(
+      run(
+        "Order within 2h 15m for next-day delivery",
+        "Order within 2h 15m for next-day delivery"
+      )
+    ).toEqual([]);
+  });
+
+  it("7.11: Turkish unit forms follow the same cue rule", () => {
+    const f = only(run("Sadece 2 gün kaldı"));
+    expect(f.confidence).toBe("low");
+    expect(f.title).toBe(TITLE_TIMER);
+    expect(only(run("Fırsat bitiyor: 3 saat")).title).toBe(TITLE_TIMER);
+    expect(only(run("Sepet 15 dk içinde kapanıyor")).title).toBe(TITLE_TIMER);
+    expect(only(run("Sona eriyor: 30 sn")).title).toBe(TITLE_TIMER);
+    expect(detectFakeUrgency(snap(underParent("İndirim", "Kargo 2 gün")))).toEqual([]);
+    expect(run("Kargo 2 gün")).toEqual([]);
+    expect(run("Kargo 2 gün", "Kargo 2 gün")).toEqual([]);
+  });
+
+  it("7.12: '2h 30m left' with a restart after a reload returns the restart rows", () => {
+    const f = only(run("2h 30m left", "4h 30m left"));
+    expect(f.confidence).toBe("high");
+    expect(f.title).toBe(TITLE_RESTART);
+    expect(f.evidence.measuredValues).toEqual({
+      firstValue: 9000,
+      reloadValue: 16200,
+      gapSeconds: 9,
+    });
+    const same = only(run("2h 30m left", "2h 30m left"));
+    expect(same.title).toBe(TITLE_TIMER);
+  });
+
+  it("7.2: '2h 30m left' written in capitals is no countdown", () => {
+    expect(run("2H 30M LEFT")).toEqual([]);
+  });
+});
+
 describe("fake-urgency: no reload and unusable gaps", () => {
   it("without afterReload a worded countdown gives only a low finding", () => {
     const f = only(run("Sale ends in 04:59:59"));

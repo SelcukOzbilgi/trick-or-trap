@@ -89,6 +89,7 @@
 { "id": "en-088", "language": "en", "text": "Shipping address same as billing. Save this address for next time", "seenAt": "checkout address form", "source": "research-b" },
 { "id": "en-089", "language": "en", "text": "None of these, or continue without gift wrap", "seenAt": "radio group of add-on options", "source": "common" },
 { "id": "en-090", "language": "en", "text": "No, I don't want any help to choose my size", "seenAt": "decline link of a styling-service pop-up", "source": "common" },
+{ "id": "en-091", "language": "en", "text": "Hurry, the sale expires in 2 days and closes in 48 hours for all members", "seenAt": "sale banner on a category page", "source": "common" },
 { "id": "tr-001", "language": "tr", "text": "Büyük indirim yarın sona eriyor, kupon koduyla ekstra kazan", "seenAt": "ana sayfa kampanya şeridi", "source": "common" },
 { "id": "tr-002", "language": "tr", "text": "Kampanya bitiyor! Son şans, acele et", "seenAt": "kategori sayfası bannerı", "source": "common" },
 { "id": "tr-003", "language": "tr", "text": "Acele edin, fırsat sadece 3 saat kaldı", "seenAt": "ürün sayfası üst bandı", "source": "common" },
@@ -147,5 +148,6 @@
 { "id": "tr-056", "language": "tr", "text": "Beni hatırla, oturumu açık tut", "seenAt": "giriş formu onay kutusu", "source": "common" },
 { "id": "tr-057", "language": "tr", "text": "Sözleşme, koşullar ve şartlar sayfasını okudum, kabul ediyorum", "seenAt": "ödeme sayfası onay kutusu", "source": "common" },
 { "id": "tr-058", "language": "tr", "text": "Fatura adresi aynı olsun", "seenAt": "ödeme sayfası adres formu", "source": "common" },
-{ "id": "tr-059", "language": "tr", "text": "Beden ve renk seçin. Sigorta yok. Kargo ve teslimat ücretsiz", "seenAt": "ürün seçenekleri formu", "source": "common" }
+{ "id": "tr-059", "language": "tr", "text": "Beden ve renk seçin. Sigorta yok. Kargo ve teslimat ücretsiz", "seenAt": "ürün seçenekleri formu", "source": "common" },
+{ "id": "tr-060", "language": "tr", "text": "Sadece 2 gün kaldı, kampanya sona eriyor ve sepet 30 dakika sonra kapanıyor", "seenAt": "kampanya bannerı", "source": "common" }
 ]

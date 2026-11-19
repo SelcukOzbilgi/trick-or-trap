@@ -61,6 +61,17 @@ const RELOAD_SHOWABLE_IDS: readonly string[] = SCORABLE_FLAG_IDS.filter(
 
 const FLOW_PATTERNS: readonly string[] = ["sneak-into-basket", "drip-pricing", "hard-to-cancel"];
 
+/**
+ * Requirement 12.3: the only entries the evaluation may miss, each with the
+ * requirement that causes the miss. An entry is added only by the task whose
+ * requirement causes the miss; any other miss fails.
+ */
+const ACCEPTED_MISSES: Readonly<Record<string, string>> = {
+  // Requirement 7.7: "Join in 09:59 for 20% off" holds no countdown cue, and the
+  // demo shop gets none, so the text-only hit of the club timer is gone.
+  "club-timer-session-restart": "7.7",
+};
+
 function sorted(ids: readonly string[]): string[] {
   return [...ids].sort();
 }
@@ -187,6 +198,12 @@ describe("Boo-tique evaluation: targets", () => {
     expect(primary.flagEntries).toBe(19);
     expect(primary.hits, message(`Recall ${primary.hits}/19, at least 16 hits needed`)).toBeGreaterThanOrEqual(16);
     expect(recallOf(primary), message("Recall below 0.8")).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it("misses only the entries of ACCEPTED_MISSES (requirement 12.3)", () => {
+    const misses = primary.rows.filter((row) => row.result === "miss").map((row) => row.entryId);
+    const unaccepted = misses.filter((id) => !(id in ACCEPTED_MISSES));
+    expect(unaccepted, message("A miss that is not in ACCEPTED_MISSES")).toEqual([]);
   });
 
   it("gives no false positive on the 8 look-alike entries, with either pair", () => {

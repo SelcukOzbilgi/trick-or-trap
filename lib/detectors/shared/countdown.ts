@@ -11,7 +11,9 @@ import type { Token } from "@/lib/detectors/shared/text";
  * `MM:SS` and `M:SS` (seconds 00 to 59, the first field may exceed 59). Unit
  * forms: up to four number-unit pairs with strictly descending units, in
  * English (d, day, h, hr, hour, m, min, minute, s, sec, second and plurals)
- * or Turkish (gün, saat, dk, dakika, sn, saniye), such as "2h 30m". The
+ * or Turkish (gün, saat, dk, dakika, sn, saniye), such as "2h 30m". A unit of
+ * one letter counts only in lower case, and a single pair with a one-letter
+ * unit ("5 m") is no countdown. The
  * display unit is the smallest unit used, because a page cannot show finer
  * steps than that.
  *
@@ -156,12 +158,18 @@ function isTimeOfDay(
   return followsCalendarDate(dates, start);
 }
 
-/** Up to four number-unit pairs from index `start` with strictly descending units. */
+/**
+ * Up to four number-unit pairs from index `start` with strictly descending
+ * units. A unit of one letter (d, h, m, s) counts only in lower case, so "1 M"
+ * and "30 S" end the read, and a result of one pair with a one-letter unit is
+ * no countdown: "5 m" is a length, not a deadline (requirements 7.1 and 7.2).
+ */
 function readUnits(read: Reader, start: number): Countdown | null {
   let next = start;
   let seconds = 0;
   let unitSeconds = 0;
   let lastRank = Number.POSITIVE_INFINITY;
+  let lastUnitLetters = 0;
   let pairs = 0;
   while (pairs < MAX_PAIRS) {
     let at = next;
@@ -183,13 +191,17 @@ function readUnits(read: Reader, start: number): Countdown | null {
     }
     const unit = UNIT_BY_WORD.get(unitToken.norm);
     if (unit === undefined || unit.rank >= lastRank) break;
+    const oneLetter = unitToken.norm.length === 1;
+    if (oneLetter && unitToken.surface !== unitToken.norm) break;
     seconds += Number(numberToken.norm) * unit.seconds;
     unitSeconds = unit.seconds;
     lastRank = unit.rank;
+    lastUnitLetters = unitToken.norm.length;
     next = at + 2;
     pairs += 1;
   }
   if (pairs === 0) return null;
+  if (pairs === 1 && lastUnitLetters === 1) return null;
   return Object.freeze({ seconds, unitSeconds, form: "units", start, end: next });
 }
 

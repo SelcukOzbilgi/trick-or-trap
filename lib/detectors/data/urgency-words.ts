@@ -81,3 +81,21 @@ export const TIME_OF_DAY_WORDS: WordList = Object.freeze({
   en: Object.freeze(["at"]),
   tr: Object.freeze(["saat"]),
 });
+
+/**
+ * Words that make a `units` or `clock2` countdown "worded": a deadline cue in
+ * the same element. Without one, "12 hours" or "12:34" is read as an ordinary
+ * duration.
+ */
+export const COUNTDOWN_CUE_WORDS: WordList = Object.freeze({
+  en: Object.freeze([
+    "ends in",
+    "expires in",
+    "closes in",
+    "left",
+    "remaining",
+    "only",
+    "hurry",
+  ]),
+  tr: Object.freeze(["bitiyor", "sona eriyor", "kaldı", "kapanıyor"]),
+});

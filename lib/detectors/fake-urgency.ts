@@ -1,4 +1,5 @@
 import {
+  COUNTDOWN_CUE_WORDS,
   FUTURE_DEADLINE_WORDS,
   OFFER_WORDS,
   ROLLING_DEADLINE_PHRASES,
@@ -43,6 +44,7 @@ import type { Confidence, Finding, PageSnapshot } from "@/lib/types";
  */
 
 const URGENCY = compilePhrases(URGENCY_WORDS);
+const COUNTDOWN_CUE = compilePhrases(COUNTDOWN_CUE_WORDS);
 const OFFER = compilePhrases(OFFER_WORDS);
 const ROLLING = compilePhrases(ROLLING_DEADLINE_PHRASES);
 const FUTURE_DEADLINE = compilePhrases(FUTURE_DEADLINE_WORDS);
@@ -163,8 +165,15 @@ function isWordedText(tokens: readonly Token[]): boolean {
   return hasAny(tokens, URGENCY) || hasAny(tokens, OFFER);
 }
 
-/** Worded: the element or its parent container holds an urgency or offer word (requirement 8.4). */
-function isWorded(ctx: Context, el: IndexedElement): boolean {
+/**
+ * Worded (requirements 7.3 and 7.4). A `clock3` countdown is worded when the
+ * element or its parent container holds an urgency or offer word. A `units`
+ * or `clock2` countdown is worded only when the same element holds a
+ * countdown cue, because "12:34" or "2 days" next to a sale word is usually an
+ * ordinary duration.
+ */
+function isWorded(ctx: Context, el: IndexedElement, countdown: Countdown): boolean {
+  if (countdown.form !== "clock3") return hasAny(el.tokens, COUNTDOWN_CUE);
   if (isWordedText(el.tokens)) return true;
   const parent = ctx.pair.first.ancestors(el, 1)[0];
   return parent !== undefined && isWordedText(parent.tokens);
@@ -317,11 +326,15 @@ function bestCountdownRow(
   countdowns: readonly Countdown[],
   lookalike: boolean
 ): CountdownRow | null {
-  const worded = isWorded(ctx, el);
   let best: CountdownRow | null = null;
   for (const countdown of countdowns) {
     const comparison = compareWithReload(ctx, el, countdown);
-    const row = rowFor(countdown, comparison, worded, lookalike);
+    const row = rowFor(
+      countdown,
+      comparison,
+      isWorded(ctx, el, countdown),
+      lookalike
+    );
     if (row === null) continue;
     if (best === null || row < best.row) best = { row, countdown, comparison };
   }

@@ -124,8 +124,48 @@ describe("parseCountdowns: number and unit forms", () => {
     expect(parse("2 hours and 5 minutes")[0].seconds).toBe(7500);
   });
 
+  // Requirement 7.1: "30m 2h" is two one-pair reads with a one-letter unit
+  // each, so it no longer parses; the same rule is tested with unit words.
   it("starts a new countdown when the units do not descend", () => {
-    expect(parse("30m 2h").map((c) => c.seconds)).toEqual([1800, 7200]);
+    expect(parse("30 min 2 hours").map((c) => c.seconds)).toEqual([1800, 7200]);
+    expect(parse("30m 2h")).toEqual([]);
+  });
+
+  describe("one-letter units (requirements 7.1, 7.2)", () => {
+    it("does not parse one pair with a one-letter unit", () => {
+      expect(parse("5 m")).toEqual([]);
+      expect(parse("1 M")).toEqual([]);
+      expect(parse("30 s")).toEqual([]);
+      expect(parse("3 d")).toEqual([]);
+      expect(parse("12 h")).toEqual([]);
+      expect(parse("Only 5 m left")).toEqual([]);
+    });
+
+    it("does not parse a pair whose one-letter unit is upper case", () => {
+      expect(parse("2H 30M")).toEqual([]);
+      expect(parse("2h 30M")).toEqual([]);
+      expect(parse("2H 30m")).toEqual([]);
+    });
+
+    it("parses two or more lower-case pairs", () => {
+      expect(parse("2h 30m")).toHaveLength(1);
+      expect(parse("2h 30m")[0].seconds).toBe(9000);
+      expect(parse("1d 2h 3m 4s")).toHaveLength(1);
+    });
+
+    it("keeps a word-unit pair that precedes an upper-case one-letter unit", () => {
+      expect(parse("1 day 3 H")[0]).toMatchObject({ seconds: 86400, end: 2 });
+    });
+
+    it("parses unit words of more than one letter, also on their own", () => {
+      expect(parse("30 sec")[0].seconds).toBe(30);
+      expect(parse("2 days")[0].seconds).toBe(172800);
+      expect(parse("15 min")[0].seconds).toBe(900);
+      expect(parse("2 gün")[0].seconds).toBe(172800);
+      expect(parse("3 saat")[0].seconds).toBe(10800);
+      expect(parse("15 dk")[0].seconds).toBe(900);
+      expect(parse("30 sn")[0].seconds).toBe(30);
+    });
   });
 
   it("ignores numbers without a unit and units without a number", () => {

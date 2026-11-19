@@ -60,6 +60,7 @@ const MODULES: Readonly<Record<string, ModuleSpec>> = {
       FUTURE_DEADLINE_WORDS: "wordlist",
       SHIPPING_CUTOFF_PHRASES: "wordlist",
       TIME_OF_DAY_WORDS: "wordlist",
+      COUNTDOWN_CUE_WORDS: "wordlist",
     },
   },
   "scarcity-words": {

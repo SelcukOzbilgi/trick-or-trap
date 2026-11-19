@@ -46,15 +46,15 @@ Rules for every task:
   - [x] 3.3 Run the eight test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 1.11, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12_
 
-- [ ] 4. Narrow the countdown rules
+- [x] 4. Narrow the countdown rules
   - Uses: `shared/countdown.ts` (`readUnits`), `fake-urgency.ts` (`isWorded`, `rowFor`, `bestCountdownRow`), `data/urgency-words.ts`, the corpus from task 1.
   - Files: edits `lib/detectors/shared/countdown.ts`, `fake-urgency.ts`, `data/urgency-words.ts`, `tests/fixtures/real-world-phrases.json`, `tests/detectors/shared/countdown.test.ts`, `fake-urgency.test.ts`, `word-lists.test.ts`, `eval/boo-tique-eval.test.ts`.
   - Reads: requirements 1, 7, 12.3; design 8.
   - Dependent tests to run: `shared/countdown.test.ts`, `fake-urgency.test.ts`, `word-lists.test.ts`, `real-world-phrases.test.ts`, `wording.test.ts`, `hostile-input.test.ts`, `eval/boo-tique-eval.test.ts`.
-  - [ ] 4.1 Tests first: every probe of requirements 7.5, 7.6, 7.8, 7.11 and 7.12 in `fake-urgency.test.ts` and the parser cases ("5 m", "1 M", "30 s", "2H 30M" give none; "2h 30m", "30 sec", "2 days" parse) in `countdown.test.ts`; `COUNTDOWN_CUE_WORDS` in `MODULES` of `word-lists.test.ts`. Run them; they fail.
-  - [ ] 4.2 Implement the one-letter rule in `readUnits`, add `COUNTDOWN_CUE_WORDS`, make `isWorded` take the countdown and use the cue rule for `units` and `clock2` (design 8). Add corpus texts that hold every cue entry.
-  - [ ] 4.3 Change the existing expectations this breaks (offer-word durations, one-letter units) with a comment naming 7.1 to 7.4. In `boo-tique-eval.test.ts` add `ACCEPTED_MISSES` holding `club-timer-session-restart` (comment: requirement 7.7); every miss must be in it; keep the floor of 16 of 19. Do not add a cue to the demo shop.
-  - [ ] 4.4 Run the seven test files (one command each), then `npx tsc --noEmit`.
+  - [x] 4.1 Tests first: every probe of requirements 7.5, 7.6, 7.8, 7.11 and 7.12 in `fake-urgency.test.ts` and the parser cases ("5 m", "1 M", "30 s", "2H 30M" give none; "2h 30m", "30 sec", "2 days" parse) in `countdown.test.ts`; `COUNTDOWN_CUE_WORDS` in `MODULES` of `word-lists.test.ts`. Run them; they fail.
+  - [x] 4.2 Implement the one-letter rule in `readUnits`, add `COUNTDOWN_CUE_WORDS`, make `isWorded` take the countdown and use the cue rule for `units` and `clock2` (design 8). Add corpus texts that hold every cue entry.
+  - [x] 4.3 Change the existing expectations this breaks (offer-word durations, one-letter units) with a comment naming 7.1 to 7.4. In `boo-tique-eval.test.ts` add `ACCEPTED_MISSES` holding `club-timer-session-restart` (comment: requirement 7.7); every miss must be in it; keep the floor of 16 of 19. Do not add a cue to the demo shop.
+  - [x] 4.4 Run the seven test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 1.11, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 7.10, 7.11, 7.12, 12.2, 12.3, 12.4_
 
 - [ ] 5. Stock calibration and English sales-pop forms
