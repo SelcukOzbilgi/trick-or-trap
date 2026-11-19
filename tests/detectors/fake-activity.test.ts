@@ -8,7 +8,7 @@ import {
 import { detectFakeActivity } from "@/lib/detectors/fake-activity";
 import { MAX_PHRASE_TOKENS } from "@/lib/detectors/shared/constants";
 import { TITLES } from "@/lib/detectors/shared/finding";
-import { compilePhrases, tokenise } from "@/lib/detectors/shared/text";
+import { compilePhrases, countPhraseElements } from "@/lib/detectors/shared/text";
 import type { WordList } from "@/lib/detectors/shared/text";
 import { FindingSchema } from "@/lib/types";
 import type { Finding, PageSnapshot } from "@/lib/types";
@@ -137,7 +137,9 @@ describe("fake-activity: A1 with a reload", () => {
   it("other count templates work, and a cart count is a count claim", () => {
     for (const [a, b] of [
       ["8 customers are viewing", "12 customers are viewing"],
-      ["5 people have this in cart", "9 people have this in cart"],
+      ["5 people have this in their cart", "9 people have this in their cart"],
+      // Requirement 2.4: the entry "# people have this in their" also matches "basket".
+      ["5 people have this in their basket", "9 people have this in their basket"],
       ["12 sold today", "19 sold today"],
       ["7 others are viewing", "3 others are viewing"],
       ["Bugün 12 adet satıldı", "Bugün 19 adet satıldı"],
@@ -400,12 +402,24 @@ describe("fake-activity: A2 and A3 without a change", () => {
     expect(run("ayşe az önce satın aldı", undefined, { over: STATUS })).toEqual([]);
   });
 
+  it("the Turkish purchase entries need 'az önce'; the entries without it are gone (requirement 2.5)", () => {
+    const withTime = only(run("Ankara'dan Ayşe az önce satın aldı", undefined, { over: STATUS }));
+    expect(withTime.title).toBe(TITLE_MESSAGE);
+    const withTimeDen = only(run("İzmir'den Mehmet az önce satın aldı", undefined, { over: STATUS }));
+    expect(withTimeDen.title).toBe(TITLE_MESSAGE);
+    expect(run("Ankara'dan Ayşe satın aldı", undefined, { over: STATUS })).toEqual([]);
+  });
+
   it("other purchase templates match", () => {
     for (const text of [
       "Alex from Leeds just purchased a lamp",
       "Alex from New York recently bought a lamp",
       "Sam in Austin just ordered a mug",
-      "Ankara'dan Ayşe satın aldı",
+      // Requirement 2.5: the Turkish purchase entries without "az önce" are removed, so
+      // this case now uses the restored entry "@'dan @ az önce satın aldı". The old
+      // wording "Ankara'dan Ayşe satın aldı" is asserted to give nothing in the
+      // test of requirement 2.5 above.
+      "Ankara'dan Ayşe az önce satın aldı",
       "Ayşe az önce satın aldı",
     ]) {
       const f = only(run(text));
@@ -586,13 +600,16 @@ describe("fake-activity: word lists", () => {
     }
   });
 
-  it("no entry is longer than MAX_PHRASE_TOKENS tokens, so none is skipped silently", () => {
+  // Requirement 2.8: the length is counted as compilePhrases counts it
+  // (`@'dan` is one element), not by tokenise tokens.
+  it("no entry is longer than MAX_PHRASE_TOKENS elements, so none is skipped silently", () => {
     for (const [name, list] of Object.entries(lists)) {
       let total = 0;
       for (const language of ["en", "tr"] as const) {
         for (const entry of list[language]) {
           total += 1;
-          expect(tokenise(entry).length, `${name}: ${entry}`).toBeLessThanOrEqual(
+          expect(countPhraseElements(entry), `${name}: ${entry}`).toBeGreaterThanOrEqual(1);
+          expect(countPhraseElements(entry), `${name}: ${entry}`).toBeLessThanOrEqual(
             MAX_PHRASE_TOKENS
           );
         }

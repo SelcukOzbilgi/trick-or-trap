@@ -374,8 +374,21 @@ function toElements(tokens: readonly Token[]): EntryElement[] {
 }
 
 /**
+ * Number of elements `compilePhrases` counts for one list entry: `#` is one,
+ * `@` is one, `@'dan` (a name placeholder with a suffix) is one, every other
+ * token is one. 0 for an empty or non-string entry. A value above
+ * `MAX_PHRASE_TOKENS` is returned as it is; `compilePhrases` skips such an
+ * entry, and tests use this function so that they count the way the compiler
+ * does.
+ */
+export function countPhraseElements(entry: string): number {
+  if (typeof entry !== "string") return 0;
+  return toElements(tokenise(entry, 200)).length;
+}
+
+/**
  * Tokenise every entry once and index it by its first token. Entries with no
- * tokens or more than `MAX_PHRASE_TOKENS` elements are not compiled, so work
+ * elements or more than `MAX_PHRASE_TOKENS` elements are not compiled, so work
  * per start token stays bounded; `size` counts the compiled entries.
  */
 export function compilePhrases(list: WordList): PhraseMatcher {
@@ -388,7 +401,8 @@ export function compilePhrases(list: WordList): PhraseMatcher {
     for (const entry of entries) {
       if (typeof entry !== "string") continue;
       const elements = toElements(tokenise(entry, 200));
-      if (elements.length === 0 || elements.length > MAX_PHRASE_TOKENS) continue;
+      const count = countPhraseElements(entry);
+      if (count === 0 || count > MAX_PHRASE_TOKENS) continue;
       const compiled: CompiledEntry = Object.freeze({
         order,
         entry,

@@ -4,6 +4,7 @@ import {
   ROLLING_MIDNIGHT_TEXT,
 } from "@/lib/boo-tique/content";
 import { SOLD_TOAST_MESSAGES } from "@/lib/boo-tique/countdown";
+import { tokenise } from "@/lib/detectors/shared/text";
 import { loadFixture } from "@/tests/boo-tique/helpers/fixture";
 
 /**
@@ -105,4 +106,27 @@ export function plantedTexts(): string[] {
     texts.push(...singleQuotedStrings(entry.element));
   }
   return [...new Set(texts)];
+}
+
+/** Words and numbers of a text, with the `#` and `@` placeholders kept; other symbols dropped. */
+export function keyTokens(text: string): string[] {
+  return tokenise(text, 400)
+    .filter((t) => t.kind !== "symbol" || t.norm === "#" || t.norm === "@")
+    .map((t) => t.norm);
+}
+
+/** True when `needle` occurs in `haystack` as a run of consecutive items. */
+export function containsSequence(haystack: readonly string[], needle: readonly string[]): boolean {
+  if (needle.length === 0 || needle.length > haystack.length) return false;
+  for (let start = 0; start + needle.length <= haystack.length; start += 1) {
+    let same = true;
+    for (let k = 0; k < needle.length; k += 1) {
+      if (haystack[start + k] !== needle[k]) {
+        same = false;
+        break;
+      }
+    }
+    if (same) return true;
+  }
+  return false;
 }

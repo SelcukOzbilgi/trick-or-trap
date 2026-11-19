@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   compilePhrases,
+  countPhraseElements,
   findPhrases,
   hasAny,
   maskDigits,
@@ -172,6 +173,46 @@ describe("tokenise", () => {
     const tokens = tokenise("a 1 !");
     expect(Object.isFrozen(tokens)).toBe(true);
     expect(tokens.every((t) => Object.isFrozen(t))).toBe(true);
+  });
+});
+
+describe("countPhraseElements", () => {
+  // Requirements 2.8 and 3.1: the length of a list entry is counted as
+  // compilePhrases counts it, so a name placeholder with a suffix is one element.
+  it("counts a name placeholder with a suffix as one element", () => {
+    expect(countPhraseElements("@'dan @ az önce satın aldı")).toBe(6);
+    expect(countPhraseElements("@'den @ az önce satın aldı")).toBe(6);
+  });
+
+  it("counts a number placeholder as one element", () => {
+    expect(countPhraseElements("# people have this in their")).toBe(6);
+    expect(countPhraseElements("only # left")).toBe(3);
+  });
+
+  it("counts plain words and a symbol token as one element each", () => {
+    expect(countPhraseElements("selling fast")).toBe(2);
+    expect(countPhraseElements("hurry, only # left")).toBe(5);
+  });
+
+  it("gives 0 for an empty, blank or non-string entry", () => {
+    expect(countPhraseElements("")).toBe(0);
+    expect(countPhraseElements("   ")).toBe(0);
+    expect(countPhraseElements(undefined as unknown as string)).toBe(0);
+  });
+
+  it("gives more than MAX_PHRASE_TOKENS for an entry that compilePhrases skips", () => {
+    const entry = "# people have this in their cart";
+    expect(countPhraseElements(entry)).toBeGreaterThan(MAX_PHRASE_TOKENS);
+    expect(compilePhrases({ en: [entry], tr: [] }).size).toBe(0);
+  });
+
+  it("agrees with compilePhrases: an entry of 1 to MAX_PHRASE_TOKENS elements is compiled", () => {
+    for (const entry of ["@'dan @ az önce satın aldı", "# people have this in their", "selling fast"]) {
+      const count = countPhraseElements(entry);
+      expect(count).toBeGreaterThanOrEqual(1);
+      expect(count).toBeLessThanOrEqual(MAX_PHRASE_TOKENS);
+      expect(compilePhrases({ en: [], tr: [entry] }).size).toBe(1);
+    }
   });
 });
 

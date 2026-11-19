@@ -16,8 +16,7 @@ export const COUNT_TEMPLATES: WordList = Object.freeze({
     "# people viewing",
     "# people are looking at this",
     "# others are viewing",
-    "# people have this in cart",
-    "# people have this in basket",
+    "# people have this in their",
     "# customers are viewing",
     "# sold in the last",
     "# bought in the last",
@@ -42,8 +41,8 @@ export const PURCHASE_TEMPLATES: WordList = Object.freeze({
     "@ in @ just ordered",
   ]),
   tr: Object.freeze([
-    "@'dan @ satın aldı",
-    "@'den @ satın aldı",
+    "@'dan @ az önce satın aldı",
+    "@'den @ az önce satın aldı",
     "@ az önce satın aldı",
   ]),
 });

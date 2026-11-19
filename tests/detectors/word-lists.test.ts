@@ -12,9 +12,21 @@ import * as urgencyWords from "@/lib/detectors/data/urgency-words";
 import { runAllDetectors } from "@/lib/detectors/all";
 import { MAX_PHRASE_TOKENS } from "@/lib/detectors/shared/constants";
 import { TITLES } from "@/lib/detectors/shared/finding";
-import { compilePhrases, tokenise } from "@/lib/detectors/shared/text";
+import {
+  compilePhrases,
+  countPhraseElements,
+  findPhrases,
+  normaliseText,
+  tokenise,
+} from "@/lib/detectors/shared/text";
 import type { WordList } from "@/lib/detectors/shared/text";
-import { DEMO_TERMS, plantedTexts } from "@/tests/detectors/helpers/demo-terms";
+import {
+  DEMO_TERMS,
+  containsSequence,
+  keyTokens,
+  plantedTexts,
+} from "@/tests/detectors/helpers/demo-terms";
+import { loadRealWorldPhrases } from "@/tests/detectors/helpers/real-world-phrases";
 import type { PageSnapshot } from "@/lib/types";
 
 /**
@@ -219,17 +231,22 @@ describe("the data modules", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Length (compilePhrases skips entries over MAX_PHRASE_TOKENS tokens)
+// Length (compilePhrases skips entries over MAX_PHRASE_TOKENS elements)
 // ---------------------------------------------------------------------------
 
 describe("the length of list entries", () => {
-  it("is at most MAX_PHRASE_TOKENS tokens, counted with tokenise, in every list of every module", () => {
+  // Requirement 2.8: entries are counted as compilePhrases counts them, so
+  // "@'dan" is one element and not three tokens.
+  it("is 1 to MAX_PHRASE_TOKENS elements, counted with countPhraseElements, in every list of every module", () => {
     const tooLong = allEntries()
       .filter((item) => {
-        const count = tokenise(item.entry, 200).length;
+        const count = countPhraseElements(item.entry);
         return count === 0 || count > MAX_PHRASE_TOKENS;
       })
-      .map((item) => `${item.where}: "${item.entry}" has ${tokenise(item.entry, 200).length} tokens`);
+      .map(
+        (item) =>
+          `${item.where}: "${item.entry}" has ${countPhraseElements(item.entry)} elements`,
+      );
     expect(tooLong).toEqual([]);
   });
 
@@ -246,51 +263,8 @@ describe("the length of list entries", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Generality (requirement 14.8)
+// Generality (requirements 3.1 to 3.6, replacing old criterion 14.8)
 // ---------------------------------------------------------------------------
-
-/** Words and numbers of a text, with the `#` and `@` placeholders kept; other symbols dropped. */
-function keyTokens(text: string): string[] {
-  return tokenise(text, 400)
-    .filter((t) => t.kind !== "symbol" || t.norm === "#" || t.norm === "@")
-    .map((t) => t.norm);
-}
-
-function containsSequence(haystack: readonly string[], needle: readonly string[]): boolean {
-  if (needle.length === 0 || needle.length > haystack.length) return false;
-  for (let start = 0; start + needle.length <= haystack.length; start += 1) {
-    let same = true;
-    for (let k = 0; k < needle.length; k += 1) {
-      if (haystack[start + k] !== needle[k]) {
-        same = false;
-        break;
-      }
-    }
-    if (same) return true;
-  }
-  return false;
-}
-
-/**
- * Planted texts that are ordinary control and consent labels. Requirement 11.3
- * and design sections 9.4 to 9.6 name them in the lists themselves ("no thanks",
- * "not now", "reject", "accept all", "options", "subscribe", "partners",
- * "insurance"), and a shop cannot be checked for them without them. They are
- * exempt only in the two control-label modules below. Every claim list
- * (urgency, scarcity, activity, shaming) stays fully covered, and so does
- * every longer planted text.
- */
-const GENERIC_CONTROL_LABELS: ReadonlySet<string> = new Set([
-  "accept all",
-  "reject",
-  "options",
-  "subscribe",
-  "no thanks",
-  "not now",
-  "partners",
-  "insurance",
-]);
-const CONTROL_LABEL_MODULES: ReadonlySet<string> = new Set(["choice-words", "preselection-words"]);
 
 describe("the generality of the word lists", () => {
   it("hold no demo term in any entry of any list", () => {
@@ -318,38 +292,35 @@ describe("the generality of the word lists", () => {
     expect(planted).toContain("Morgan from Ohio just bought the Cursed Candle Set");
   });
 
-  it("have no entry that equals or contains a planted text", () => {
-    const planted = plantedTexts()
-      .map((text) => ({ text, tokens: keyTokens(text) }))
-      .filter((p) => p.tokens.length > 0);
-    const hits: string[] = [];
+  // Requirements 3.1, 3.4, 3.5, 3.6: every entry of a word or phrase list must
+  // occur in a corpus text of its language. A planted Boo-tique text is
+  // accepted as an entry when it is common wording (3.2).
+  it("has every entry of every word or phrase list in a text of the real-world corpus", () => {
+    const corpus = loadRealWorldPhrases();
+    const tokensByLanguage: Record<"en" | "tr", ReturnType<typeof tokenise>[]> = {
+      en: corpus.filter((item) => item.language === "en").map((item) => tokenise(item.text, 400)),
+      tr: corpus.filter((item) => item.language === "tr").map((item) => tokenise(item.text, 400)),
+    };
+    const missing: string[] = [];
     for (const item of allEntries()) {
-      // Word and phrase lists only: glyphs, currency codes, time zone names,
-      // month names and the forbidden words are facts, not shop wording.
       if (item.kind !== "wordlist") continue;
-      const tokens = keyTokens(item.entry);
-      for (const p of planted) {
-        const exempt =
-          CONTROL_LABEL_MODULES.has(item.module) &&
-          GENERIC_CONTROL_LABELS.has(p.tokens.join(" "));
-        if (!exempt && containsSequence(tokens, p.tokens)) {
-          hits.push(`${item.where}: "${item.entry}" equals or contains the planted text "${p.text}"`);
-        }
+      const language = item.where.endsWith(".tr") ? "tr" : "en";
+      const texts = tokensByLanguage[language];
+      if (item.list === "FIRST_PERSON_SUFFIXES") {
+        const ending = normaliseText(item.entry);
+        const found = texts.some((tokens) =>
+          tokens.some((t) => t.kind === "word" && t.norm.endsWith(ending)),
+        );
+        if (!found) missing.push(`${item.where}: ending "${item.entry}" is in no corpus word`);
+        continue;
       }
+      const matcher = compilePhrases(
+        language === "tr" ? { en: [], tr: [item.entry] } : { en: [item.entry], tr: [] },
+      );
+      const found = texts.some((tokens) => findPhrases(tokens, matcher).length > 0);
+      if (!found) missing.push(`${item.where}: "${item.entry}" is in no corpus text`);
     }
-    expect(hits).toEqual([]);
-  });
-
-  it("keeps the control-label exemption small and out of every claim list", () => {
-    expect(GENERIC_CONTROL_LABELS.size).toBeLessThanOrEqual(8);
-    const claimModules = ["urgency-words", "scarcity-words", "activity-words", "confirmshaming-words"];
-    const planted = plantedTexts().map((text) => keyTokens(text).join(" "));
-    for (const label of GENERIC_CONTROL_LABELS) expect(planted).toContain(label);
-    const hits = allEntries()
-      .filter((item) => claimModules.includes(item.module))
-      .filter((item) => GENERIC_CONTROL_LABELS.has(keyTokens(item.entry).join(" ")))
-      .map((item) => `${item.where}: "${item.entry}"`);
-    expect(hits).toEqual([]);
+    expect(missing).toEqual([]);
   });
 });
 

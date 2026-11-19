@@ -249,6 +249,19 @@ describe("Boo-tique evaluation: targets", () => {
     expect(inventory.matched, message("No finding on the real inventory")).toEqual([]);
   });
 
+  it("finds the two unquantified scarcity badges as low S5 findings (requirements 2.1 and 2.2)", () => {
+    // Requirements 2.1 and 2.2: "Selling fast" and "Almost gone" are entries of the
+    // unquantified list again, so these two entries are hits.
+    for (const id of ["product-selling-fast-badge", "product-almost-gone-tiny"]) {
+      for (const result of [primary, secondary]) {
+        const row = rowOf(result, id);
+        expect(row.result, message(id)).toBe("hit");
+        expect(row.confidences, message(`${id} is low`)).toEqual(["low"]);
+        expect(row.titles, message(`${id} title`)).toEqual(["Possible fake scarcity: scarcity wording"]);
+      }
+    }
+  });
+
   it("uses no word of FORBIDDEN_WORDS in any string of any finding", () => {
     const forbidden = new Set(FORBIDDEN_WORDS.map((word) => normaliseText(word)));
     const hits: string[] = [];

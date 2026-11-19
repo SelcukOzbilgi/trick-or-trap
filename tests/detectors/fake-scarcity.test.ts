@@ -235,6 +235,15 @@ describe("fake-scarcity: text rows", () => {
   });
 
   it("S3: another scarcity claim elsewhere on the page supports a qualified claim", () => {
+    // Task 12 of the old spec renamed this text to "Selling out fast"; it is back
+    // to the natural phrase (requirement 2.10). The extra entry has its own case below.
+    const findings = detectFakeScarcity(
+      snap([raw("el-1-0", "Only 25 left"), raw("el-1-1", "Selling fast")])
+    );
+    expect(findings.map((f) => f.confidence)).toEqual(["medium", "low"]);
+  });
+
+  it("S3: the extra entry 'selling out fast' supports a qualified claim as well", () => {
     const findings = detectFakeScarcity(
       snap([raw("el-1-0", "Only 25 left"), raw("el-1-1", "Selling out fast")])
     );
@@ -267,9 +276,11 @@ describe("fake-scarcity: text rows", () => {
   });
 
   it("S5: unquantified wording gives a low finding, in English and Turkish", () => {
+    // Requirements 2.1, 2.2, 2.3: the natural phrases are entries again.
     for (const text of [
-      "Selling out fast",
-      "Almost sold out",
+      "Selling fast",
+      "Almost gone",
+      "Almost gone!",
       "Low stock",
       "Tükenmek üzere",
       "Çok satıyor",
@@ -283,7 +294,22 @@ describe("fake-scarcity: text rows", () => {
     }
   });
 
+  it("S5: the extra entries 'selling out fast' and 'almost sold out' still give a low finding (requirement 2.3)", () => {
+    for (const text of ["Selling out fast", "Almost sold out"]) {
+      const f = only(run(text));
+      expect(f.confidence).toBe("low");
+      expect(f.title).toBe(TITLE_WORDING);
+      expect(f.evidence.text).toBe(`Text "${text}".`);
+    }
+  });
+
   it("S5 does not use the reload sample", () => {
+    const f = only(run("Selling fast", "Selling fast"));
+    expect(f.confidence).toBe("low");
+    expect(f.evidence.text).toBe('Text "Selling fast".');
+  });
+
+  it("S5 does not use the reload sample for the extra entry either", () => {
     const f = only(run("Selling out fast", "Selling out fast"));
     expect(f.confidence).toBe("low");
     expect(f.evidence.text).toBe('Text "Selling out fast".');
@@ -297,6 +323,7 @@ describe("fake-scarcity: text rows", () => {
       "Only 2 left for free shipping",
       "Sepetinizde 2 ürün",
       "Ücretsiz kargo için son 5 ürün",
+      "Selling fast, 120 reviews",
       "Selling out fast, 120 reviews",
       "4.8 ratings",
     ]) {

@@ -88,7 +88,7 @@ function pageElements(reload: boolean): Raw[] {
     el("el-1-0", "span", reload ? "Sale ends in 01:59:59" : "Sale ends in 01:59:58"),
     el("el-1-1", "span", "Ends at midnight"),
     el("el-1-2", "span", reload ? "Only 6 left!" : "Only 2 left!"),
-    el("el-1-3", "span", "Selling out fast"),
+    el("el-1-3", "span", "Selling fast"),
     el(
       "el-1-4",
       "span",
