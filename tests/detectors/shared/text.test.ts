@@ -6,6 +6,7 @@ import {
   hasAny,
   isForbiddenToken,
   maskDigits,
+  matchesStem,
   normaliseText,
   quote,
   tokenise,
@@ -19,8 +20,10 @@ import {
   FORBIDDEN_STEM_EXTRA_MAX,
   MAX_PHRASE_TOKENS,
   MAX_QUOTE_CHARS,
+  MAX_STEM_EXTRA_CHARS,
   MAX_TEXT_READ,
   MAX_TOKENS_PER_TEXT,
+  MIN_STEM_CHARS,
 } from "@/lib/detectors/shared/constants";
 
 const norms = (tokens: readonly Token[]): string[] => tokens.map((t) => t.norm);
@@ -218,6 +221,194 @@ describe("countPhraseElements", () => {
       expect(count).toBeLessThanOrEqual(MAX_PHRASE_TOKENS);
       expect(compilePhrases({ en: [], tr: [entry] }).size).toBe(1);
     }
+  });
+});
+
+describe("matchesStem", () => {
+  // Requirements 9.1, 9.3 and 9.10: the stem is a prefix, followed by at most
+  // MAX_STEM_EXTRA_CHARS letters, compared in normalised form.
+  const stem = (word: string): string => normaliseText(word);
+  const matches = (word: string, entryStem: string): boolean =>
+    matchesStem(normaliseText(word), stem(entryStem), MAX_STEM_EXTRA_CHARS);
+
+  it.each([
+    ["kaçırma", "kaçırma"],
+    ["kaçırmayın", "kaçırma"],
+    ["kaçırmak", "kaçırma"],
+    ["kaçırmak", "kaçır"],
+    ["indirim", "indirim"],
+    ["indirimleri", "indirim"],
+    ["fırsatları", "fırsat"],
+    ["fırsatlarını", "fırsat"],
+    ["bültenimiz", "bülten"],
+    ["İNDİRİMLERİ", "indirim"],
+  ])("matches %s for the stem %s", (word, entryStem) => {
+    expect(matches(word, entryStem)).toBe(true);
+  });
+
+  it.each([
+    ["indirimlerinizdekilerden", "indirim"],
+    ["fırsatlarınızı", "fırsat"],
+    ["kampanyalarımızdan", "kampanya"],
+    ["indirim2024", "indirim"],
+    ["indirim'e", "indirim"],
+    ["indirim-fırsat", "indirim"],
+    ["indi", "indirim"],
+  ])("does not match %s for the stem %s", (word, entryStem) => {
+    expect(matches(word, entryStem)).toBe(false);
+  });
+
+  // Requirement 9.5: "para", "ileti" and "bağış" stay exact entries because a
+  // stem would match "paragraf", "iletişim" and "bağışıklık".
+  it.each([
+    ["paragraf", "para"],
+    ["iletişim", "ileti"],
+    ["bağışıklık", "bağış"],
+  ])("would match %s for a stem %s, which is why the list keeps it exact", (word, exact) => {
+    expect(matchesStem(normaliseText(word), normaliseText(exact), MAX_STEM_EXTRA_CHARS)).toBe(true);
+    expect(findPhrases(tokenise(word), compilePhrases({ en: [], tr: [exact] }))).toEqual([]);
+  });
+
+  it("allows exactly MAX_STEM_EXTRA_CHARS letters and not one more", () => {
+    expect(MAX_STEM_EXTRA_CHARS).toBe(6);
+    expect(matchesStem("abcdxxxxxx", "abcd", MAX_STEM_EXTRA_CHARS)).toBe(true);
+    expect(matchesStem("abcdxxxxxxx", "abcd", MAX_STEM_EXTRA_CHARS)).toBe(false);
+  });
+
+  it("does not match an empty stem or a word with a different start", () => {
+    expect(matchesStem("indirim", "", MAX_STEM_EXTRA_CHARS)).toBe(false);
+    expect(matchesStem("sindirim", "indirim", MAX_STEM_EXTRA_CHARS)).toBe(false);
+  });
+});
+
+describe("stem entries (requirements 9.1 to 9.3, 9.10)", () => {
+  const tr = (...entries: string[]) => compilePhrases({ en: [], tr: entries });
+  const hits = (matcher: ReturnType<typeof tr>, text: string) =>
+    findPhrases(tokenise(text), matcher).map((h) => [h.entry, h.start, h.end]);
+
+  it("pins the two stem constants", () => {
+    expect(MAX_STEM_EXTRA_CHARS).toBe(6);
+    expect(MIN_STEM_CHARS).toBe(4);
+  });
+
+  it.each([
+    "kaçırma",
+    "kaçırmayın",
+    "kaçırmak",
+    "KAÇIRMAYIN",
+  ])("matches %s through kaçırma*", (word) => {
+    expect(hits(tr("kaçırma*"), word)).toEqual([["kaçırma*", 0, 1]]);
+  });
+
+  it.each(["indirim", "indirimleri", "İndirimler", "indirimi"])(
+    "matches %s through indirim*",
+    (word) => {
+      expect(hits(tr("indirim*"), `Büyük ${word} başladı`)).toEqual([["indirim*", 1, 2]]);
+    }
+  );
+
+  it("matches fırsatları and bültenimiz through their stems", () => {
+    expect(hits(tr("fırsat*"), "fırsatları")).toEqual([["fırsat*", 0, 1]]);
+    expect(hits(tr("bülten*"), "bültenimiz")).toEqual([["bülten*", 0, 1]]);
+  });
+
+  it("does not match a word with more than MAX_STEM_EXTRA_CHARS further letters", () => {
+    expect(hits(tr("indirim*"), "indirimlerinizdekilerden")).toEqual([]);
+    expect(hits(tr("kampanya*"), "kampanyalarımızdan")).toEqual([]);
+  });
+
+  it("does not match a token with an apostrophe, a different start or a shorter word", () => {
+    expect(hits(tr("indirim*"), "indirim'e")).toEqual([]);
+    expect(hits(tr("indirim*"), "sindirim")).toEqual([]);
+    expect(hits(tr("indirim*"), "indi")).toEqual([]);
+  });
+
+  it("keeps exact entries exact: paragraf, iletişim and bağışıklık do not match", () => {
+    expect(hits(tr("para"), "paragraf")).toEqual([]);
+    expect(hits(tr("ileti"), "iletişim")).toEqual([]);
+    expect(hits(tr("bağış"), "bağışıklık")).toEqual([]);
+    expect(hits(tr("para"), "para")).toEqual([["para", 0, 1]]);
+  });
+
+  it("counts a stem as one element inside a longer entry", () => {
+    const matcher = tr("fırsat* kaçır* istiyorum", "tüken* üzere", "# kişi inceli*", "şu an # kişi bakıyor*");
+    expect(matcher.size).toBe(4);
+    expect(hits(matcher, "Hayır, fırsatları kaçırmak istiyorum")).toEqual([
+      ["fırsat* kaçır* istiyorum", 2, 5],
+    ]);
+    expect(hits(matcher, "Tükenmek üzere!")).toEqual([["tüken* üzere", 0, 2]]);
+    const viewers = findPhrases(tokenise("23 kişi inceliyor"), matcher);
+    expect(viewers.map((h) => [h.entry, h.numbers])).toEqual([["# kişi inceli*", [23]]]);
+    const live = findPhrases(tokenise("şu an 12 kişi bakıyor"), matcher);
+    expect(live.map((h) => [h.entry, h.numbers])).toEqual([["şu an # kişi bakıyor*", [12]]]);
+  });
+
+  it("matches an entry that starts with a stem at every start token", () => {
+    const matcher = tr("indirim* istemiyorum");
+    expect(hits(matcher, "Hayır, indirimleri istemiyorum")).toEqual([["indirim* istemiyorum", 2, 4]]);
+    expect(hits(matcher, "indirim istemiyorum")).toEqual([["indirim* istemiyorum", 0, 2]]);
+  });
+
+  it("folds i and ı the same way on both sides", () => {
+    expect(hits(tr("kaçır*"), "KAÇIRMAYIN")).toEqual([["kaçır*", 0, 1]]);
+    expect(hits(tr("ıslak*"), "İSLAKLIK")).toEqual([["ıslak*", 0, 1]]);
+  });
+
+  describe("entries that are not compiled (requirement 9.2)", () => {
+    it("does not compile a stem in an English entry, and counts 0 for it", () => {
+      expect(compilePhrases({ en: ["indirim*"], tr: [] }).size).toBe(0);
+      expect(countPhraseElements("indirim*", "en")).toBe(0);
+      expect(countPhraseElements("only # lef*", "en")).toBe(0);
+    });
+
+    it("compiles the same entry in a Turkish list", () => {
+      expect(compilePhrases({ en: [], tr: ["indirim*"] }).size).toBe(1);
+      expect(countPhraseElements("indirim*", "tr")).toBe(1);
+      expect(countPhraseElements("indirim*")).toBe(1);
+    });
+
+    it("does not compile a stem shorter than MIN_STEM_CHARS", () => {
+      for (const entry of ["ind*", "ab*", "a*", "# kişi ind*"]) {
+        expect(compilePhrases({ en: [], tr: [entry] }).size, entry).toBe(0);
+        expect(countPhraseElements(entry, "tr"), entry).toBe(0);
+      }
+    });
+
+    it("compiles a stem of exactly MIN_STEM_CHARS characters", () => {
+      expect(compilePhrases({ en: [], tr: ["bakı*"] }).size).toBe(1);
+      expect(countPhraseElements("bakı*", "tr")).toBe(1);
+    });
+
+    it("measures the stem after normalisation, not before", () => {
+      // "İİİ*" is three characters either way; "kaçı*" is four.
+      expect(countPhraseElements("İİİ*", "tr")).toBe(0);
+      expect(countPhraseElements("kaçı*", "tr")).toBe(1);
+    });
+
+    it.each([
+      "*",
+      "* indirim",
+      "indirim *",
+      "indirim**",
+      "# *",
+      "5*",
+      "indirim* *",
+      "hayır, * indirim",
+    ])("does not compile the stray star in %j", (entry) => {
+      expect(compilePhrases({ en: [], tr: [entry] }).size, entry).toBe(0);
+      expect(countPhraseElements(entry, "tr"), entry).toBe(0);
+    });
+
+    it("does not compile a stem entry with more than MAX_PHRASE_TOKENS elements", () => {
+      const entry = "a1 a2 a3 a4 a5 indirim*";
+      expect(countPhraseElements(entry, "tr")).toBeGreaterThan(MAX_PHRASE_TOKENS);
+      expect(compilePhrases({ en: [], tr: [entry] }).size).toBe(0);
+    });
+  });
+
+  it("treats a star in the page text as a symbol token, not as a wildcard", () => {
+    expect(hits(tr("indirim*"), "indirim * fırsat")).toEqual([["indirim*", 0, 1]]);
+    expect(hits(tr("fırsat*"), "indirim * fırsat")).toEqual([["fırsat*", 2, 3]]);
   });
 });
 

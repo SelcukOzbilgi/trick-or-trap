@@ -4,7 +4,10 @@ import type { WordList } from "@/lib/detectors/shared/text";
  * Review rule: an entry is added here only when it comes from section B of
  * docs/research/dark-patterns.md or is common shop wording, never to make one
  * demo page pass. Entries are written in plain readable form; compilePhrases
- * normalises them. Each entry has at most six tokens.
+ * normalises them. Each entry has at most six tokens. In a Turkish entry a word
+ * directly followed by `*` is a stem: it matches that word and up to six
+ * further letters ("indirim*" matches "indirimleri"); a stem has at least four
+ * characters.
  */
 
 /** Words that show a time limit is being pressed on the reader. */
@@ -37,7 +40,7 @@ export const URGENCY_WORDS: WordList = Object.freeze({
 /** Words that show a price offer is being made. */
 export const OFFER_WORDS: WordList = Object.freeze({
   en: Object.freeze(["off", "sale", "deal", "offer", "discount", "save", "coupon"]),
-  tr: Object.freeze(["indirim", "fırsat", "kampanya", "kupon", "kazan"]),
+  tr: Object.freeze(["indirim*", "fırsat*", "kampanya*", "kupon*", "kazan"]),
 });
 
 /** Deadlines that roll over to the next day without a calendar date. */

@@ -10,7 +10,7 @@ import * as preselectionWords from "@/lib/detectors/data/preselection-words";
 import * as scarcityWords from "@/lib/detectors/data/scarcity-words";
 import * as urgencyWords from "@/lib/detectors/data/urgency-words";
 import { runAllDetectors } from "@/lib/detectors/all";
-import { MAX_PHRASE_TOKENS } from "@/lib/detectors/shared/constants";
+import { MAX_PHRASE_TOKENS, MIN_STEM_CHARS } from "@/lib/detectors/shared/constants";
 import { TITLES } from "@/lib/detectors/shared/finding";
 import {
   compilePhrases,
@@ -247,16 +247,20 @@ describe("the data modules", () => {
 
 describe("the length of list entries", () => {
   // Requirement 2.8: entries are counted as compilePhrases counts them, so
-  // "@'dan" is one element and not three tokens.
+  // "@'dan" is one element and not three tokens. Requirement 9.2: a stem in an
+  // English entry is not compiled and counts 0, so it fails here.
+  const languageOf = (where: string): "en" | "tr" | undefined =>
+    where.endsWith(".tr") ? "tr" : where.endsWith(".en") ? "en" : undefined;
+
   it("is 1 to MAX_PHRASE_TOKENS elements, counted with countPhraseElements, in every list of every module", () => {
     const tooLong = allEntries()
       .filter((item) => {
-        const count = countPhraseElements(item.entry);
+        const count = countPhraseElements(item.entry, languageOf(item.where));
         return count === 0 || count > MAX_PHRASE_TOKENS;
       })
       .map(
         (item) =>
-          `${item.where}: "${item.entry}" has ${countPhraseElements(item.entry)} elements`,
+          `${item.where}: "${item.entry}" has ${countPhraseElements(item.entry, languageOf(item.where))} elements`,
       );
     expect(tooLong).toEqual([]);
   });
@@ -270,6 +274,91 @@ describe("the length of list entries", () => {
         expect(compilePhrases(value).size, `${module}.${list}`).toBe(total);
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stems (requirements 9.1, 9.2, 9.5, 9.9; design section 10)
+// ---------------------------------------------------------------------------
+
+describe("the stem entries of the word lists", () => {
+  /** Stem entries exist only in these Turkish lists (design section 10). */
+  const STEM_LISTS: ReadonlySet<string> = new Set([
+    "urgency-words.OFFER_WORDS.tr",
+    "scarcity-words.SCARCITY_SUPPORT_WORDS.tr",
+    "scarcity-words.UNQUANTIFIED_SCARCITY.tr",
+    "activity-words.COUNT_TEMPLATES.tr",
+    "confirmshaming-words.SHAMING_PHRASES.tr",
+    "confirmshaming-words.BENEFIT_LOSS_TERMS.tr",
+    "confirmshaming-words.NEGATION_EMOTION_TOKENS.tr",
+    "preselection-words.CONSENT_WORDS.tr",
+    "preselection-words.PAID_ADDON_WORDS.tr",
+  ]);
+
+  const stemEntries = (): ListEntry[] => allEntries().filter((item) => item.entry.includes("*"));
+
+  it("stand only in the Turkish lists that design section 10 names", () => {
+    const stray = stemEntries()
+      .filter((item) => !STEM_LISTS.has(item.where))
+      .map((item) => `${item.where}: "${item.entry}"`);
+    expect(stray).toEqual([]);
+  });
+
+  it("are found in every list that design section 10 names", () => {
+    const found = new Set(stemEntries().map((item) => item.where));
+    expect([...STEM_LISTS].filter((where) => !found.has(where))).toEqual([]);
+  });
+
+  it("write each stem directly before its star, with at least MIN_STEM_CHARS characters", () => {
+    for (const item of stemEntries()) {
+      for (const word of item.entry.split(" ")) {
+        if (!word.includes("*")) continue;
+        expect(word.endsWith("*"), `${item.where}: "${item.entry}"`).toBe(true);
+        expect(word.indexOf("*"), `${item.where}: "${item.entry}"`).toBe(word.length - 1);
+        expect(
+          Array.from(normaliseText(word.slice(0, -1))).length,
+          `${item.where}: "${item.entry}"`,
+        ).toBeGreaterThanOrEqual(MIN_STEM_CHARS);
+      }
+    }
+  });
+
+  // Requirement 9.5: short or ambiguous words stay exact entries, so that
+  // "paragraf", "iletişim" and "bağışıklık" do not match.
+  it("keep 'para', 'ileti' and 'bağış' as exact entries", () => {
+    expect(confirmshamingWords.BENEFIT_LOSS_TERMS.tr).toContain("para");
+    expect(preselectionWords.CONSENT_WORDS.tr).toContain("ileti");
+    expect(preselectionWords.PAID_ADDON_WORDS.tr).toContain("bağış");
+  });
+
+  it("do not make 'paragraf', 'iletişim' or 'bağışıklık' match their exact entries", () => {
+    const cases: ReadonlyArray<[WordList, string]> = [
+      [confirmshamingWords.BENEFIT_LOSS_TERMS, "paragraf"],
+      [preselectionWords.CONSENT_WORDS, "iletişim"],
+      [preselectionWords.PAID_ADDON_WORDS, "bağışıklık"],
+    ];
+    for (const [list, text] of cases) {
+      expect(findPhrases(tokenise(text), compilePhrases(list)), text).toEqual([]);
+    }
+  });
+
+  it("match the inflected forms of requirement 9.6 through one stem each", () => {
+    const hit = (list: WordList, text: string): string[] =>
+      findPhrases(tokenise(text), compilePhrases(list)).map((h) => h.entry);
+    expect(hit(scarcityWords.SCARCITY_SUPPORT_WORDS, "kaçırma")).toEqual(["kaçırma*"]);
+    expect(hit(scarcityWords.SCARCITY_SUPPORT_WORDS, "kaçırmayın")).toEqual(["kaçırma*"]);
+    expect(hit(scarcityWords.SCARCITY_SUPPORT_WORDS, "kaçırmak")).toEqual(["kaçırma*"]);
+    expect(hit(urgencyWords.OFFER_WORDS, "indirimleri")).toEqual(["indirim*"]);
+    expect(hit(urgencyWords.OFFER_WORDS, "fırsatları")).toEqual(["fırsat*"]);
+  });
+
+  it("do not match a word with more than six further letters or a different start", () => {
+    const hit = (list: WordList, text: string): string[] =>
+      findPhrases(tokenise(text), compilePhrases(list)).map((h) => h.entry);
+    expect(hit(urgencyWords.OFFER_WORDS, "indirimlerinizdekilerden")).toEqual([]);
+    expect(hit(urgencyWords.OFFER_WORDS, "kampanyalarımızdan")).toEqual([]);
+    expect(hit(urgencyWords.OFFER_WORDS, "indirim'e")).toEqual([]);
+    expect(hit(urgencyWords.OFFER_WORDS, "indi")).toEqual([]);
   });
 });
 

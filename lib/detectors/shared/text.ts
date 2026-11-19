@@ -6,8 +6,10 @@ import {
   FORBIDDEN_STEM_EXTRA_MAX,
   MAX_PHRASE_TOKENS,
   MAX_QUOTE_CHARS,
+  MAX_STEM_EXTRA_CHARS,
   MAX_TEXT_READ,
   MAX_TOKENS_PER_TEXT,
+  MIN_STEM_CHARS,
 } from "@/lib/detectors/shared/constants";
 
 /**
@@ -323,7 +325,8 @@ export type PhraseHit = {
 type EntryElement =
   | { readonly kind: "lit"; readonly norm: string }
   | { readonly kind: "num" }
-  | { readonly kind: "name"; readonly suffix: string | null };
+  | { readonly kind: "name"; readonly suffix: string | null }
+  | { readonly kind: "stem"; readonly stem: string };
 
 type CompiledEntry = {
   readonly order: number;
@@ -344,15 +347,50 @@ type InternalMatcher = PhraseMatcher & { readonly [MATCHER_DATA]?: MatcherData }
 /** Most words one `@` placeholder may take. */
 const MAX_NAME_WORDS = 3;
 
+/** List entries are read up to this many characters. */
+const ENTRY_READ_CAP = 200;
+
 /**
- * Turn the entry's tokens into elements. `#` is a number, `@` is one to three
- * capitalised words, and `@'dan` (a name placeholder directly followed by an
- * apostrophe and a word) is a name whose last word ends with that suffix.
+ * For each `*` of the cleaned entry, in order: true when a letter directly
+ * precedes it (no space, symbol or digit between). The tokeniser drops that
+ * information, and a stem must be written "word*".
  */
-function toElements(tokens: readonly Token[]): EntryElement[] {
+function starsTouchingLetters(entry: string): boolean[] {
+  const chars = Array.from(normaliseText(entry, ENTRY_READ_CAP));
+  const touching: boolean[] = [];
+  for (let i = 0; i < chars.length; i += 1) {
+    if (chars[i] !== "*") continue;
+    const before = i > 0 ? classify(chars[i - 1].codePointAt(0) as number) : "space";
+    touching.push(before === "letter" || before === "mark");
+  }
+  return touching;
+}
+
+function isStar(token: Token | undefined): boolean {
+  return token !== undefined && token.kind === "symbol" && token.norm === "*";
+}
+
+/**
+ * Turn an entry into elements, or null when the entry cannot be compiled.
+ * `#` is a number, `@` is one to three capitalised words, and `@'dan` (a name
+ * placeholder directly followed by an apostrophe and a word) is a name whose
+ * last word ends with that suffix. A word directly followed by `*` is a stem
+ * element; it is allowed only in a Turkish entry (`language` "tr", or not given
+ * when only counting), only when the stem has at least `MIN_STEM_CHARS`
+ * characters after normalisation, and a `*` that follows anything else is an
+ * error (requirement 9.2).
+ */
+function toElements(entry: string, language: Language | undefined): EntryElement[] | null {
+  const tokens = tokenise(entry, ENTRY_READ_CAP);
+  const touching = starsTouchingLetters(entry);
+  let starIndex = 0;
   const elements: EntryElement[] = [];
   for (let i = 0; i < tokens.length; i += 1) {
     const t = tokens[i];
+    if (isStar(t)) {
+      // A star that no word consumed below.
+      return null;
+    }
     if (t.kind === "symbol" && t.norm === "#") {
       elements.push({ kind: "num" });
     } else if (t.kind === "symbol" && t.norm === "@") {
@@ -370,6 +408,13 @@ function toElements(tokens: readonly Token[]): EntryElement[] {
       } else {
         elements.push({ kind: "name", suffix: null });
       }
+    } else if (t.kind === "word" && isStar(tokens[i + 1])) {
+      const attached = touching[starIndex] === true;
+      starIndex += 1;
+      if (!attached || language === "en") return null;
+      if (Array.from(t.norm).length < MIN_STEM_CHARS) return null;
+      elements.push({ kind: "stem", stem: t.norm });
+      i += 1;
     } else {
       elements.push({ kind: "lit", norm: t.norm });
     }
@@ -379,15 +424,17 @@ function toElements(tokens: readonly Token[]): EntryElement[] {
 
 /**
  * Number of elements `compilePhrases` counts for one list entry: `#` is one,
- * `@` is one, `@'dan` (a name placeholder with a suffix) is one, every other
- * token is one. 0 for an empty or non-string entry. A value above
+ * `@` is one, `@'dan` (a name placeholder with a suffix) is one, a stem
+ * ("indirim*") is one, every other token is one. 0 for an empty or non-string
+ * entry and for an entry that cannot be compiled: a stray `*`, a stem shorter
+ * than `MIN_STEM_CHARS`, or a stem when `language` is "en". A value above
  * `MAX_PHRASE_TOKENS` is returned as it is; `compilePhrases` skips such an
  * entry, and tests use this function so that they count the way the compiler
- * does.
+ * does. Without `language`, stems are allowed.
  */
-export function countPhraseElements(entry: string): number {
+export function countPhraseElements(entry: string, language?: Language): number {
   if (typeof entry !== "string") return 0;
-  return toElements(tokenise(entry, 200)).length;
+  return toElements(entry, language)?.length ?? 0;
 }
 
 /**
@@ -404,9 +451,10 @@ export function compilePhrases(list: WordList): PhraseMatcher {
     if (!Array.isArray(entries)) continue;
     for (const entry of entries) {
       if (typeof entry !== "string") continue;
-      const elements = toElements(tokenise(entry, 200));
-      const count = countPhraseElements(entry);
-      if (count === 0 || count > MAX_PHRASE_TOKENS) continue;
+      const elements = toElements(entry, language);
+      if (elements === null || elements.length === 0 || elements.length > MAX_PHRASE_TOKENS) {
+        continue;
+      }
       const compiled: CompiledEntry = Object.freeze({
         order,
         entry,
@@ -512,6 +560,17 @@ function matchFrom(
     const end = matchFrom(tokens, limit, elements, ei + 1, pos + 1, numbers);
     if (end < 0) numbers.pop();
     return end;
+  }
+  if (el.kind === "stem") {
+    const token = pos < limit ? tokens[pos] : undefined;
+    if (
+      !token ||
+      token.kind !== "word" ||
+      !matchesStem(token.norm, el.stem, MAX_STEM_EXTRA_CHARS)
+    ) {
+      return -1;
+    }
+    return matchFrom(tokens, limit, elements, ei + 1, pos + 1, numbers);
   }
   for (let n = 1; n <= MAX_NAME_WORDS; n += 1) {
     const last = pos + n - 1;

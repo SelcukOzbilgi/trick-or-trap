@@ -273,6 +273,66 @@ describe("fake-activity: A1 with a reload", () => {
   });
 });
 
+describe("fake-activity: Turkish word orders and forms by stem (requirements 9.7, 9.8)", () => {
+  const FORMS: ReadonlyArray<[string, string, boolean]> = [
+    // [first text, reload text, holds a live-context word]
+    ["23 kişi bu ürünü inceliyor", "31 kişi bu ürünü inceliyor", false],
+    ["23 kişi şu an bakıyor", "31 kişi şu an bakıyor", true],
+    ["23 kişi şu anda bakıyor", "31 kişi şu anda bakıyor", true],
+    ["23 kişi şu an inceliyor", "31 kişi şu an inceliyor", true],
+    ["23 kişi şu anda inceliyor", "31 kişi şu anda inceliyor", true],
+    ["Şu an 23 kişi inceliyor", "Şu an 31 kişi inceliyor", true],
+    ["Bu ürünü şu anda 15 kişi inceliyor", "Bu ürünü şu anda 27 kişi inceliyor", true],
+    ["Şu an 23 kişi bakıyor", "Şu an 31 kişi bakıyor", true],
+    ["Şu anda 23 kişi bakıyor", "Şu anda 31 kişi bakıyor", true],
+    ["Bu sayfayı 9 kişi görüntülüyor", "Bu sayfayı 12 kişi görüntülüyor", false],
+  ];
+
+  it.each(FORMS)("A1: %s gives a high finding when the number changes", (first, reload) => {
+    const f = only(run(first, reload));
+    expect(f.confidence).toBe("high");
+    expect(f.title).toBe(TITLE_NUMBER);
+    expect(f.evidence.measuredValues?.gapSeconds).toBe(9);
+    expect(f.evidence.measuredValues?.firstValue).not.toBe(f.evidence.measuredValues?.reloadValue);
+  });
+
+  it("A1: '23 kişi şu an bakıyor' reports 23 and then 31", () => {
+    const f = only(run("23 kişi şu an bakıyor", "31 kişi şu an bakıyor"));
+    expect(f.evidence.text).toBe(
+      'Activity message "23 kişi şu an bakıyor" showed 23, then 31 after a reload 9 s later.'
+    );
+    expect(f.evidence.measuredValues).toEqual({ firstValue: 23, reloadValue: 31, gapSeconds: 9 });
+  });
+
+  it("A1: 'Bu ürünü şu anda 15 kişi inceliyor' reports 15 and then 27", () => {
+    const f = only(run("Bu ürünü şu anda 15 kişi inceliyor", "Bu ürünü şu anda 27 kişi inceliyor"));
+    expect(f.confidence).toBe("high");
+    expect(f.evidence.measuredValues).toEqual({ firstValue: 15, reloadValue: 27, gapSeconds: 9 });
+  });
+
+  it.each(FORMS)("%s without a reload gives a message finding, medium with a live word and low without", (first, _reload, live) => {
+    const f = only(run(first));
+    expect(f.title).toBe(TITLE_MESSAGE);
+    expect(f.confidence).toBe(live ? "medium" : "low");
+  });
+
+  it("'şu an' alone is a live-context word, not a claim", () => {
+    expect(run("Şu an kargo ücretsiz")).toEqual([]);
+    expect(run("Şu an 23 indirim var")).toEqual([]);
+  });
+
+  it("'şu an' gives context to a claim of another template", () => {
+    const f = only(run("Şu an 5 kişi sepetine ekledi"));
+    expect(f.confidence).toBe("medium");
+  });
+
+  it("a stem does not match a word that starts differently or is too long", () => {
+    expect(run("23 kişi inceleme yaptı")).toEqual([]);
+    expect(run("23 kişi şu an bakıyorsunuzdur")).toEqual([]);
+    expect(run("23 kişi görüntü gönderdi")).toEqual([]);
+  });
+});
+
 describe("fake-activity: A2 and A3 without a change", () => {
   it("the same toast text in both samples gives A2 and says so", () => {
     const f = only(run(TOAST_A, TOAST_A, { over: STATUS }));
@@ -692,8 +752,8 @@ describe("fake-activity: word lists", () => {
       for (const language of ["en", "tr"] as const) {
         for (const entry of list[language]) {
           total += 1;
-          expect(countPhraseElements(entry), `${name}: ${entry}`).toBeGreaterThanOrEqual(1);
-          expect(countPhraseElements(entry), `${name}: ${entry}`).toBeLessThanOrEqual(
+          expect(countPhraseElements(entry, language), `${name}: ${entry}`).toBeGreaterThanOrEqual(1);
+          expect(countPhraseElements(entry, language), `${name}: ${entry}`).toBeLessThanOrEqual(
             MAX_PHRASE_TOKENS
           );
         }

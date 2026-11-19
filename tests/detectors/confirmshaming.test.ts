@@ -192,6 +192,75 @@ describe("confirmshaming: C1, a listed phrase on a decline control next to an ac
   });
 });
 
+describe("confirmshaming: Turkish word forms by stem (requirements 9.6, 9.11)", () => {
+  it("C1: 'Hayır, indirimleri kaçırmak istiyorum' next to an accept control gives a medium finding (requirement 9.11)", () => {
+    const f = only(run("Hayır, indirimleri kaçırmak istiyorum", "Evet, istiyorum"));
+    expect(f.confidence).toBe("medium");
+    expect(f.title).toBe(TITLE);
+    expect(f.description).toBe(C1_DESCRIPTION);
+    expect(f.evidence.text).toBe(
+      'Decline option "Hayır, indirimleri kaçırmak istiyorum" next to "Evet, istiyorum".'
+    );
+    expect(f.evidence.measuredValues).toEqual({ judgeCandidate: 1, phraseListMatch: 1 });
+  });
+
+  it("C1: 'Hayır, teşekkürler' is a plain decline and gives nothing (requirement 9.11)", () => {
+    expect(run("Hayır, teşekkürler", "Evet, istiyorum")).toEqual([]);
+  });
+
+  it("C1: inflected forms of the listed Turkish phrases give a medium finding", () => {
+    for (const text of [
+      "İndirimleri istemiyorum",
+      "Hayır, indirimi istemiyorum",
+      "Hayır, fırsatları kaçırmak istiyorum",
+      "Fırsatı kaçırmayı istiyorum",
+      "İndirimleri kaçırmak istiyorum",
+      "İNDİRİMLERİ KAÇIRMAK İSTİYORUM",
+    ]) {
+      const f = only(run(text, "Evet, istiyorum"));
+      expect(f.confidence, text).toBe("medium");
+      expect(f.evidence.measuredValues, text).toEqual({ judgeCandidate: 1, phraseListMatch: 1 });
+    }
+  });
+
+  it("C1: an inflected phrase on a control outside any choice group is a candidate", () => {
+    const f = only(detectConfirmshaming(snap([raw("el-1-4", "a", "Hayır, indirimleri istemiyorum")])));
+    expect(f.confidence).toBe("low");
+    expect(f.evidence.measuredValues).toEqual({ judgeCandidate: 1, phraseListMatch: 0 });
+  });
+
+  it("C2: first-person negative wording with an inflected benefit word is a candidate", () => {
+    for (const text of [
+      "Ben fırsatlardan nefret ediyorum",
+      "Ben indirimlerden nefret ediyorum",
+      "Hayır, korumayı istemiyorum",
+      "Ben tasarrufu istemiyorum",
+    ]) {
+      const f = only(run(text, "Evet, istiyorum"));
+      expect(f.confidence, text).toBe("low");
+      expect(f.description, text).toBe(C2_DESCRIPTION);
+      expect(f.evidence.measuredValues, text).toEqual({ judgeCandidate: 1, phraseListMatch: 0 });
+    }
+  });
+
+  it("gives nothing for words that only start like a stem or are too long", () => {
+    for (const text of [
+      "Ben indirimlerinizdekilerden nefret ediyorum",
+      "Ben kampanyalarımızdan nefret ediyorum",
+      "Hayır, indi istemiyorum",
+      "Ben paragraftan nefret ediyorum",
+    ]) {
+      expect(run(text, "Evet, istiyorum"), text).toEqual([]);
+    }
+  });
+
+  it("gives nothing for a plain Turkish decline", () => {
+    for (const text of ["Hayır, teşekkürler", "Şimdi değil", "Hayır, kapat"]) {
+      expect(run(text, "Evet, istiyorum"), text).toEqual([]);
+    }
+  });
+});
+
 describe("confirmshaming: C2, a candidate for the judge", () => {
   it("flags first-person negative wording with a benefit term, in English", () => {
     const f = only(run("No, I don't need protection", "Add protection"));

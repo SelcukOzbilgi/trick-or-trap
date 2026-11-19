@@ -6,7 +6,9 @@ import type { WordList } from "@/lib/detectors/shared/text";
  * demo page pass. Entries are written in plain readable form; compilePhrases
  * normalises them. `#` stands for one number, `@` for one to three words that
  * start with a capital letter, and each entry has at most six tokens (a longer
- * entry would be skipped without a message).
+ * entry would be skipped without a message). In a Turkish entry a word directly
+ * followed by `*` is a stem: it matches that word and up to six further
+ * letters ("inceli*" matches "inceliyor"); a stem has at least four characters.
  */
 
 /** Viewer, buyer and cart counts: "14 people are viewing this". */
@@ -23,9 +25,16 @@ export const COUNT_TEMPLATES: WordList = Object.freeze({
     "# sold today",
   ]),
   tr: Object.freeze([
-    "# kişi bu ürünü inceliyor",
-    "# kişi şu anda bakıyor",
-    "# kişi görüntülüyor",
+    "# kişi bu ürünü inceli*",
+    "# kişi şu an bakıyor*",
+    "# kişi şu anda bakıyor*",
+    "# kişi şu an inceli*",
+    "# kişi şu anda inceli*",
+    "şu an # kişi inceli*",
+    "şu anda # kişi inceli*",
+    "şu an # kişi bakıyor*",
+    "şu anda # kişi bakıyor*",
+    "# kişi görüntül*",
     "# kişi sepetine ekledi",
     "son # saatte # adet satıldı",
     "bugün # adet satıldı",
@@ -77,7 +86,7 @@ export const PURCHASE_TIME_WORDS: WordList = Object.freeze({
 /** Wording that marks a message as live. */
 export const ACTIVITY_CONTEXT_WORDS: WordList = Object.freeze({
   en: Object.freeze(["right now"]),
-  tr: Object.freeze(["şu anda"]),
+  tr: Object.freeze(["şu anda", "şu an"]),
 });
 
 /** Honest look-alikes: review counts and the shopper's own cart. */

@@ -176,6 +176,68 @@ describe("preselection: checkboxes, P2 (consent) and P3 (paid add-on without pri
   });
 });
 
+describe("preselection: Turkish word forms by stem (requirements 9.5, 9.12)", () => {
+  it("P2: 'Kampanyalardan e-posta ile haberdar olmak istiyorum', ticked, is a consent finding", () => {
+    const f = only(runBox("Kampanyalardan e-posta ile haberdar olmak istiyorum"));
+    expect(f.confidence).toBe("medium");
+    expect(f.title).toBe(TITLES.preselection[1]);
+    expect(f.description).toBe(P2_DESCRIPTION);
+  });
+
+  it("P1: 'Ürün koruma paketi ekle +49,90 TL', ticked, is a priced finding", () => {
+    const f = only(runBox("Ürün koruma paketi ekle +49,90 TL"));
+    expect(f.confidence).toBe("medium");
+    expect(f.title).toBe(TITLES.preselection[0]);
+    expect(f.evidence.measuredValues).toEqual({ priceMinor: 4990 });
+  });
+
+  it("'Bültene abone olmak istiyorum' gives nothing when it is unticked (requirement 9.12)", () => {
+    expect(runBox("Bültene abone olmak istiyorum", { checked: false })).toEqual([]);
+  });
+
+  it("P2: inflected consent words match their stems when ticked", () => {
+    for (const text of [
+      "Bültene abone olmak istiyorum",
+      "Bültenimize abone ol",
+      "Kampanyalar hakkında bilgi almak istiyorum",
+      "Pazarlama amaçlı iletiler göndermenizi kabul ediyorum",
+    ]) {
+      const f = only(runBox(text));
+      expect(f.confidence, text).toBe("medium");
+      expect(f.title, text).toBe(TITLES.preselection[1]);
+    }
+  });
+
+  it("P3: inflected paid add-on words match their stems when ticked and no price is shown", () => {
+    for (const text of ["Korumalı paket ekle", "Sigortalı gönderim", "Garantili teslim", "Koruma paketi ekle"]) {
+      const f = only(runBox(text));
+      expect(f.confidence, text).toBe("low");
+      expect(f.description, text).toBe(P3_DESCRIPTION);
+    }
+  });
+
+  it("gives nothing for words that only start like an exact entry: paragraf, iletişim, bağışıklık", () => {
+    for (const text of [
+      "Paragraf düzenini kaydet",
+      "İletişim bilgilerimi kaydet",
+      "Bağışıklık desteği için not düş",
+    ]) {
+      expect(runBox(text), text).toEqual([]);
+    }
+  });
+
+  it("gives nothing for a stem word with more than six further letters", () => {
+    expect(runBox("Kampanyalarımızdan haberdar ol")).toEqual([]);
+    expect(runBox("Bültenlerimizdekilerden haberdar ol")).toEqual([]);
+  });
+
+  it("still takes the exact entries 'ileti', 'sms' and 'e-posta' and 'bağış'", () => {
+    expect(only(runBox("Ticari ileti göndermenizi kabul ediyorum")).title).toBe(TITLES.preselection[1]);
+    expect(only(runBox("SMS ile bilgilendir")).title).toBe(TITLES.preselection[1]);
+    expect(only(runBox("Bağış yap")).description).toBe(P3_DESCRIPTION);
+  });
+});
+
 describe("preselection: checkboxes, look-alikes and non-controls", () => {
   it("gives nothing for neutral labels", () => {
     expect(runBox("Remember me")).toEqual([]);

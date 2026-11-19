@@ -68,15 +68,15 @@ Rules for every task:
   - [x] 5.4 Run the seven test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 1.11, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 10.1, 10.2, 10.3, 10.4_
 
-- [ ] 6. Turkish word forms by stem
+- [x] 6. Turkish word forms by stem
   - Uses: `shared/text.ts` (`toElements`, `matchFrom`, `compilePhrases`, `countPhraseElements`), `confirmshaming.ts` and `preselection.ts` (read to see which lists go through a matcher), the data files of design 10, the corpus.
   - Files: edits `lib/detectors/shared/text.ts`, `shared/constants.ts`, the data files named in design 10, `tests/fixtures/real-world-phrases.json`, `tests/detectors/shared/text.test.ts`, `shared/constants.test.ts`, `word-lists.test.ts`, `fake-urgency.test.ts`, `fake-scarcity.test.ts`, `fake-activity.test.ts`, `confirmshaming.test.ts`, `preselection.test.ts`.
   - Reads: requirements 1, 9; design 2, 5 (stem engine), 10.
   - Dependent tests to run: `shared/text.test.ts`, `shared/constants.test.ts`, `word-lists.test.ts`, `real-world-phrases.test.ts`, `fake-urgency.test.ts`, `fake-scarcity.test.ts`, `fake-activity.test.ts`, `confirmshaming.test.ts`, `preselection.test.ts`, `wording.test.ts`, `eval/boo-tique-eval.test.ts`.
-  - [ ] 6.1 Tests first in `text.test.ts`: `matchesStem` and `compilePhrases` with stems (positives and negatives of design 10 and requirement 9.3; a stem in an English entry, a stem shorter than 4 characters and a stray `*` are not compiled and `countPhraseElements` gives 0); `constants.test.ts` gains `MAX_STEM_EXTRA_CHARS: 6` and `MIN_STEM_CHARS: 4`. Run them; they fail.
-  - [ ] 6.2 Implement the stem element in `text.ts` and the constants. Then change the lists exactly as design 10 says (only the lists named there; exact entries stay where it says so). A list that is not read through a matcher keeps its exact entries.
-  - [ ] 6.3 Add the detector cases of requirements 9.6 to 9.8, 9.11 and 9.12, including the false-positive words "paragraf", "iletişim" and "bağışıklık"; add corpus texts for every new stem entry.
-  - [ ] 6.4 Run the eleven test files (one command each), then `npx tsc --noEmit`.
+  - [x] 6.1 Tests first in `text.test.ts`: `matchesStem` and `compilePhrases` with stems (positives and negatives of design 10 and requirement 9.3; a stem in an English entry, a stem shorter than 4 characters and a stray `*` are not compiled and `countPhraseElements` gives 0); `constants.test.ts` gains `MAX_STEM_EXTRA_CHARS: 6` and `MIN_STEM_CHARS: 4`. Run them; they fail.
+  - [x] 6.2 Implement the stem element in `text.ts` and the constants. Then change the lists exactly as design 10 says (only the lists named there; exact entries stay where it says so). A list that is not read through a matcher keeps its exact entries.
+  - [x] 6.3 Add the detector cases of requirements 9.6 to 9.8, 9.11 and 9.12, including the false-positive words "paragraf", "iletişim" and "bağışıklık"; add corpus texts for every new stem entry.
+  - [x] 6.4 Run the eleven test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 1.8, 1.11, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12_
 
 - [ ] 7. Backgrounds behind uncaptured layers

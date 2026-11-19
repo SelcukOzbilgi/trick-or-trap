@@ -5,7 +5,9 @@ import type { WordList } from "@/lib/detectors/shared/text";
  * docs/research/dark-patterns.md or is common shop wording, never to make one
  * demo page pass. Entries are written in plain readable form; compilePhrases
  * normalises them. `#` stands for one number and each entry has at most six
- * tokens.
+ * tokens. In a Turkish entry a word directly followed by `*` is a stem: it
+ * matches that word and up to six further letters ("tüken*" matches
+ * "tükeniyor"); a stem has at least four characters.
  */
 
 /** A qualifier, a number and a stock word: "Only 2 left". */
@@ -55,8 +57,9 @@ export const UNQUANTIFIED_SCARCITY: WordList = Object.freeze({
   ]),
   tr: Object.freeze([
     "çok satıyor",
-    "hızla tükeniyor",
-    "tükenmek üzere",
+    "hızla tüken*",
+    "tüken* üzere",
+    "stokta son ürün*",
     "son birkaç",
     "sınırlı stok",
     "az kaldı",
@@ -93,7 +96,7 @@ export const SCARCITY_SUPPORT_WORDS: WordList = Object.freeze({
   tr: Object.freeze([
     "acele et",
     "acele edin",
-    "kaçırmayın",
+    "kaçırma*",
     "son şans",
     "tükenmeden",
   ]),

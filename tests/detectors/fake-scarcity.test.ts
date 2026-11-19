@@ -401,6 +401,61 @@ describe("fake-scarcity: text rows", () => {
   });
 });
 
+describe("fake-scarcity: Turkish word forms by stem (requirements 9.5 to 9.8)", () => {
+  it("S5: 'Tükenmek üzere!', 'Hızla tükeniyor', 'Hızla tükenmekte' and 'Stokta son ürünler' give a low wording finding", () => {
+    for (const text of [
+      "Tükenmek üzere!",
+      "Tükenmek üzere",
+      "TÜKENMEK ÜZERE",
+      "Hızla tükeniyor",
+      "Hızla tükenmekte",
+      "Stokta son ürünler",
+      "Stokta son ürün",
+    ]) {
+      const f = only(run(text));
+      expect(f.confidence, text).toBe("low");
+      expect(f.title, text).toBe(TITLE_WORDING);
+      expect(f.evidence.text, text).toBe(`Text "${text}".`);
+    }
+  });
+
+  it("a stem does not match a word that is too long or that starts differently", () => {
+    expect(run("Tükenmişlikten üzere")).toEqual([]);
+    expect(run("Hızla tükenebilirlikten")).toEqual([]);
+    expect(run("Stokta son")).toEqual([]);
+  });
+
+  it("'Stokta son 2 ürün' stays a qualified claim, not an unquantified one", () => {
+    const f = only(run("Stokta son 2 ürün"));
+    expect(f.title).toBe(TITLE_LOW_STOCK);
+    expect(f.confidence).toBe("low");
+  });
+
+  it("S3: 'kaçırmayın', 'kaçırma' and 'kaçırmak' are pressure words that support a qualified claim", () => {
+    for (const text of [
+      "Sadece 25 adet kaldı, kaçırmayın",
+      "Sadece 25 adet kaldı, sakın kaçırma",
+      "Sadece 25 adet kaldı, fırsatı kaçırmak olmaz",
+    ]) {
+      const f = only(run(text));
+      expect(f.confidence, text).toBe("medium");
+      expect(f.title, text).toBe(TITLE_LOW_STOCK);
+    }
+  });
+
+  it("S4: the same claim without a pressure word stays low, and 'kaçıran' is too far from the stem", () => {
+    expect(only(run("Sadece 25 adet kaldı")).confidence).toBe("low");
+    expect(only(run("Sadece 25 adet kaldı, kaçıran")).confidence).toBe("low");
+  });
+
+  it("S1: a changed number in a claim with a stem word gives the same high row as the base form (requirement 9.8)", () => {
+    const f = only(run("Sadece 2 adet kaldı, kaçırmayın", "Sadece 6 adet kaldı, kaçırmayın"));
+    expect(f.confidence).toBe("high");
+    expect(f.title).toBe(TITLE_CHANGED);
+    expect(f.evidence.measuredValues).toEqual({ firstValue: 2, reloadValue: 6, gapSeconds: 9 });
+  });
+});
+
 describe("fake-scarcity: shared contract", () => {
   it("reports the same claim in a parent and a child once, on the child", () => {
     const elements = [

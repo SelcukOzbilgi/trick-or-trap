@@ -157,5 +157,19 @@
 { "id": "tr-057", "language": "tr", "text": "Sözleşme, koşullar ve şartlar sayfasını okudum, kabul ediyorum", "seenAt": "ödeme sayfası onay kutusu", "source": "common" },
 { "id": "tr-058", "language": "tr", "text": "Fatura adresi aynı olsun", "seenAt": "ödeme sayfası adres formu", "source": "common" },
 { "id": "tr-059", "language": "tr", "text": "Beden ve renk seçin. Sigorta yok. Kargo ve teslimat ücretsiz", "seenAt": "ürün seçenekleri formu", "source": "common" },
-{ "id": "tr-060", "language": "tr", "text": "Sadece 2 gün kaldı, kampanya sona eriyor ve sepet 30 dakika sonra kapanıyor", "seenAt": "kampanya bannerı", "source": "common" }
+{ "id": "tr-060", "language": "tr", "text": "Sadece 2 gün kaldı, kampanya sona eriyor ve sepet 30 dakika sonra kapanıyor", "seenAt": "kampanya bannerı", "source": "common" },
+{ "id": "tr-061", "language": "tr", "text": "Hayır teşekkürler, indirimleri kaçırmak istiyorum", "seenAt": "indirim penceresi ret bağlantısı", "source": "common" },
+{ "id": "tr-062", "language": "tr", "text": "Hayır, indirimleri istemiyorum", "seenAt": "bülten penceresi ret bağlantısı", "source": "common" },
+{ "id": "tr-063", "language": "tr", "text": "Stokta son ürünler, tükenmeden alın", "seenAt": "ürün sayfası stok satırı", "source": "common" },
+{ "id": "tr-064", "language": "tr", "text": "23 kişi şu an bakıyor", "seenAt": "ürün sayfası sosyal kanıt satırı", "source": "common" },
+{ "id": "tr-065", "language": "tr", "text": "Bu ürünü şu anda 15 kişi inceliyor", "seenAt": "ürün sayfası sosyal kanıt satırı", "source": "common" },
+{ "id": "tr-066", "language": "tr", "text": "Şu an 12 kişi bakıyor", "seenAt": "ürün sayfası sosyal kanıt satırı", "source": "common" },
+{ "id": "tr-067", "language": "tr", "text": "Şu anda 7 kişi bakıyor", "seenAt": "ürün sayfası sosyal kanıt satırı", "source": "common" },
+{ "id": "tr-068", "language": "tr", "text": "Şu an 9 kişi inceliyor", "seenAt": "ürün sayfası sosyal kanıt satırı", "source": "common" },
+{ "id": "tr-069", "language": "tr", "text": "14 kişi şu an inceliyor", "seenAt": "ürün sayfası sosyal kanıt satırı", "source": "common" },
+{ "id": "tr-070", "language": "tr", "text": "14 kişi şu anda inceliyor", "seenAt": "ürün sayfası sosyal kanıt satırı", "source": "common" },
+{ "id": "tr-071", "language": "tr", "text": "Kampanya ve fırsatlardan e-posta ile haberdar olmak istiyorum", "seenAt": "üyelik formu onay kutusu", "source": "common" },
+{ "id": "tr-072", "language": "tr", "text": "Koruma paketi ekle +29,90 TL", "seenAt": "ödeme sayfası onay kutusu", "source": "common" },
+{ "id": "tr-073", "language": "tr", "text": "Bültene abone olmak istiyorum", "seenAt": "üyelik formu onay kutusu", "source": "common" },
+{ "id": "tr-074", "language": "tr", "text": "Fırsatları kaçırmayın, kuponlarınız sizi bekliyor", "seenAt": "ana sayfa bannerı", "source": "common" }
 ]

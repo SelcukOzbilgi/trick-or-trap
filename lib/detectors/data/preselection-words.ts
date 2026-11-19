@@ -4,7 +4,10 @@ import type { WordList } from "@/lib/detectors/shared/text";
  * Review rule: an entry is added here only when it comes from section B of
  * docs/research/dark-patterns.md or is common shop wording, never to make one
  * demo page pass. Entries are written in plain readable form; compilePhrases
- * normalises them. Each entry has at most six tokens.
+ * normalises them. Each entry has at most six tokens. In a Turkish entry a word
+ * directly followed by `*` is a stem: it matches that word and up to six
+ * further letters ("koruma*" matches "korumalı"); a stem has at least four
+ * characters.
  */
 
 /** Options that usually cost extra money (class "paid add-on"). */
@@ -25,9 +28,9 @@ export const PAID_ADDON_WORDS: WordList = Object.freeze({
     "add-on",
   ]),
   tr: Object.freeze([
-    "koruma",
-    "sigorta",
-    "garanti",
+    "koruma*",
+    "sigorta*",
+    "garanti*",
     "bağış",
     "bahşiş",
     "öncelikli",
@@ -54,9 +57,9 @@ export const CONSENT_WORDS: WordList = Object.freeze({
     "keep me updated",
   ]),
   tr: Object.freeze([
-    "bülten",
-    "kampanya",
-    "pazarlama",
+    "bülten*",
+    "kampanya*",
+    "pazarlama*",
     "iş ortakları",
     "üçüncü taraf",
     "paylaş",

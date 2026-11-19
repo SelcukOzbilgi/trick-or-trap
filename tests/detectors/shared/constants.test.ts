@@ -14,6 +14,10 @@ const EXPECTED = {
   MAX_ID_DEPTH: 64,
   MAX_TOKENS_PER_TEXT: 80,
   MAX_PHRASE_TOKENS: 6,
+  // Requirement 9.1 and 9.2: a stem matches at most 6 further letters and is
+  // at least 4 characters long.
+  MAX_STEM_EXTRA_CHARS: 6,
+  MIN_STEM_CHARS: 4,
   // Requirement 5.1: a forbidden stem may be followed by at most 10 letters.
   FORBIDDEN_STEM_EXTRA_MAX: 10,
   MAX_QUOTE_CHARS: 120,

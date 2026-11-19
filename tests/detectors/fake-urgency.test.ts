@@ -161,6 +161,29 @@ describe("fake-urgency: countdown rows with a reload", () => {
     expect(f.title).toBe(TITLE_TIMER);
   });
 
+  // Requirements 9.1, 9.3, 9.6: the Turkish offer words are stems, so an inflected
+  // form makes a countdown "worded" and a form that is too long does not.
+  it.each([
+    "İndirimleri",
+    "Fırsatları",
+    "Kampanyalar",
+    "Kuponlar",
+    "Kampanya",
+  ])("U2: the inflected offer word %s makes a restarting countdown worded", (word) => {
+    const f = only(run(`${word} 01:59:58`, `${word} 01:59:59`));
+    expect(f.confidence).toBe("high");
+    expect(f.title).toBe(TITLE_RESTART);
+  });
+
+  it.each(["Kampanyalarımızdan", "İndirimlerinizdekilerden", "indirim'e"])(
+    "U4: %s has too many further characters to be an offer word, so the countdown stays unworded",
+    (word) => {
+      const f = only(run(`${word} 01:59:58`, `${word} 01:59:59`));
+      expect(f.confidence).toBe("medium");
+      expect(f.title).toBe(TITLE_RESTART);
+    }
+  );
+
   it("U4: an unworded HH:MM:SS countdown that restarts gives a medium finding", () => {
     const f = only(run("Next draw 01:59:58", "Next draw 01:59:59"));
     expect(f.confidence).toBe("medium");
