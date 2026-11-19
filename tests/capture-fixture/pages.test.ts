@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { FORBIDDEN_ATTRIBUTE_FRAGMENTS } from "@/lib/capture/constants";
@@ -331,11 +332,14 @@ describe("what no output holds", () => {
   });
 
   it.each(Object.keys(HTML_PAGES))("%s has no attribute name that the capture code treats as a hook", (name) => {
-    const markup = HTML_PAGES[name].replace(/<script[\s\S]*?<\/script>/g, "").replace(/<style[\s\S]*?<\/style>/g, "");
+    const parsed = new DOMParser().parseFromString(HTML_PAGES[name], "text/html");
+    for (const element of parsed.querySelectorAll("script, style")) {
+      element.remove();
+    }
     const names: string[] = [];
-    for (const tag of markup.matchAll(/<[a-zA-Z][^>]*>/g)) {
-      for (const attr of tag[0].matchAll(/\s([a-zA-Z_:][-\w:.]*)(?==|\s|\/|>)/g)) {
-        names.push(attr[1].toLowerCase());
+    for (const element of parsed.querySelectorAll("*")) {
+      for (const attr of Array.from(element.attributes)) {
+        names.push(attr.name.toLowerCase());
       }
     }
     expect(names.length).toBeGreaterThan(0);
