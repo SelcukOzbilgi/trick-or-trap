@@ -89,15 +89,15 @@ Rules for every task:
   - [ ] 7.3 Run the five test files. If a Boo-tique entry changes row or becomes a miss, add the entry to `ACCEPTED_MISSES` only if it is a miss, with a comment naming 11.1; if the floor of 16 of 19 then fails, stop and report; tune nothing (requirement 11.7). Then `npx tsc --noEmit`.
   _Requirements: 1.11, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 12.3, 12.4_
 
-- [ ] 8. Hold-out evaluation
+- [x] 8. Hold-out evaluation
   - Uses: `eval/helpers/tree.ts` (`buildSnapshot`, `PageNode`), `eval/helpers/light.ts` (`toLightSample`), `eval/helpers/pages.ts` (`BASE_TIME`, `RELOAD_TIME`), `eval/helpers/no-hooks.ts` (`assertNoTestHooks`), `runAllDetectors`.
   - Files: creates `tests/detectors/eval/helpers/holdout-cases.ts`, `holdout.ts`, `tests/detectors/eval/holdout.test.ts`, `holdout-eval.test.ts`; edits `tests/detectors/wording.test.ts`.
   - Reads: requirements 1, 4; design 13.
   - Dependent tests to run: `eval/holdout.test.ts`, `eval/holdout-eval.test.ts`, `wording.test.ts`.
-  - [ ] 8.1 Tests first: `holdout.test.ts` checks the case table (28 flag cases, 20 honest cases, 8 extras; the texts of design 13; unique ids), the scoring with synthetic findings (hit needs pattern and node, false positive by confidence, known misses listed) and `formatHoldoutTable` (names the review baseline). Run it; it fails.
-  - [ ] 8.2 Create `holdout-cases.ts`: the 56 cases word for word, completing each ⟦…⟧ element once with plain wording; shapes of design 13; every snapshot checked with `PageSnapshotSchema` and `assertNoTestHooks`. Create `holdout.ts` (`runHoldout`, `scoreHoldout`, `formatHoldoutTable`).
-  - [ ] 8.3 Create `holdout-eval.test.ts`: run `runAllDetectors` on every case, print the table with `console.log`, assert only requirement 4.6 (every case ran with `errors: []`, the case counts, recall of the 28 at least 0.5). Add no threshold for false positives. Extend `wording.test.ts` with every hold-out case.
-  - [ ] 8.4 Run the three test files (one command each), then `npx tsc --noEmit`. Report the printed table in the final reply; change no case because of it.
+  - [x] 8.1 Tests first: `holdout.test.ts` checks the case table (28 flag cases, 20 honest cases, 8 extras; the texts of design 13; unique ids), the scoring with synthetic findings (hit needs pattern and node, false positive by confidence, known misses listed) and `formatHoldoutTable` (names the review baseline). Run it; it fails.
+  - [x] 8.2 Create `holdout-cases.ts`: the 56 cases word for word, completing each ⟦…⟧ element once with plain wording; shapes of design 13; every snapshot checked with `PageSnapshotSchema` and `assertNoTestHooks`. Create `holdout.ts` (`runHoldout`, `scoreHoldout`, `formatHoldoutTable`).
+  - [x] 8.3 Create `holdout-eval.test.ts`: run `runAllDetectors` on every case, print the table with `console.log`, assert only requirement 4.6 (every case ran with `errors: []`, the case counts, recall of the 28 at least 0.5). Add no threshold for false positives. Extend `wording.test.ts` with every hold-out case.
+  - [x] 8.4 Run the three test files (one command each), then `npx tsc --noEmit`. Report the printed table in the final reply; change no case because of it.
   _Requirements: 1.11, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 5.6, 6.7_
 
 - [ ] 9. Record, steering and amendment notes

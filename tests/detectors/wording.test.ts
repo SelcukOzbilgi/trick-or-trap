@@ -5,6 +5,8 @@ import {
   FORBIDDEN_WORDS,
 } from "@/lib/detectors/data/forbidden-words";
 import { isForbiddenToken, normaliseText, quote } from "@/lib/detectors/shared/text";
+import { buildHoldoutSnapshot } from "@/tests/detectors/eval/helpers/holdout";
+import { HOLDOUT_CASES } from "@/tests/detectors/eval/helpers/holdout-cases";
 import { PAGE_VARIANTS, buildVariantSnapshot } from "@/tests/detectors/eval/helpers/pages";
 import { ROW_SNAPSHOTS } from "@/tests/detectors/helpers/row-snapshots";
 import type { Finding, PageSnapshot } from "@/lib/types";
@@ -229,6 +231,17 @@ describe("wording: the harness page variants", () => {
     "variant %s has Possible titles and no banned word",
     (_id, page) => {
       const findings = runClean(buildVariantSnapshot(page).snapshot);
+      expect(titlesWithoutPossible(findings)).toEqual([]);
+      expect(bannedIn(findings)).toEqual([]);
+    }
+  );
+});
+
+describe("wording: the hold-out cases (requirement 4, 5.6)", () => {
+  it.each(HOLDOUT_CASES.map((c) => [c.id, c] as const))(
+    "case %s has Possible titles and no banned word",
+    (_id, c) => {
+      const findings = runClean(buildHoldoutSnapshot(c).snapshot);
       expect(titlesWithoutPossible(findings)).toEqual([]);
       expect(bannedIn(findings)).toEqual([]);
     }
