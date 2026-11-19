@@ -7,7 +7,9 @@ useDefault = true
 # Browser Use Cloud API keys. Their public docs say a key starts with "bu_"; they
 # do not state a length, so the rule takes any token of 20 or more characters
 # after the prefix and leans on the entropy check and the allowlist below to
-# keep ordinary words out.
+# keep ordinary words out. It can still flag an identifier that starts with bu_
+# and has digits or capitals (a variable or CSS class, say). To allow one, add its
+# exact text to the allowlist below, for example '''^bu_my_identifier_v2$'''.
 [[rules]]
 id = "browser-use-api-key"
 description = "Browser Use Cloud API key"
@@ -19,5 +21,6 @@ entropy = 3.0
   description = "Placeholders, and plain lowercase names such as a snake_case identifier"
   regexes = [
     '''^bu_[a-z_]+$''',
-    '''(?i)^bu_(your|example|sample|placeholder|dummy|fake|redacted|x{4,}|0{4,})''',
+    '''(?i)^bu_(your|example|sample|placeholder|dummy|fake|redacted)[a-z_]*$''',
+    '''(?i)^bu_(x{4,}|0{4,})$''',
   ]
