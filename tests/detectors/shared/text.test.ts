@@ -4,6 +4,7 @@ import {
   countPhraseElements,
   findPhrases,
   hasAny,
+  isForbiddenToken,
   maskDigits,
   normaliseText,
   quote,
@@ -11,12 +12,16 @@ import {
 } from "@/lib/detectors/shared/text";
 import type { Token } from "@/lib/detectors/shared/text";
 import {
+  FORBIDDEN_STEMS,
+  FORBIDDEN_WORDS,
+} from "@/lib/detectors/data/forbidden-words";
+import {
+  FORBIDDEN_STEM_EXTRA_MAX,
   MAX_PHRASE_TOKENS,
   MAX_QUOTE_CHARS,
   MAX_TEXT_READ,
   MAX_TOKENS_PER_TEXT,
 } from "@/lib/detectors/shared/constants";
-import { FORBIDDEN_WORDS } from "@/lib/detectors/data/forbidden-words";
 
 const norms = (tokens: readonly Token[]): string[] => tokens.map((t) => t.norm);
 const surfaces = (tokens: readonly Token[]): string[] =>
@@ -532,7 +537,9 @@ describe("quote", () => {
     });
 
     it("leaves a different word that only contains a listed one", () => {
-      expect(quote("scampi")).toBe('"scampi"');
+      // Requirement 5.1: "scampi" starts with a forbidden stem and carries 2
+      // extra letters, so it is masked too (accepted over-masking, see the
+      // comment of FORBIDDEN_STEMS). It moved to the stem tests below.
       expect(quote("cheaters")).toBe('"cheaters"');
       expect(quote("the lies of the sea")).toBe('"the lies of the sea"');
     });
@@ -544,6 +551,138 @@ describe("quote", () => {
         expect(result.toLowerCase()).not.toContain(word);
       }
     });
+
+    // Requirements 5.1, 5.3, 5.4: a word that starts with a forbidden stem and
+    // carries up to FORBIDDEN_STEM_EXTRA_MAX letters is masked.
+    describe("stems", () => {
+      it.each([
+        "scammers",
+        "frauds",
+        "dolandırıcılara",
+        "dolandırıcılık",
+        "dolandırıcılarından",
+        "illegally",
+        "yasadışı",
+        "aldatıcı",
+        "unlawfully",
+        "deceived",
+        "deception",
+        // Accepted over-masking: a word that only starts with a stem.
+        "scampi",
+      ])("masks %s", (word) => {
+        expect(quote(word)).toBe('"[word omitted]"');
+        expect(quote(`a ${word} here`)).toBe('"a [word omitted] here"');
+      });
+
+      it.each([
+        "SCAMMERS",
+        "FRAUDS",
+        "DOLANDIRICILARA",
+        "DOLANDIRICILIK",
+        "ILLEGALLY",
+        "YASADIŞI",
+        "ALDATICI",
+        "Scammers",
+      ])("masks %s in capitals", (word) => {
+        expect(quote(word)).toBe('"[word omitted]"');
+      });
+
+      it.each([
+        "scammers's",
+        "scammers\u2019s",
+        "dolandırıcılar'a",
+        "dolandırıcılara'dan",
+        "Yasadışı'nın",
+        "aldatıcı'ya",
+        "ALDATICI'YA",
+        "frauds's",
+      ])("masks %s with an apostrophe suffix", (word) => {
+        expect(quote(`x ${word} y`)).toBe('"x [word omitted] y"');
+      });
+
+      it("does not mask a word with more than FORBIDDEN_STEM_EXTRA_MAX extra letters", () => {
+        const extra = "q".repeat(FORBIDDEN_STEM_EXTRA_MAX);
+        const tooLong = "q".repeat(FORBIDDEN_STEM_EXTRA_MAX + 1);
+        expect(quote(`scam${extra}`)).toBe('"[word omitted]"');
+        expect(quote(`scam${tooLong}`)).toBe(`"scam${tooLong}"`);
+        expect(quote(`dolandırıcı${extra}`)).toBe('"[word omitted]"');
+        expect(quote(`dolandırıcı${tooLong}`)).toBe(`"dolandırıcı${tooLong}"`);
+      });
+
+      it("counts only letters as extra characters", () => {
+        // A digit, a hyphen or a symbol ends the word; the stem alone is a listed word.
+        expect(quote("scam2024")).toBe('"[word omitted]2024"');
+        expect(quote("scam-ish")).toBe('"[word omitted]-ish"');
+        expect(quote("frauds+")).toBe('"[word omitted]+"');
+        expect(isForbiddenToken("scam2024")).toBe(false);
+        expect(isForbiddenToken("scam-ish")).toBe(false);
+        expect(isForbiddenToken("scams+")).toBe(false);
+      });
+
+      it("keeps a word that merely contains a stem inside", () => {
+        expect(quote("gunscam")).toBe('"gunscam"');
+        expect(quote("prefraud")).toBe('"prefraud"');
+        expect(quote("cheaters")).toBe('"cheaters"');
+      });
+
+      it("never lets a word with a stem through, also at the cut", () => {
+        const text = `${"x".repeat(MAX_QUOTE_CHARS - 5)} scammers frauds illegally`;
+        const result = quote(text).toLowerCase();
+        for (const stem of FORBIDDEN_STEMS) {
+          expect(result).not.toContain(stem);
+        }
+      });
+    });
+  });
+});
+
+describe("isForbiddenToken", () => {
+  it("matches every entry of FORBIDDEN_WORDS after normalisation", () => {
+    for (const word of FORBIDDEN_WORDS) {
+      expect(isForbiddenToken(normaliseText(word)), word).toBe(true);
+    }
+  });
+
+  it("matches a stem with up to FORBIDDEN_STEM_EXTRA_MAX letters and the part before an apostrophe", () => {
+    expect(isForbiddenToken("scammers")).toBe(true);
+    expect(isForbiddenToken("dolandirici")).toBe(true);
+    expect(isForbiddenToken("scammers's")).toBe(true);
+    expect(isForbiddenToken("dolandirici'dan")).toBe(true);
+    expect(isForbiddenToken(`scam${"q".repeat(FORBIDDEN_STEM_EXTRA_MAX)}`)).toBe(true);
+    expect(isForbiddenToken(`scam${"q".repeat(FORBIDDEN_STEM_EXTRA_MAX + 1)}`)).toBe(false);
+  });
+
+  it("rejects an empty text, an ordinary word and a stem inside a word", () => {
+    expect(isForbiddenToken("")).toBe(false);
+    expect(isForbiddenToken("price")).toBe(false);
+    expect(isForbiddenToken("lies")).toBe(false);
+    expect(isForbiddenToken("gunscam")).toBe(false);
+    expect(isForbiddenToken("sca")).toBe(false);
+  });
+});
+
+describe("FORBIDDEN_STEMS", () => {
+  it("is a frozen list of plain lower-case stems", () => {
+    expect(Object.isFrozen(FORBIDDEN_STEMS)).toBe(true);
+    for (const stem of FORBIDDEN_STEMS) {
+      expect(stem).toBe(stem.trim());
+      expect(stem).not.toContain(" ");
+      expect(stem).toBe(stem.toLowerCase());
+    }
+  });
+
+  it("holds the stems of requirement 5.3", () => {
+    expect([...FORBIDDEN_STEMS]).toEqual([
+      "scam",
+      "fraud",
+      "illegal",
+      "unlawful",
+      "deceiv",
+      "decept",
+      "dolandırıcı",
+      "yasadışı",
+      "aldatıcı",
+    ]);
   });
 });
 

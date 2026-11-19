@@ -1,11 +1,10 @@
-import { FORBIDDEN_WORDS } from "@/lib/detectors/data/forbidden-words";
 import {
   MAX_FINDINGS_PER_DETECTOR,
   MAX_STYLE_READ,
 } from "@/lib/detectors/shared/constants";
 import type { IndexedElement } from "@/lib/detectors/shared/elements";
 import { isIsoUtcText } from "@/lib/detectors/shared/patterns";
-import { normaliseText } from "@/lib/detectors/shared/text";
+import { isForbiddenToken, normaliseText } from "@/lib/detectors/shared/text";
 import { FindingSchema } from "@/lib/types";
 import type { Confidence, Finding } from "@/lib/types";
 
@@ -150,26 +149,19 @@ export function detectedAtFrom(snapshot: unknown): DetectedAt {
 // Forbidden words
 // ---------------------------------------------------------------------------
 
-const FORBIDDEN_NORMALISED: ReadonlySet<string> = new Set(
-  FORBIDDEN_WORDS.map((word) => normaliseText(word))
-);
-
 function isWordChar(ch: string): boolean {
   return ch.toLowerCase() !== ch.toUpperCase();
 }
 
 function runIsForbidden(run: string): boolean {
-  if (run === "") return false;
-  if (FORBIDDEN_NORMALISED.has(run)) return true;
-  // A possessive or a Turkish suffix after an apostrophe.
-  const apostrophe = run.indexOf("'");
-  return apostrophe > 0 && FORBIDDEN_NORMALISED.has(run.slice(0, apostrophe));
+  return run !== "" && isForbiddenToken(run);
 }
 
 /**
- * True when the text holds a word of `FORBIDDEN_WORDS` as a whole word, after
- * the same normalisation the word lists use. The whole text is scanned; there
- * is no token limit.
+ * True when the text holds a word of `FORBIDDEN_WORDS`, or a word that starts
+ * with a forbidden stem (up to `FORBIDDEN_STEM_EXTRA_MAX` letters after it),
+ * after the same normalisation the word lists use. `quote` masks by the same
+ * rule (`isForbiddenToken`). The whole text is scanned; there is no token limit.
  */
 export function containsForbidden(text: string): boolean {
   if (typeof text !== "string" || text.length === 0) return false;

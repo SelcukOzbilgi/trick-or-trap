@@ -1,5 +1,9 @@
-import { FORBIDDEN_WORDS } from "@/lib/detectors/data/forbidden-words";
 import {
+  FORBIDDEN_STEMS,
+  FORBIDDEN_WORDS,
+} from "@/lib/detectors/data/forbidden-words";
+import {
+  FORBIDDEN_STEM_EXTRA_MAX,
   MAX_PHRASE_TOKENS,
   MAX_QUOTE_CHARS,
   MAX_TEXT_READ,
@@ -580,17 +584,50 @@ const FORBIDDEN_NORMALISED: ReadonlySet<string> = new Set(
   FORBIDDEN_WORDS.map((word) => normaliseText(word))
 );
 
+const FORBIDDEN_STEMS_NORMALISED: readonly string[] = FORBIDDEN_STEMS.map((stem) =>
+  normaliseText(stem)
+);
+
 const MASK = "[word omitted]";
 
-function isForbiddenWord(run: string): boolean {
-  const norm = normaliseText(run);
-  if (FORBIDDEN_NORMALISED.has(norm)) return true;
-  // A possessive or a Turkish suffix after an apostrophe: "scam's", "dolandırıcı'dan".
-  const apostrophe = norm.indexOf("'");
-  return apostrophe > 0 && FORBIDDEN_NORMALISED.has(norm.slice(0, apostrophe));
+function isLetterChar(ch: string): boolean {
+  return ch.toLowerCase() !== ch.toUpperCase();
 }
 
-/** Replace each whole word of `FORBIDDEN_WORDS` with the mask, keeping all other text as it is. */
+/**
+ * True when `norm` starts with `stem` and what follows the stem is at most
+ * `maxExtra` characters long and holds letters only (no digit, apostrophe,
+ * hyphen or symbol). The stem itself must be given in normalised form.
+ */
+export function matchesStem(norm: string, stem: string, maxExtra: number): boolean {
+  if (stem === "" || !norm.startsWith(stem)) return false;
+  const extra = Array.from(norm.slice(stem.length));
+  if (extra.length > maxExtra) return false;
+  return extra.every(isLetterChar);
+}
+
+/**
+ * True when a normalised word is a whole word of `FORBIDDEN_WORDS`, or starts
+ * with a forbidden stem and carries at most `FORBIDDEN_STEM_EXTRA_MAX` letters
+ * after it. Only the part before the first apostrophe is judged, so a
+ * possessive or a Turkish suffix after an apostrophe does not hide the word.
+ * Masking and the finding drop rule both call this one function.
+ */
+export function isForbiddenToken(norm: string): boolean {
+  if (typeof norm !== "string" || norm === "") return false;
+  const apostrophe = norm.indexOf("'");
+  const head = apostrophe > 0 ? norm.slice(0, apostrophe) : norm;
+  if (FORBIDDEN_NORMALISED.has(head)) return true;
+  return FORBIDDEN_STEMS_NORMALISED.some((stem) =>
+    matchesStem(head, stem, FORBIDDEN_STEM_EXTRA_MAX)
+  );
+}
+
+function isForbiddenWord(run: string): boolean {
+  return isForbiddenToken(normaliseText(run));
+}
+
+/** Replace each whole word of `FORBIDDEN_WORDS`, and each word with a forbidden stem, with the mask, keeping all other text as it is. */
 function maskForbidden(text: string): string {
   const chars = Array.from(text);
   const classes = chars.map((ch) => classify(ch.codePointAt(0) as number));

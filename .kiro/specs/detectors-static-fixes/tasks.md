@@ -25,15 +25,15 @@ Rules for every task:
   - [x] 1.7 Run the seven test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 1.3, 1.4, 1.8, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 2.10, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 12.3_
 
-- [ ] 2. Forbidden words by stem, and the wording test
+- [x] 2. Forbidden words by stem, and the wording test
   - Uses: `shared/text.ts` (`quote`, `maskForbidden`), `shared/finding.ts` (`containsForbidden`), `data/forbidden-words.ts`, `shared/constants.ts`, `tests/detectors/eval/helpers/pages.ts` (`PAGE_VARIANTS`, `buildVariantSnapshot`).
   - Files: creates `tests/detectors/wording.test.ts`, `tests/detectors/helpers/row-snapshots.ts`; edits `lib/detectors/data/forbidden-words.ts`, `shared/text.ts`, `shared/finding.ts`, `shared/constants.ts`, `tests/detectors/shared/text.test.ts`, `shared/finding.test.ts`, `shared/constants.test.ts`, `word-lists.test.ts`.
   - Reads: requirements 1, 5; design 5 (forbidden stems), 6, 15.
   - Dependent tests to run: `shared/text.test.ts`, `shared/finding.test.ts`, `shared/constants.test.ts`, `word-lists.test.ts`, `wording.test.ts`, `eval/boo-tique-eval.test.ts`.
-  - [ ] 2.1 Tests first: `text.test.ts` quote cases for "scammers", "frauds", "dolandırıcılara", "dolandırıcılık", "illegally", "yasadışı", "aldatıcı", also with a Turkish apostrophe suffix and in capitals; a word that starts with a stem but has more than `FORBIDDEN_STEM_EXTRA_MAX` extra letters is not masked; `finding.test.ts` drop rule for the same words; `constants.test.ts` gains `FORBIDDEN_STEM_EXTRA_MAX: 10`.
-  - [ ] 2.2 Create `helpers/row-snapshots.ts` (one small plain-object snapshot per rule row, design 6) and `wording.test.ts` (design 6; the hold-out cases are added by task 8). Run it; the stem cases fail.
-  - [ ] 2.3 Add `FORBIDDEN_STEMS` and the constant; add `isForbiddenToken` to `text.ts` and call it from `maskForbidden` and from `containsForbidden`; add `FORBIDDEN_STEMS` to `MODULES` of `word-lists.test.ts` as a "plain" list. No regular expression.
-  - [ ] 2.4 Run the six test files (one command each), then `npx tsc --noEmit`.
+  - [x] 2.1 Tests first: `text.test.ts` quote cases for "scammers", "frauds", "dolandırıcılara", "dolandırıcılık", "illegally", "yasadışı", "aldatıcı", also with a Turkish apostrophe suffix and in capitals; a word that starts with a stem but has more than `FORBIDDEN_STEM_EXTRA_MAX` extra letters is not masked; `finding.test.ts` drop rule for the same words; `constants.test.ts` gains `FORBIDDEN_STEM_EXTRA_MAX: 10`.
+  - [x] 2.2 Create `helpers/row-snapshots.ts` (one small plain-object snapshot per rule row, design 6) and `wording.test.ts` (design 6; the hold-out cases are added by task 8). Run it; the stem cases fail.
+  - [x] 2.3 Add `FORBIDDEN_STEMS` and the constant; add `isForbiddenToken` to `text.ts` and call it from `maskForbidden` and from `containsForbidden`; add `FORBIDDEN_STEMS` to `MODULES` of `word-lists.test.ts` as a "plain" list. No regular expression.
+  - [x] 2.4 Run the six test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 1.5, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9_
 
 - [ ] 3. Report detector exceptions

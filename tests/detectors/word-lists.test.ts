@@ -45,7 +45,7 @@ type ModuleSpec = {
 const MODULES: Readonly<Record<string, ModuleSpec>> = {
   "forbidden-words": {
     exports: forbiddenWords,
-    lists: { FORBIDDEN_WORDS: "plain" },
+    lists: { FORBIDDEN_WORDS: "plain", FORBIDDEN_STEMS: "plain" },
   },
   months: {
     exports: months,

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { FORBIDDEN_WORDS } from "@/lib/detectors/data/forbidden-words";
+import { FORBIDDEN_STEM_EXTRA_MAX } from "@/lib/detectors/shared/constants";
 import { buildIndex } from "@/lib/detectors/shared/elements";
 import type { IndexedElement } from "@/lib/detectors/shared/elements";
 import {
@@ -407,6 +408,46 @@ describe("finaliseFindings: forbidden words", () => {
   it("finds a listed word at the end of a long text", () => {
     const text = `${"ordinary words ".repeat(2_000)}${word}`;
     expect(containsForbidden(text)).toBe(true);
+  });
+
+  // Requirements 5.2, 5.4: a word with a forbidden stem and up to
+  // FORBIDDEN_STEM_EXTRA_MAX letters counts, in any case and with an apostrophe suffix.
+  it.each([
+    "scammers",
+    "frauds",
+    "dolandırıcılara",
+    "dolandırıcılık",
+    "illegally",
+    "yasadışı",
+    "aldatıcı",
+    "SCAMMERS",
+    "DOLANDIRICILARA",
+    "Yasadışı'nın",
+    "dolandırıcılar'a",
+    "scammers\u2019s",
+  ])("finds the stem word %s", (text) => {
+    expect(containsForbidden(text)).toBe(true);
+    expect(containsForbidden(`A fine ${text}, really`)).toBe(true);
+  });
+
+  it("does not count a word with more than FORBIDDEN_STEM_EXTRA_MAX extra letters or a stem inside a word", () => {
+    expect(containsForbidden(`scam${"q".repeat(FORBIDDEN_STEM_EXTRA_MAX)}`)).toBe(true);
+    expect(containsForbidden(`scam${"q".repeat(FORBIDDEN_STEM_EXTRA_MAX + 1)}`)).toBe(false);
+    expect(containsForbidden("gunscam")).toBe(false);
+    expect(containsForbidden("cheaters")).toBe(false);
+  });
+
+  it("drops a draft with a stem word in its description, evidence text or both", () => {
+    const el = one();
+    const findings = finaliseFindings(
+      [
+        draft([el], { description: "People call this illegally cheap." }),
+        draft([el], { evidenceText: "Text dolandırıcılara." }),
+        draft([el], { ruleOrder: 3 }),
+      ],
+      context()
+    );
+    expect(findings).toHaveLength(1);
   });
 
   it("has no forbidden word in any fixed title or explanation", () => {

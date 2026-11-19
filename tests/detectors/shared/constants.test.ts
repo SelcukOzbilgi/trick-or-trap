@@ -14,6 +14,8 @@ const EXPECTED = {
   MAX_ID_DEPTH: 64,
   MAX_TOKENS_PER_TEXT: 80,
   MAX_PHRASE_TOKENS: 6,
+  // Requirement 5.1: a forbidden stem may be followed by at most 10 letters.
+  FORBIDDEN_STEM_EXTRA_MAX: 10,
   MAX_QUOTE_CHARS: 120,
   MAX_FINDINGS_PER_DETECTOR: 20,
   MAX_CHOICE_GROUPS: 50,

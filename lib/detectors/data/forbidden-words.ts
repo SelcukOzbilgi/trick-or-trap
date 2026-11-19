@@ -30,3 +30,24 @@ export const FORBIDDEN_WORDS: readonly string[] = Object.freeze([
   "dolandırıcılık",
   "aldatıcı",
 ]);
+
+/**
+ * Stems of the same words. A token that starts with a stem and carries at most
+ * `FORBIDDEN_STEM_EXTRA_MAX` letters after it counts as a forbidden word, so
+ * inflected forms ("scammers", "frauds", "dolandırıcılara") are covered too.
+ * Entries are plain lower-case words, normalised when they are loaded.
+ *
+ * Over-masking costs less than under-masking: a quoted "scampi" or "scampering"
+ * is masked as well. This is accepted.
+ */
+export const FORBIDDEN_STEMS: readonly string[] = Object.freeze([
+  "scam",
+  "fraud",
+  "illegal",
+  "unlawful",
+  "deceiv",
+  "decept",
+  "dolandırıcı",
+  "yasadışı",
+  "aldatıcı",
+]);

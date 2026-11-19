@@ -26,6 +26,9 @@ export const MAX_ID_DEPTH = 64;
 export const MAX_TOKENS_PER_TEXT = 80;
 export const MAX_PHRASE_TOKENS = 6;
 
+/** Most letters a word may carry after a forbidden stem and still be masked. */
+export const FORBIDDEN_STEM_EXTRA_MAX = 10;
+
 /** Longest quoted page text, before the ellipsis. */
 export const MAX_QUOTE_CHARS = 120;
 
