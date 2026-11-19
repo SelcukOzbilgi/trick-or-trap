@@ -386,53 +386,50 @@ function keepDeepest(ctx: Context, candidates: readonly Candidate[]): Candidate[
 }
 
 /**
- * Detect possible fake scarcity in one snapshot. Never throws; any value that
- * is not a usable snapshot gives an empty array.
+ * Detect possible fake scarcity in one snapshot. A value that is not a usable
+ * snapshot gives an empty array. An unexpected exception propagates; the
+ * registry reports it (requirement 6.1).
  */
 export function detectFakeScarcity(snapshot: PageSnapshot): Finding[] {
-  try {
-    const pair = buildSamplePair(snapshot);
-    const detectedAt = detectedAtFrom(snapshot);
-    const ctx: Context = { pair, stable: new Map<IndexedElement, Claims>() };
+  const pair = buildSamplePair(snapshot);
+  const detectedAt = detectedAtFrom(snapshot);
+  const ctx: Context = { pair, stable: new Map<IndexedElement, Claims>() };
 
-    // First pass: the claims of every visible element that has no look-alike wording.
-    const found: { el: IndexedElement; claims: Claim[] }[] = [];
-    for (const el of pair.first.elements) {
-      if (el.hidden || el.tokens.length === 0) continue;
-      if (hasAny(el.tokens, LOOKALIKES)) continue;
-      const claims = claimsOf(el.tokens);
-      if (claims.length > 0) found.push({ el, claims });
-    }
-
-    // Elements that hold a qualified or unquantified claim support each other.
-    const supporting = found
-      .filter((f) => f.claims.some((c) => c.kind !== "bare"))
-      .map((f) => f.el);
-    const hasOtherClaim = (el: IndexedElement): boolean =>
-      supporting.some(
-        (other) =>
-          other !== el &&
-          !pair.first.isAncestor(other, el) &&
-          !pair.first.isAncestor(el, other)
-      );
-
-    const candidates: Candidate[] = [];
-    for (const { el, claims } of found) {
-      const choice = bestRow(ctx, el, claims, hasOtherClaim(el));
-      if (choice === null) continue;
-      candidates.push({
-        el,
-        key: keyOf(el.tokens, choice.claim),
-        draft: draftFor(ctx, el, choice),
-      });
-    }
-
-    const drafts = keepDeepest(ctx, candidates).map((c) => c.draft);
-    return finaliseFindings(drafts, {
-      detectedAt,
-      pageTruncated: pair.first.captureTruncated || pair.first.budgetHit,
-    });
-  } catch {
-    return [];
+  // First pass: the claims of every visible element that has no look-alike wording.
+  const found: { el: IndexedElement; claims: Claim[] }[] = [];
+  for (const el of pair.first.elements) {
+    if (el.hidden || el.tokens.length === 0) continue;
+    if (hasAny(el.tokens, LOOKALIKES)) continue;
+    const claims = claimsOf(el.tokens);
+    if (claims.length > 0) found.push({ el, claims });
   }
+
+  // Elements that hold a qualified or unquantified claim support each other.
+  const supporting = found
+    .filter((f) => f.claims.some((c) => c.kind !== "bare"))
+    .map((f) => f.el);
+  const hasOtherClaim = (el: IndexedElement): boolean =>
+    supporting.some(
+      (other) =>
+        other !== el &&
+        !pair.first.isAncestor(other, el) &&
+        !pair.first.isAncestor(el, other)
+    );
+
+  const candidates: Candidate[] = [];
+  for (const { el, claims } of found) {
+    const choice = bestRow(ctx, el, claims, hasOtherClaim(el));
+    if (choice === null) continue;
+    candidates.push({
+      el,
+      key: keyOf(el.tokens, choice.claim),
+      draft: draftFor(ctx, el, choice),
+    });
+  }
+
+  const drafts = keepDeepest(ctx, candidates).map((c) => c.draft);
+  return finaliseFindings(drafts, {
+    detectedAt,
+    pageTruncated: pair.first.captureTruncated || pair.first.budgetHit,
+  });
 }

@@ -195,7 +195,7 @@ function readUnits(read: Reader, start: number): Countdown | null {
 
 /**
  * Find every countdown in the tokens, in token order. Reads at most
- * `MAX_TOKENS_PER_TEXT` tokens and never throws on odd input.
+ * `MAX_TOKENS_PER_TEXT` tokens; odd input gives an array.
  */
 export function parseCountdowns(tokens: readonly Token[]): readonly Countdown[] {
   const list: unknown = tokens;

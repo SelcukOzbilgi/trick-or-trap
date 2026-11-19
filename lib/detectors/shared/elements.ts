@@ -17,8 +17,10 @@ import type { Token } from "@/lib/detectors/shared/text";
 
 /**
  * Safe, bounded view of one snapshot sample. Every field of a page is
- * untrusted: it is read through a guard that never throws, cut to its cap
- * before any other work, and given a default when it has the wrong type.
+ * untrusted: it is cut to its cap before any other work and given a default
+ * when it has the wrong type. A value that can be read never makes this code
+ * throw; a read that itself throws (a hostile getter or proxy trap) is not
+ * caught here, and the registry reports it (requirement 6.4).
  * Ids are parsed into integer paths so that ancestry compares integers, not
  * string prefixes ("el-1-1" is not an ancestor of "el-1-10").
  */
@@ -81,7 +83,7 @@ export type ElementIndex = {
 };
 
 // ---------------------------------------------------------------------------
-// Safe reads
+// Reads
 // ---------------------------------------------------------------------------
 
 const ATTR_KEYS: ReadonlySet<string> = new Set([
@@ -111,14 +113,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-/** Property read that never throws (a hostile getter or proxy gives undefined). */
+/**
+ * Property read. A value that is not an object gives undefined. A read that
+ * itself throws (a hostile getter or proxy trap) is not odd input: the
+ * exception propagates and `runDetectors` reports it (requirement 6.4).
+ */
 function readProp(source: unknown, key: string): unknown {
   if (!isRecord(source)) return undefined;
-  try {
-    return source[key];
-  } catch {
-    return undefined;
-  }
+  return source[key];
 }
 
 /** Cut to at most `cap` UTF-16 units without leaving half of a surrogate pair. */
@@ -240,13 +242,9 @@ function makeAttrReader(attributes: unknown): (name: AttrKey) => string | undefi
   return (name: AttrKey): string | undefined => {
     if (typeof name !== "string" || !ATTR_KEYS.has(name)) return undefined;
     if (!isRecord(attributes)) return undefined;
-    try {
-      if (!Object.hasOwn(attributes, name)) return undefined;
-      const value = attributes[name];
-      return typeof value === "string" ? cut(value, MAX_ATTR_READ) : undefined;
-    } catch {
-      return undefined;
-    }
+    if (!Object.hasOwn(attributes, name)) return undefined;
+    const value = attributes[name];
+    return typeof value === "string" ? cut(value, MAX_ATTR_READ) : undefined;
   };
 }
 
@@ -432,12 +430,7 @@ export function buildIndex(sample: unknown, light: boolean): ElementIndex {
   const drafts: Draft[] = [];
   const limit = Math.min(list.length, budget);
   for (let i = 0; i < limit; i += 1) {
-    let entry: unknown;
-    try {
-      entry = list[i];
-    } catch {
-      continue;
-    }
+    const entry: unknown = list[i];
     if (!isRecord(entry) || Array.isArray(entry)) continue;
     drafts.push(readDraft(entry, i, textCap));
   }

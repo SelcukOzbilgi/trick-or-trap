@@ -297,7 +297,7 @@ const MATCHERS: ReadonlyArray<(read: Reader, i: number) => Match | null> = [
 
 /**
  * Find every calendar date in the tokens, in token order. Reads at most
- * `MAX_TOKENS_PER_TEXT` tokens and never throws on odd input.
+ * `MAX_TOKENS_PER_TEXT` tokens; odd input gives an array.
  */
 export function parseCalendarDates(tokens: readonly Token[]): readonly CalendarDate[] {
   const list: unknown = tokens;

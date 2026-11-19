@@ -97,7 +97,7 @@ function amountMinor(norm: string): number | null {
   return Number.isFinite(minor) && minor <= MAX_MINOR ? minor : null;
 }
 
-/** Every price in the tokens, in text order. Never throws; a value that is not a token array gives []. */
+/** Every price in the tokens, in text order. A value that is not a token array gives []. */
 export function parsePrices(tokens: readonly Token[]): readonly Price[] {
   const found: Price[] = [];
   const list: unknown = tokens;

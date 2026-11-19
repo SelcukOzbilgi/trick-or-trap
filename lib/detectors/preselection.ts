@@ -361,31 +361,28 @@ function groupDraft(
 // ---------------------------------------------------------------------------
 
 /**
- * Detect possible preselection in one snapshot. Never throws; any value that
- * is not a usable snapshot gives an empty array.
+ * Detect possible preselection in one snapshot. A value that is not a usable
+ * snapshot gives an empty array. An unexpected exception propagates; the
+ * registry reports it (requirement 6.1).
  */
 export function detectPreselection(snapshot: PageSnapshot): Finding[] {
-  try {
-    const index = buildIndex(snapshot, false);
-    const detectedAt = detectedAtFrom(snapshot);
-    const drafts: FindingDraft[] = [];
+  const index = buildIndex(snapshot, false);
+  const detectedAt = detectedAtFrom(snapshot);
+  const drafts: FindingDraft[] = [];
 
-    for (const el of index.elements) {
-      if (!isTickedToggle(el) || isDisabled(el) || hardHidden(index, el)) continue;
-      const draft = toggleDraft(index, el);
-      if (draft !== null) drafts.push(draft);
-    }
-
-    for (const members of findRadioGroups(index)) {
-      const draft = groupDraft(index, members);
-      if (draft !== null) drafts.push(draft);
-    }
-
-    return finaliseFindings(drafts, {
-      detectedAt,
-      pageTruncated: index.captureTruncated || index.budgetHit,
-    });
-  } catch {
-    return [];
+  for (const el of index.elements) {
+    if (!isTickedToggle(el) || isDisabled(el) || hardHidden(index, el)) continue;
+    const draft = toggleDraft(index, el);
+    if (draft !== null) drafts.push(draft);
   }
+
+  for (const members of findRadioGroups(index)) {
+    const draft = groupDraft(index, members);
+    if (draft !== null) drafts.push(draft);
+  }
+
+  return finaliseFindings(drafts, {
+    detectedAt,
+    pageTruncated: index.captureTruncated || index.budgetHit,
+  });
 }

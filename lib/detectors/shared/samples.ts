@@ -43,13 +43,10 @@ export function parseCapturedAt(value: unknown): number | null {
   return roundTrip === value.slice(0, DATE_TIME_PREFIX) ? ms : null;
 }
 
+/** Property read. A non-object gives undefined; a read that throws propagates (requirement 6.4). */
 function readProp(source: unknown, key: string): unknown {
   if (typeof source !== "object" || source === null) return undefined;
-  try {
-    return (source as Record<string, unknown>)[key];
-  } catch {
-    return undefined;
-  }
+  return (source as Record<string, unknown>)[key];
 }
 
 function isUsableSample(value: unknown): boolean {

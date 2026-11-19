@@ -142,39 +142,36 @@ function canBeShaming(control: IndexedElement): boolean {
 }
 
 /**
- * Detect possible confirmshaming in one snapshot. Never throws; any value that
- * is not a usable snapshot gives an empty array.
+ * Detect possible confirmshaming in one snapshot. A value that is not a usable
+ * snapshot gives an empty array. An unexpected exception propagates; the
+ * registry reports it (requirement 6.1).
  */
 export function detectConfirmshaming(snapshot: PageSnapshot): Finding[] {
-  try {
-    const index = buildIndex(snapshot, false);
-    const detectedAt = detectedAtFrom(snapshot);
-    const drafts: FindingDraft[] = [];
-    // Controls of a group that holds an accept control; they are judged as decline controls only.
-    const judged = new Set<IndexedElement>();
+  const index = buildIndex(snapshot, false);
+  const detectedAt = detectedAtFrom(snapshot);
+  const drafts: FindingDraft[] = [];
+  // Controls of a group that holds an accept control; they are judged as decline controls only.
+  const judged = new Set<IndexedElement>();
 
-    for (const group of findChoiceGroups(index)) {
-      const accept = group.controls.find((c) => classifyControl(c) === "accept");
-      if (accept === undefined) continue;
-      for (const control of group.controls) {
-        judged.add(control);
-        if (control === accept || !canBeShaming(control)) continue;
-        const draft = declineDraft(control, accept);
-        if (draft !== null) drafts.push(draft);
-      }
+  for (const group of findChoiceGroups(index)) {
+    const accept = group.controls.find((c) => classifyControl(c) === "accept");
+    if (accept === undefined) continue;
+    for (const control of group.controls) {
+      judged.add(control);
+      if (control === accept || !canBeShaming(control)) continue;
+      const draft = declineDraft(control, accept);
+      if (draft !== null) drafts.push(draft);
     }
-
-    for (const control of index.elements) {
-      if (judged.has(control) || !isChoiceControl(control)) continue;
-      if (!hasAny(control.tokens, SHAMING) || !canBeShaming(control)) continue;
-      drafts.push(candidateDraft(control, null));
-    }
-
-    return finaliseFindings(drafts, {
-      detectedAt,
-      pageTruncated: index.captureTruncated || index.budgetHit,
-    });
-  } catch {
-    return [];
   }
+
+  for (const control of index.elements) {
+    if (judged.has(control) || !isChoiceControl(control)) continue;
+    if (!hasAny(control.tokens, SHAMING) || !canBeShaming(control)) continue;
+    drafts.push(candidateDraft(control, null));
+  }
+
+  return finaliseFindings(drafts, {
+    detectedAt,
+    pageTruncated: index.captureTruncated || index.budgetHit,
+  });
 }

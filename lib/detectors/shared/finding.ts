@@ -121,15 +121,10 @@ const UNKNOWN_TIME: DetectedAt = Object.freeze({ iso: EPOCH_ISO, ms: null });
  * gives the epoch and `ms: null`, which makes callers treat the time as unknown.
  */
 export function detectedAtFrom(snapshot: unknown): DetectedAt {
-  let value: unknown;
-  try {
-    value =
-      typeof snapshot === "object" && snapshot !== null
-        ? (snapshot as Record<string, unknown>).capturedAt
-        : undefined;
-  } catch {
-    return UNKNOWN_TIME;
-  }
+  const value: unknown =
+    typeof snapshot === "object" && snapshot !== null
+      ? (snapshot as Record<string, unknown>).capturedAt
+      : undefined;
   if (typeof value !== "string" || value.length > MAX_STYLE_READ) {
     return UNKNOWN_TIME;
   }
@@ -304,7 +299,8 @@ function compare(a: Prepared, b: Prepared): number {
  * are sorted by the document position of their first element, then by
  * `ruleOrder`, then by that element's id; at most `MAX_FINDINGS_PER_DETECTOR`
  * are kept and the last one says how many were left out. Every returned
- * finding passes `FindingSchema`.
+ * finding passes `FindingSchema`. A draft that cannot be read (a getter that
+ * throws) raises its exception; the registry reports it (requirement 6.1).
  */
 export function finaliseFindings(
   drafts: readonly FindingDraft[],
@@ -316,12 +312,8 @@ export function finaliseFindings(
 
   const prepared: Prepared[] = [];
   for (const source of drafts) {
-    try {
-      const item = prepare(source, detectedAt, pageTruncated);
-      if (item) prepared.push(item);
-    } catch {
-      // A broken draft is skipped; the others still count.
-    }
+    const item = prepare(source, detectedAt, pageTruncated);
+    if (item) prepared.push(item);
   }
   prepared.sort(compare);
 

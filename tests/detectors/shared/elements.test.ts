@@ -514,8 +514,15 @@ describe("element fields", () => {
     }
   });
 
-  it("does not take an inherited property as an attribute and survives a throwing getter", () => {
+  it("does not take an inherited property as an attribute", () => {
     const inherited = Object.create({ type: "checkbox" }) as Record<string, string>;
+    const index = buildIndex(sample([raw("el-1", { attributes: inherited })]), false);
+    expect(must(index.byId("el-1")).attr("type")).toBeUndefined();
+  });
+
+  // Requirement 6.4: a getter that throws is an unexpected exception and
+  // propagates when the attribute is read; it used to give undefined.
+  it("lets a throwing attribute getter propagate when the attribute is read", () => {
     const throwing: Record<string, string> = {};
     Object.defineProperty(throwing, "type", {
       enumerable: true,
@@ -523,15 +530,8 @@ describe("element fields", () => {
         throw new Error("boom");
       },
     });
-    const index = buildIndex(
-      sample([
-        raw("el-1", { attributes: inherited }),
-        raw("el-2", { attributes: throwing }),
-      ]),
-      false
-    );
-    expect(must(index.byId("el-1")).attr("type")).toBeUndefined();
-    expect(must(index.byId("el-2")).attr("type")).toBeUndefined();
+    const index = buildIndex(sample([raw("el-2", { attributes: throwing })]), false);
+    expect(() => must(index.byId("el-2")).attr("type")).toThrow("boom");
   });
 
   it("cuts fields to their caps before use", () => {

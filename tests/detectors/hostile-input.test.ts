@@ -396,7 +396,7 @@ const ODD_SNAPSHOTS: ReadonlyArray<readonly [string, unknown]> = [
 describe("hostile input: every case, per detector", () => {
   for (const hostile of HOSTILE_CASES) {
     describe(hostile.name, () => {
-      it("keeps the shared helpers from throwing, so the detector guard is not what passes it", () => {
+      it("keeps the shared helpers from throwing, so the detectors need no guard to pass it", () => {
         const snapshot = hostile.build();
         expect(() => buildSamplePair(snapshot)).not.toThrow();
         expect(() => buildIndex(snapshot, false)).not.toThrow();

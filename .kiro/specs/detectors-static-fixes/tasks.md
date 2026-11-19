@@ -36,14 +36,14 @@ Rules for every task:
   - [x] 2.4 Run the six test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 1.5, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9_
 
-- [ ] 3. Report detector exceptions
+- [x] 3. Report detector exceptions
   - Uses: the six detectors, `shared/elements.ts`, `shared/samples.ts`, `shared/finding.ts`, `lib/detectors/index.ts` (read only; its exports and `registry.test.ts` stay unchanged).
   - Files: creates `tests/detectors/detector-errors.test.ts`; edits the six detector files, `shared/elements.ts`, `shared/samples.ts`, `shared/finding.ts`, `tests/detectors/source-rules.test.ts`, `shared/finding.test.ts`, `hostile-input.test.ts` and any helper test that expects a throwing getter to be swallowed.
   - Reads: requirements 1, 6; design 7.
   - Dependent tests to run: `detector-errors.test.ts`, `source-rules.test.ts`, `shared/finding.test.ts`, `shared/elements.test.ts`, `shared/samples.test.ts`, `hostile-input.test.ts`, `all.test.ts`, `eval/boo-tique-eval.test.ts`.
-  - [ ] 3.1 Tests first: `detector-errors.test.ts` as in design 7 (hostile proxy and getter give six `threw` errors in order and no throw; each detector called directly throws; registry with a real and a probe detector; odd values give `[]` and `errors: []`; normal snapshot gives `errors: []`). Add the source rule "no `catch` in `lib/detectors/**` except `index.ts`" to `source-rules.test.ts`. Run both; they fail.
-  - [ ] 3.2 Remove every `catch` listed in design 7 and update the doc comments (requirement 6.11). Search `tests/detectors/` for `get ` accessors and `Proxy` cases that expect a swallowed read; change them to expect the exception, with a comment naming 6.4; rename the `hostile-input.test.ts` helper test as design 7 says.
-  - [ ] 3.3 Run the eight test files (one command each), then `npx tsc --noEmit`.
+  - [x] 3.1 Tests first: `detector-errors.test.ts` as in design 7 (hostile proxy and getter give six `threw` errors in order and no throw; each detector called directly throws; registry with a real and a probe detector; odd values give `[]` and `errors: []`; normal snapshot gives `errors: []`). Add the source rule "no `catch` in `lib/detectors/**` except `index.ts`" to `source-rules.test.ts`. Run both; they fail.
+  - [x] 3.2 Remove every `catch` listed in design 7 and update the doc comments (requirement 6.11). Search `tests/detectors/` for `get ` accessors and `Proxy` cases that expect a swallowed read; change them to expect the exception, with a comment naming 6.4; rename the `hostile-input.test.ts` helper test as design 7 says.
+  - [x] 3.3 Run the eight test files (one command each), then `npx tsc --noEmit`.
   _Requirements: 1.11, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12_
 
 - [ ] 4. Narrow the countdown rules

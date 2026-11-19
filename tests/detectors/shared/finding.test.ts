@@ -131,13 +131,15 @@ describe("detectedAtFrom", () => {
     expect(detectedAtFrom(undefined)).toEqual({ iso: EPOCH, ms: null });
   });
 
-  it("does not throw when reading capturedAt throws", () => {
+  // Requirement 6.4: a read that itself throws is an unexpected exception and
+  // propagates; the registry reports it. It used to give the epoch.
+  it("lets an exception raised while reading capturedAt propagate", () => {
     const hostile = {
       get capturedAt(): string {
         throw new Error("boom");
       },
     };
-    expect(detectedAtFrom(hostile)).toEqual({ iso: EPOCH, ms: null });
+    expect(() => detectedAtFrom(hostile)).toThrow("boom");
   });
 
   it("keeps the real epoch distinct from an unusable time", () => {

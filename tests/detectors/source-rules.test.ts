@@ -296,6 +296,19 @@ describe("the files under lib/detectors", () => {
     expect(hits).toEqual([]);
   });
 
+  // Requirements 6.1 and 6.8: an exception is turned into data in one place,
+  // the registry (lib/detectors/index.ts); no detector or helper swallows it.
+  it("hold no catch clause except in index.ts", () => {
+    const hits: string[] = [];
+    for (const file of FILES) {
+      if (file.rel === "index.ts") continue;
+      if (/\bcatch\b/.test(scanSource(file.source).code)) hits.push(file.rel);
+    }
+    expect(hits).toEqual([]);
+    const index = FILES.find((file) => file.rel === "index.ts");
+    expect(/\bcatch\b/.test(scanSource(index?.source ?? "").code)).toBe(true);
+  });
+
   it("hold regular expression literals only in shared/patterns.ts", () => {
     const hits: string[] = [];
     for (const file of FILES) {

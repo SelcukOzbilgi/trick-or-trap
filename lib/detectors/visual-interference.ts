@@ -483,34 +483,31 @@ function closeDraft(index: ElementIndex, close: IndexedElement): FindingDraft | 
 // ---------------------------------------------------------------------------
 
 /**
- * Detect possible visual interference in one snapshot. Never throws; any value
- * that is not a usable snapshot gives an empty array.
+ * Detect possible visual interference in one snapshot. A value that is not a
+ * usable snapshot gives an empty array. An unexpected exception propagates;
+ * the registry reports it (requirement 6.1).
  */
 export function detectVisualInterference(snapshot: PageSnapshot): Finding[] {
-  try {
-    const index = buildIndex(snapshot, false);
-    const detectedAt = detectedAtFrom(snapshot);
-    const drafts: FindingDraft[] = [];
+  const index = buildIndex(snapshot, false);
+  const detectedAt = detectedAtFrom(snapshot);
+  const drafts: FindingDraft[] = [];
 
-    for (const group of findChoiceGroups(index)) {
-      const result = pairsOfGroup(index, group);
-      if (result !== null) drafts.push(pairDraft(result));
-    }
-
-    let closesRead = 0;
-    for (const el of index.elements) {
-      if (closesRead >= MAX_CHOICE_GROUPS) break;
-      if (!isChoiceControl(el) || classifyControl(el) !== "close") continue;
-      closesRead += 1;
-      const draft = closeDraft(index, el);
-      if (draft !== null) drafts.push(draft);
-    }
-
-    return finaliseFindings(drafts, {
-      detectedAt,
-      pageTruncated: index.captureTruncated || index.budgetHit,
-    });
-  } catch {
-    return [];
+  for (const group of findChoiceGroups(index)) {
+    const result = pairsOfGroup(index, group);
+    if (result !== null) drafts.push(pairDraft(result));
   }
+
+  let closesRead = 0;
+  for (const el of index.elements) {
+    if (closesRead >= MAX_CHOICE_GROUPS) break;
+    if (!isChoiceControl(el) || classifyControl(el) !== "close") continue;
+    closesRead += 1;
+    const draft = closeDraft(index, el);
+    if (draft !== null) drafts.push(draft);
+  }
+
+  return finaliseFindings(drafts, {
+    detectedAt,
+    pageTruncated: index.captureTruncated || index.budgetHit,
+  });
 }

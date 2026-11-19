@@ -413,35 +413,32 @@ function keepDeepest(ctx: Context, candidates: readonly Candidate[]): Candidate[
 }
 
 /**
- * Detect possible fake activity in one snapshot. Never throws; any value that
- * is not a usable snapshot gives an empty array.
+ * Detect possible fake activity in one snapshot. A value that is not a usable
+ * snapshot gives an empty array. An unexpected exception propagates; the
+ * registry reports it (requirement 6.1).
  */
 export function detectFakeActivity(snapshot: PageSnapshot): Finding[] {
-  try {
-    const pair = buildSamplePair(snapshot);
-    const detectedAt = detectedAtFrom(snapshot);
-    const ctx: Context = { pair, stable: new Map<IndexedElement, Claims>() };
+  const pair = buildSamplePair(snapshot);
+  const detectedAt = detectedAtFrom(snapshot);
+  const ctx: Context = { pair, stable: new Map<IndexedElement, Claims>() };
 
-    const candidates: Candidate[] = [];
-    for (const el of pair.first.elements) {
-      if (el.hidden || el.tokens.length === 0) continue;
-      if (hasAny(el.tokens, LOOKALIKES)) continue;
-      const claims = claimsOf(el.tokens);
-      if (claims.length === 0) continue;
-      const choice = bestRow(ctx, el, claims);
-      candidates.push({
-        el,
-        key: keyOf(el.tokens, choice.claim),
-        draft: draftFor(ctx, el, choice),
-      });
-    }
-
-    const drafts = keepDeepest(ctx, candidates).map((c) => c.draft);
-    return finaliseFindings(drafts, {
-      detectedAt,
-      pageTruncated: pair.first.captureTruncated || pair.first.budgetHit,
+  const candidates: Candidate[] = [];
+  for (const el of pair.first.elements) {
+    if (el.hidden || el.tokens.length === 0) continue;
+    if (hasAny(el.tokens, LOOKALIKES)) continue;
+    const claims = claimsOf(el.tokens);
+    if (claims.length === 0) continue;
+    const choice = bestRow(ctx, el, claims);
+    candidates.push({
+      el,
+      key: keyOf(el.tokens, choice.claim),
+      draft: draftFor(ctx, el, choice),
     });
-  } catch {
-    return [];
   }
+
+  const drafts = keepDeepest(ctx, candidates).map((c) => c.draft);
+  return finaliseFindings(drafts, {
+    detectedAt,
+    pageTruncated: pair.first.captureTruncated || pair.first.budgetHit,
+  });
 }

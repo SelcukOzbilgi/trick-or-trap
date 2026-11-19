@@ -424,32 +424,29 @@ function keepDeepest(ctx: Context, candidates: readonly Candidate[]): Candidate[
 }
 
 /**
- * Detect possible fake urgency in one snapshot. Never throws; any value that
- * is not a usable snapshot gives an empty array.
+ * Detect possible fake urgency in one snapshot. A value that is not a usable
+ * snapshot gives an empty array. An unexpected exception propagates; the
+ * registry reports it (requirement 6.1).
  */
 export function detectFakeUrgency(snapshot: PageSnapshot): Finding[] {
-  try {
-    const pair = buildSamplePair(snapshot);
-    const detectedAt = detectedAtFrom(snapshot);
-    const ctx: Context = {
-      pair,
-      detectedMs: detectedAt.ms,
-      detectedIso: detectedAt.iso,
-      stable: new Map<IndexedElement, Stable>(),
-    };
+  const pair = buildSamplePair(snapshot);
+  const detectedAt = detectedAtFrom(snapshot);
+  const ctx: Context = {
+    pair,
+    detectedMs: detectedAt.ms,
+    detectedIso: detectedAt.iso,
+    stable: new Map<IndexedElement, Stable>(),
+  };
 
-    const candidates: Candidate[] = [];
-    for (const el of pair.first.elements) {
-      const candidate = analyse(ctx, el);
-      if (candidate !== null) candidates.push(candidate);
-    }
-
-    const drafts = keepDeepest(ctx, candidates).map((c) => c.draft);
-    return finaliseFindings(drafts, {
-      detectedAt,
-      pageTruncated: pair.first.captureTruncated || pair.first.budgetHit,
-    });
-  } catch {
-    return [];
+  const candidates: Candidate[] = [];
+  for (const el of pair.first.elements) {
+    const candidate = analyse(ctx, el);
+    if (candidate !== null) candidates.push(candidate);
   }
+
+  const drafts = keepDeepest(ctx, candidates).map((c) => c.draft);
+  return finaliseFindings(drafts, {
+    detectedAt,
+    pageTruncated: pair.first.captureTruncated || pair.first.budgetHit,
+  });
 }
