@@ -37,39 +37,86 @@ export type BoundingBox = z.infer<typeof BoundingBoxSchema>;
 
 export const ElementSnapshotSchema = z.object({
   /** Stable synthetic id assigned by the extractor (not the HTML id attribute). */
-  id: z.string(),
-  tag: z.string(),
-  role: z.string().optional(),
+  id: z.string().max(2_048),
+  tag: z.string().max(64),
+  role: z.string().max(64).optional(),
   /** Visible text content of the element. */
-  text: z.string().optional(),
+  text: z.string().max(1_000).optional(),
   boundingBox: BoundingBoxSchema,
   // Computed style fields (always strings, as returned by getComputedStyle)
-  color: z.string(),
-  backgroundColor: z.string(),
-  fontSize: z.string(),
-  opacity: z.string(),
-  display: z.string(),
-  visibility: z.string(),
-  position: z.string(),
+  color: z.string().max(64),
+  backgroundColor: z.string().max(64),
+  fontSize: z.string().max(64),
+  opacity: z.string().max(64),
+  display: z.string().max(64),
+  visibility: z.string().max(64),
+  position: z.string().max(64),
   // Form state
   checked: z.boolean(),
   selected: z.boolean(),
+  // Capture extensions (page-capture spec). All optional: old snapshots stay valid.
+  /** Allow-listed HTML attributes, each value length-capped by the extractor. Untrusted page data. */
+  attributes: z
+    .record(z.string().max(64), z.string().max(200))
+    .refine((value) => Object.keys(value).length <= 32, "At most 32 attributes")
+    .optional(),
+  /** True when `text` was cut at the extractor's text cap. */
+  textTruncated: z.boolean().optional(),
+  /** True when no screenshot image covers any part of the element's box. */
+  outsideImage: z.boolean().optional(),
 });
 
 export type ElementSnapshot = z.infer<typeof ElementSnapshotSchema>;
+
+// ── CaptureMeta ────────────────────────────────────────────────────────────
+// Page-capture metadata: how the sample and its screenshot images were read.
+// The limits are literals: lib/types must not import lib/capture.
+// tests/types/capture-meta.test.ts compares them with the capture constants.
+
+export const CaptureMetaSchema = z.object({
+  devicePixelRatio: z.number().positive().max(16),
+  /** Layout width in CSS px used for the read and the single image. Absent on older snapshots. */
+  layoutWidth: z.number().positive().max(100_000).optional(),
+  scrollX: z.number(),
+  scrollY: z.number(),
+  eligibleElementCount: z.number().int().nonnegative().max(10_000_000),
+  elementsTruncated: z.boolean(),
+  /** True for the lighter sample read after a reload. */
+  light: z.boolean(),
+  /** Absent on samples without a screenshot (the reload sample). */
+  images: z
+    .object({
+      mode: z.enum(["single", "tiled"]),
+      truncated: z.boolean(),
+      items: z
+        .array(
+          z.object({
+            offsetY: z.number().nonnegative(),
+            width: z.number().int().positive(),
+            height: z.number().int().positive(),
+          })
+        )
+        .min(1)
+        .max(10),
+    })
+    .optional(),
+});
+
+export type CaptureMeta = z.infer<typeof CaptureMetaSchema>;
 
 // ── BaseSnapshot ───────────────────────────────────────────────────────────
 // Flat, non-recursive single-load capture record.
 
 export const BaseSnapshotSchema = z.object({
-  url: z.string(),
+  url: z.string().max(8_192),
   capturedAt: z.iso.datetime(), // ISO-8601 datetime string
   viewportWidth: z.number(),
   viewportHeight: z.number(),
   fullWidth: z.number(),
   fullHeight: z.number(),
-  elements: z.array(ElementSnapshotSchema),
+  elements: z.array(ElementSnapshotSchema).max(1_500),
   screenshotRef: z.string().optional(),
+  capture: CaptureMetaSchema.optional(),
 });
 
 export type BaseSnapshot = z.infer<typeof BaseSnapshotSchema>;

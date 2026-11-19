@@ -1,5 +1,7 @@
 # Requirements: Page Capture
 
+> Note: this spec is partly superseded by `page-capture-fixes`, see "Superseded criteria of page-capture" in `.kiro/specs/page-capture-fixes/design.md`.
+
 ## Out of scope
 
 - An HTTP route, `maxDuration`, and the `/api/scan` handler.
@@ -153,7 +155,7 @@
 10.8. WHEN the text of an element exceeds the text cap THE SYSTEM SHALL cut it at the cap and set `textTruncated` on that element.
 10.9. WHEN the text of an element is read THE SYSTEM SHALL collapse whitespace and use the own text nodes for plain text elements and the visible text of the subtree for controls, links, labels, summaries and role elements.
 10.10. WHEN an element is collected THE SYSTEM SHALL give it the id `el-` followed by its element-child indices from `<html>` joined by `-`, so the same element has the same id in the first and the reload sample while the DOM is unchanged.
-10.11. WHEN an element is collected THE SYSTEM SHALL record `attributes` limited to `disabled`, every `aria-*`, `data-testid`, `type`, `name`, `href`, `for`, `placeholder` and `value`, each cut at 200 characters.
+10.11. WHEN an element is collected THE SYSTEM SHALL record `attributes` limited to `disabled`, every `aria-*`, `type`, `name`, `href`, `for`, `placeholder` and `value`, each cut at 200 characters.
 10.12. WHEN an element is not a checkbox, radio, submit, button or reset input, a `button` or an `option` THE SYSTEM SHALL omit its `value`.
 10.13. WHEN an element is collected THE SYSTEM SHALL record the seven computed-style strings named by `ElementSnapshotSchema`, `checked` and `selected`.
 
@@ -198,7 +200,7 @@
 13.1. WHEN the first sample and the screenshots are done and at least 12 s of the whole-capture budget remain THE SYSTEM SHALL reload the page in the same session.
 13.2. WHEN fewer than 12 s remain THE SYSTEM SHALL skip the reload and add the warning `reload-skipped`.
 13.3. WHEN the reload finishes THE SYSTEM SHALL wait the settle delay before reading.
-13.4. WHEN the reload sample is read THE SYSTEM SHALL use a cap of 750 elements, a text cap of 120 characters and only the attributes `type`, `name`, `disabled` and `data-testid`, and every field required by the schema SHALL still be present.
+13.4. WHEN the reload sample is read THE SYSTEM SHALL use a cap of 750 elements, a text cap of 120 characters and only the attributes `type`, `name` and `disabled`, and every field required by the schema SHALL still be present.
 13.5. WHEN the reload sample is read THE SYSTEM SHALL not take a screenshot.
 13.6. WHEN the reload sample is stored THE SYSTEM SHALL put it in `afterReload` and leave `secondSample` unset.
 13.7. WHEN the reload navigates THE SYSTEM SHALL limit it to the smaller of 15 s and the remaining budget.

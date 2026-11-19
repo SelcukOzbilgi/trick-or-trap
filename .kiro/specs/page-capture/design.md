@@ -1,5 +1,7 @@
 # Design: Page Capture
 
+> Note: this spec is partly superseded by `page-capture-fixes`, see "Superseded criteria of page-capture" in `.kiro/specs/page-capture-fixes/design.md`.
+
 `page-capture` is a server-only library in `lib/capture/`. Its entry point, `capturePage(url, deps?)`, checks the URL, opens a Browser Use Cloud browser over CDP, reads the page once, takes screenshots from the same load (one image, or viewport tiles for tall pages), reloads for a second lighter read, stops the session, and returns a validated `PageSnapshot` plus the images. It has no route, no UI, no detectors and no storage.
 
 ## Experiment findings
@@ -313,7 +315,7 @@ capture: CaptureMetaSchema.optional(),
 
 | Field | On | Why |
 |---|---|---|
-| `attributes` | `ElementSnapshot` | Detectors need `disabled`, `aria-*`, `data-testid`, `type`, `name`, `href`, `for`, `placeholder`, `value` and the schema has no place for them |
+| `attributes` | `ElementSnapshot` | Detectors need `disabled`, `aria-*`, `type`, `name`, `href`, `for`, `placeholder`, `value` and the schema has no place for them |
 | `textTruncated` | `ElementSnapshot` | A regex over cut text can miss a claim; consumers must know |
 | `outsideImage` | `ElementSnapshot` | Marks boxes below or right of the cropped image so a marker is not pinned in empty space |
 | `capture.devicePixelRatio`, `scrollX`, `scrollY` | `BaseSnapshot` | Randomised per session (finding 4); needed to interpret boxes and screenshot |
@@ -408,7 +410,7 @@ Session creation that is still pending when the whole deadline fires is tracked:
 - The walker counts every eligible element (`eligibleCount`) but stores only the first `maxElements`.
 - `text`: collapsed whitespace. Own text nodes for plain text elements, so a parent does not repeat its children. Visible text (`innerText`) for controls, links, labels, summaries and role elements. Cut at `maxTextChars` with `textTruncated`.
 - `path`: element-child index at each level from `<html>`. The post-processing turns `[1, 0, 3]` into `el-1-0-3`. The path depends only on DOM position, so an unchanged DOM gives the same ids in both samples, whatever the caps are.
-- Attributes, full read: `disabled`, every `aria-*`, `data-testid`, `type`, `name`, `href`, `for`, `placeholder`, `value`. Light read: `type`, `name`, `disabled`, `data-testid`. Each value is cut at `maxAttrChars`. `value` is kept only for `input` of type `checkbox`, `radio`, `submit`, `button`, `reset`, for `button` and for `option`, because a text, password or hidden input can hold user or secret data.
+- Attributes, full read: `disabled`, every `aria-*`, `type`, `name`, `href`, `for`, `placeholder`, `value`. Light read: `type`, `name`, `disabled`. Each value is cut at `maxAttrChars`. `value` is kept only for `input` of type `checkbox`, `radio`, `submit`, `button`, `reset`, for `button` and for `option`, because a text, password or hidden input can hold user or secret data.
 - Style fields come from one `getComputedStyle(el)` call per element. `backgroundColor` is the element's own value; the effective background is a detector concern.
 
 `buildSample(raw, params)` runs outside the page and never trusts it:

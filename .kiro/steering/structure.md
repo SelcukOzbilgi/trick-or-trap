@@ -40,8 +40,25 @@ trick-or-trap/
 │   │   └── index.ts               # PageSnapshot, Finding, Scan – all zod-validated
 │   ├── boo-tique/                 # palette, styles, variants, timers, content, ground-truth schema
 │   ├── capture/
-│   │   ├── browser.ts             # getBrowser() with three modes
-│   │   └── extractor.ts           # page.evaluate script → PageSnapshot
+│   │   ├── browser.ts             # getBrowser() with three modes (only `remote` implemented)
+│   │   ├── extractor.ts           # page.evaluate script → PageSnapshot
+│   │   ├── capture.ts             # capturePage() orchestrator
+│   │   ├── types.ts               # error and warning codes, CaptureResult, CaptureFailure, raw page types
+│   │   ├── constants.ts           # named deadlines and limits
+│   │   ├── redact.ts              # redactText, toDetail
+│   │   ├── clock.ts               # Clock, Deadline, withTimeout
+│   │   ├── config.ts              # env parsing (server-only)
+│   │   ├── ip-ranges.ts           # IP parsing and blocked ranges
+│   │   ├── url-check.ts           # checkUrlSyntax, checkUrl, Resolver
+│   │   ├── resolver.ts            # default DNS Resolver
+│   │   ├── seam.ts                # browser seam interfaces, no Playwright types
+│   │   ├── browser-use-api.ts     # Browser Use create and stop calls
+│   │   ├── remote-browser.ts      # BrowserProvider over CDP; the only file importing playwright-core
+│   │   ├── cdp.ts                 # CdpSession interface, isolated-world calls, page metrics, scrollbars
+│   │   ├── guard-types.ts         # request guard types: GuardVerdict, RequestGuardEvent, RequestPolicy
+│   │   ├── request-guard.ts       # installRequestGuard: CDP Fetch interception, child targets, host limit
+│   │   ├── geometry.ts            # pure maths: boxes, mode choice, tiles, sizes
+│   │   └── screenshots.ts         # captureImages: single or tiled screenshots
 │   ├── detectors/
 │   │   ├── fake-urgency.ts
 │   │   ├── fake-scarcity.ts
@@ -68,7 +85,15 @@ trick-or-trap/
 │   │   ├── preselection.test.ts
 │   │   └── visual-interference.test.ts
 │   ├── capture/
-│   │   └── extractor.test.ts
+│   │   ├── extractor.test.ts
+│   │   ├── collector-dom.test.ts  # collectInPage on real DOM (jsdom)
+│   │   ├── request-guard.test.ts  # real guard against a fake CDP session
+│   │   ├── cdp.test.ts            # isolated world, page metrics, scrollbars
+│   │   ├── capture-guards.test.ts # orchestrator: refused requests, warnings, host cache
+│   │   ├── lib-text-rules.test.ts # no forbidden attribute word under lib/capture, tests and specs
+│   │   ├── helpers/               # fake-browser.ts, manual-clock.ts, fake-cdp.ts, forbidden-attribute.ts
+│   │   ├── remote-capture.test.ts # opt-in live test (RUN_REMOTE_CAPTURE=1), skipped by default
+│   │   └── ...                    # one test file per lib/capture file, plus capture-stop, capture-deadlines, capture-reload
 │   ├── walker/
 │   │   └── walker.test.ts
 │   └── fixtures/
