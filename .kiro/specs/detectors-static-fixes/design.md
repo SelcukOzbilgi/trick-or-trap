@@ -192,11 +192,13 @@ Recorded results (the last task fills this table; do not edit afterwards):
 
 | Evaluation | Printed result | Date |
 |---|---|---|
-| Boo-tique, primary pairs | (not run yet) | |
-| Boo-tique, secondary pairs | (not run yet) | |
-| Hold-out, 28 flag cases | (not run yet; review baseline 18/28) | |
-| Hold-out, 20 honest cases | (not run yet; review baseline 3 false positives) | |
-| Hold-out, 8 extras | (not run yet) | |
+| Boo-tique, primary pairs | Recall 18/19 = 0.95; unplanted findings 0; flow-pattern findings ignored 0; false positives on look-alikes 0. By detector (flag / found / missed / false pos.): fake-urgency 3/2/1/0, fake-scarcity 3/3/0/0, fake-activity 2/2/0/0, confirmshaming 3/3/0/0, preselection 5/5/0/0, visual-interference 3/3/0/0. Only miss: club-timer-session-restart (7.7) | 17:25 local time, calendar date not available to the run |
+| Boo-tique, secondary pairs | Recall 18/19 = 0.95; unplanted findings 0; flow-pattern findings ignored 0; false positives on look-alikes 0. Same per-detector counts as the primary pairs. Only miss: club-timer-session-restart (7.7) | 17:25 local time, calendar date not available to the run |
+| Hold-out, 28 flag cases | Flag cases: 26/28 hits (recall 0.93), 2 of the misses are known misses (scarcity-only-3-split-span, urgency-offer-split-countdown). Review baseline (c21325f): 18/28. Hand-made hold-out of 48 review probes plus extras, not a measure of accuracy on real shops | 17:25 local time, calendar date not available to the run |
+| Hold-out, 20 honest cases | Honest cases: 1/20 false positives (low 1, medium 0, high 0): honest-only-3-same-after-reload [fake-scarcity] low. Review baseline: 3/20 | 17:25 local time, calendar date not available to the run |
+| Hold-out, 8 extras | Extras: flag 1/2 hits (extra-only-2-days-left hit, low; extra-offer-counting-up missed, known miss); honest 0/6 false positives (low 0, medium 0, high 0). Detector errors: 0 | 17:25 local time, calendar date not available to the run |
+
+Task 7 (unseen layers, requirement 11) was not run for this record: the figures above do not include it, and the cookie-banner entries are unchanged by it.
 
 ## 15. Constants
 

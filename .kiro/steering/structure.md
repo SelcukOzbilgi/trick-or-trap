@@ -96,9 +96,12 @@ trick-or-trap/
 │   │   ├── source-rules.test.ts   # no clock, random, locale case, stray regex, hook word or demo terms
 │   │   ├── word-lists.test.ts     # list shape, generality, other languages
 │   │   ├── hostile-input.test.ts  # bounds, invariance and wording on hostile snapshots
+│   │   ├── wording.test.ts        # forbidden words by stem in every finding string, on the Boo-tique and hold-out snapshots
+│   │   ├── detector-errors.test.ts # a throwing detector is reported in `errors`, never swallowed
+│   │   ├── real-world-phrases.test.ts # every list entry occurs in the corpus; corpus texts are found
 │   │   ├── shared/                # one test file per lib/detectors/shared file
-│   │   ├── helpers/               # demo-terms.ts
-│   │   └── eval/                  # Boo-tique harness: helpers/, tree, snapshot-sync, score and boo-tique-eval tests
+│   │   ├── helpers/               # demo-terms.ts, real-world-phrases.ts, row-snapshots.ts
+│   │   └── eval/                  # Boo-tique harness: helpers/, tree, snapshot-sync, score and boo-tique-eval tests; holdout.test.ts, holdout-eval.test.ts and helpers/holdout*.ts (hold-out evaluation)
 │   ├── capture/
 │   │   ├── extractor.test.ts
 │   │   ├── collector-dom.test.ts  # collectInPage on real DOM (jsdom)
@@ -113,6 +116,7 @@ trick-or-trap/
 │   │   └── walker.test.ts
 │   └── fixtures/
 │       ├── boo-tique-ground-truth.json  # copy of docs/research file, canonical pattern ids
+│       ├── real-world-phrases.json      # corpus of real-world wording; every word-list entry must occur in it
 │       └── snapshots/                   # PageSnapshot fixtures per Boo-tique page
 ├── .kiro/
 │   ├── steering/                  # these files

@@ -42,6 +42,11 @@ No code outside `lib/capture` calls Playwright directly. This seam makes the det
 
 Detectors are pure TypeScript functions. Each detector receives a `PageSnapshot` (DOM text, computed styles, element boxes, checkbox states, reload samples) and returns an array of `Finding` objects. `Finding` and `PageSnapshot` are defined in `lib/types` and validated with Zod. Detectors have no side effects and no network calls. `runAllDetectors` in `lib/detectors/all.ts` is the entry point for the six static detectors; it builds a fresh registry on every call, and nothing registers on import. Word lists live in `lib/detectors/data/` (English and Turkish).
 
+- **Generality rule:** list entries are common real-world wording; only demo-specific strings (words that exist only on the Boo-tique) are forbidden. Every list entry must occur in the corpus `tests/fixtures/real-world-phrases.json`, and no entry is added to make a Boo-tique entry pass.
+- **Errors:** the six detectors and `lib/detectors/shared/` contain no `catch`. An exception inside a detector is reported by `runDetectors` (the one place that catches) in `errors`, so a failure is visible and never turns into "no finding".
+- **Stems:** Turkish word forms are matched by stem, with a bounded number of extra characters after the stem (`MAX_STEM_EXTRA_CHARS`, `MIN_STEM_CHARS` in `shared/constants.ts`).
+- **Evaluation:** `tests/detectors/eval/boo-tique-eval.test.ts` is a regression test on the Boo-tique. `tests/detectors/eval/holdout-eval.test.ts` is the generalisation figure: a hand-made hold-out of 48 review probes plus extras, not a measure of accuracy on real shops.
+
 ## LLM judge
 
 One small language model (default: Claude Haiku 5.5; fallback: Gemini 2.5 Flash-Lite) is used for confirmshaming classification and borderline visual-interference cases. It sits behind a `Judge` interface so tests can inject a mock that returns deterministic results without any network call.

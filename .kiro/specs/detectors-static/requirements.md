@@ -400,3 +400,23 @@ It closes two open notes of the foundation-fixes review: detector registration w
 18.4. WHEN the final task runs THE SYSTEM SHALL add to the "Detectors" section of `tech.md` that `runAllDetectors` in `lib/detectors/all.ts` is the entry point, that it builds a fresh registry per call, and where the word lists live.
 18.5. WHEN the final task runs THE SYSTEM SHALL replace the doc comment of `defaultRegistry` in `lib/detectors/index.ts` with one that says nothing registers into it and points to `lib/detectors/all.ts`, changing no export.
 18.6. WHEN the final task runs THE SYSTEM SHALL run `npm run lint` once and report its result.
+
+## Amendments (detectors-static-fixes)
+
+The spec `.kiro/specs/detectors-static-fixes/` amends the items below. Each line says what changed and names the requirement of that spec. No other line of this file changed. Task 7 of that spec (backgrounds behind uncaptured layers, its requirement 11) was not run, so old criteria 13.6 and 13.7 carry no amendment.
+
+- 2.7: a detector still returns an array for odd values and does not throw on them, but an unexpected exception is no longer caught inside the detector. It propagates, and `runDetectors` reports it in `errors` (requirement 6.1, 6.3, 6.9).
+- 2.13: same change as 2.7. A non-finite or negative box number is odd input and gives an array; an exception raised while reading a field is reported in `errors` (requirement 6.3, 6.4, 6.9).
+- 3.12: a word is masked as "[word omitted]" when it is a word of `FORBIDDEN_WORDS` or starts with a forbidden stem plus at most `FORBIDDEN_STEM_EXTRA_MAX` letters, in English and Turkish (requirement 5.1, 5.3, 5.4, 5.9).
+- 3.13: a finding is dropped when a string still holds a whole forbidden word or a word that starts with a forbidden stem (requirement 5.2, 5.7).
+- 3.18: the forbidden-word scan no longer reads the findings of the per-detector unit tests, which cannot be observed from another test file. It reads the findings of one row snapshot per rule row, every Boo-tique variant, every hold-out case and page texts that carry banned words, in `tests/detectors/wording.test.ts` (requirement 5.6, 5.7, 5.8).
+- 7.14: task 7 not run; the criterion is unchanged so far (requirement 11 is open).
+- 8.4: a countdown of the form `units` or `clock2` is "worded" only when the same element holds a countdown cue word; `clock3` keeps the old rule (requirement 7.3, 7.4).
+- 8.18 (rows U1 and U5): the two rows apply to a `units` or `clock2` countdown only with a cue word, and a lone one-letter unit ("5 m", "1 M") or an upper-case unit among several pairs is no countdown (requirement 7.1, 7.2, 7.3, 7.5, 7.11).
+- 9.3: the unquantified scarcity phrases "selling fast" and "almost gone", and the Turkish forms by stem, are in the lists again (requirement 2.1, 2.2, 9.7).
+- 9.4: a qualified stock claim is "supported" by an exclamation mark, a pressure word in the element or its parent, or another scarcity claim on the page. A number of at most `LOW_STOCK_MAX` no longer counts; the constant stays defined and pinned but no rule uses it (requirement 8.1, 8.2, 8.5).
+- 10.2: the purchase entries with "az önce" ("@'dan @ az önce satın aldı", "@'den @ az önce satın aldı") and the timed English purchase templates ("@ in @ purchased" and the like, with a time word in the same element) are restored (requirement 2.4, 2.5, 10.1, 10.2).
+- 14.8: replaced. New rule, quoted from requirement 3.1 of the fixes spec: "WHEN the generality test runs THE SYSTEM SHALL find that no list entry holds a word of `DEMO_TERMS`, that no entry is longer than `MAX_PHRASE_TOKENS` elements as counted by `compilePhrases`, and that every entry of a word or phrase list occurs, after `normaliseText`, in at least one text of `tests/fixtures/real-world-phrases.json`." An entry may equal or contain a planted Boo-tique text (requirement 3.1, 3.2, 3.3).
+- New 14.10: WHEN a list entry would exceed `MAX_PHRASE_TOKENS` elements it is shortened only from its start or its end, never by removing an inner word (requirement 2.7, 2.8).
+- 17.6: the club timer entry `club-timer-session-restart` is an accepted miss. "Join in 09:59 for 20% off" holds no countdown cue, so its text-only U5 hit is gone and the Boo-tique result is 18 of 19 (requirement 7.7, 12.3).
+- New 17.19: the hold-out evaluation (`tests/detectors/eval/holdout-eval.test.ts`) runs the 28 flag cases, the 20 honest cases and the extras, prints a table and asserts only that every case ran without a detector error, the case counts, and a sanity floor of recall at least 0.5 over the 28 flag cases; there is no assertion about false positives (requirement 4.5, 4.6, 12.11).

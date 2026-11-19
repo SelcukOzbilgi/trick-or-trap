@@ -180,3 +180,9 @@ Rules for every task:
   - [x] 16.4 In `lib/detectors/index.ts`, replace only the doc comment above `defaultRegistry` with: nothing registers into it; the static detectors run through `runAllDetectors` in `lib/detectors/all.ts`. Change no code and no export.
   - [x] 16.5 Run `npx vitest run tests/detectors/registry.test.ts --maxWorkers=2`, `npx vitest run tests/detectors/all.test.ts --maxWorkers=2`, `npx vitest run tests/detectors/source-rules.test.ts --maxWorkers=2`, `npx tsc --noEmit`, then `npm run lint` once; fix lint findings only in files this spec created, and report the result.
   _Requirements: 4.9, 18.1, 18.2, 18.3, 18.4, 18.5, 18.6_
+
+## Amendments (detectors-static-fixes)
+
+The spec `.kiro/specs/detectors-static-fixes/` amends the item below. No other line of this file changed.
+
+- Task 12.3 (`tests/detectors/word-lists.test.ts`): the rule "no normalised entry equals or contains a normalised text of `plantedTexts()`" is replaced by the corpus check of requirement 3.1 of the fixes spec: every entry of a word or phrase list occurs in at least one text of `tests/fixtures/real-world-phrases.json`, no entry holds a `DEMO_TERMS` word, and no entry is longer than `MAX_PHRASE_TOKENS` elements as counted by `compilePhrases`. `GENERIC_CONTROL_LABELS` and its exemption tests are removed (requirement 3.1, 3.3, 3.4).
