@@ -11,4 +11,4 @@ inclusion: always
 - Pull requests are merged with a merge commit, never squashed or rebased. The owner merges; the branch is deleted on merge.
 - Issues: one per remaining spec (label `spec`) plus real defects (label `bug`). Reference an issue with `Refs #N`, and close it with `Closes #N` only in the pull request that finishes it.
 - Security reports never go in a public issue; they use private vulnerability reporting (see `SECURITY.md`).
-- Files under `.github/`, `.githooks/`, `.kiro/hooks/`, `.kiro/agents/`, `.gitleaks.toml` and `SECURITY.md` are not written by Kiro; the driver writes them and says so in the commit body.
+- Kiro does not write these; the driver does, and says so in the commit body: `.github/`, `.githooks/`, `.kiro/hooks/`, `.kiro/agents/`, `scripts/enable-hooks.mjs`, `scripts/kiro-related-tests.mjs`, `.gitleaks.toml` and `SECURITY.md`.
