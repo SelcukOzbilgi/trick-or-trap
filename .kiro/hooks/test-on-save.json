@@ -1,0 +1,13 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run related tests after a source save",
+      "description": "When Kiro saves a source file under lib/ or components/, run only the vitest files that import it.",
+      "trigger": "PostFileSave",
+      "matcher": "(^|/)(lib|components)/.+\\.tsx?$",
+      "action": { "type": "command", "command": "node scripts/kiro-related-tests.mjs" },
+      "timeout": 120
+    }
+  ]
+}
