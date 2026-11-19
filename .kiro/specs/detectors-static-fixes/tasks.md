@@ -87,6 +87,7 @@ Rules for every task:
   - [ ] 7.1 Tests first: `colour.test.ts` cases for `unseen` (gap between element and opaque ancestor; no opaque ancestor with an uncaptured wrapper; adjacent parent is not unseen; own opaque background is not unseen; null path is not unseen); `visual-interference.test.ts` cases for the dark banner (requirement 11.4), the two-measure pair under a gap (11.5) and a transparent button decline versus a transparent link decline (11.3). Run them; they fail.
   - [ ] 7.2 Implement `unseen` and the null contrast; add the explicit guard in the detector where a measure is computed another way; implement the button rule for "filled versus transparent".
   - [ ] 7.3 Run the five test files. If a Boo-tique entry changes row or becomes a miss, add the entry to `ACCEPTED_MISSES` only if it is a miss, with a comment naming 11.1; if the floor of 16 of 19 then fails, stop and report; tune nothing (requirement 11.7). Then `npx tsc --noEmit`.
+  - Note (second independent review): it found the dark-banner false positive; the new hold-out case `extra-dark-banner-with-sentence-uncaptured-wrapper` documents it (listed in `KNOWN_FALSE_POSITIVES`); the case `extra-dark-banner-with-sentence-equal-weight` is clean. This task stays unrun and must be done before the public scan route.
   _Requirements: 1.11, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 12.3, 12.4_
 
 - [x] 8. Hold-out evaluation

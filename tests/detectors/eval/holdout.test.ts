@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { PageSnapshotSchema } from "@/lib/types";
 import type { Confidence, Finding, PatternId } from "@/lib/types";
-import { HOLDOUT_CASES } from "@/tests/detectors/eval/helpers/holdout-cases";
+import { HOLDOUT_CASES, KNOWN_FALSE_POSITIVES } from "@/tests/detectors/eval/helpers/holdout-cases";
 import type { HoldoutCase } from "@/tests/detectors/eval/helpers/holdout-cases";
 import {
   REVIEW_BASELINE_LINE,
@@ -81,6 +81,9 @@ const EXTRA_TEXTS: readonly string[] = [
   "Accept all / Reject all",
   "Only 2 days left",
   "Offer ends in 02:14:33",
+  // Requirement 4.2 and the second review: the two banner cases with a sentence.
+  "We use cookies to improve your experience. Accept all / Reject all",
+  "We use cookies to improve your experience. Accept all / Reject all",
 ];
 
 const SHAPES: readonly string[] = [
@@ -131,11 +134,12 @@ function emptyRun(c: HoldoutCase): CaseRun {
 }
 
 describe("hold-out case table (4.1, 4.2)", () => {
-  it("has 28 flag cases, 20 honest cases and 8 extras", () => {
+  // Requirement 4.2 and the second review: 8 extras and 56 cases became 10 and 58.
+  it("has 28 flag cases, 20 honest cases and 10 extras", () => {
     expect(group("flag")).toHaveLength(28);
     expect(group("honest")).toHaveLength(20);
-    expect(group("extra")).toHaveLength(8);
-    expect(HOLDOUT_CASES).toHaveLength(56);
+    expect(group("extra")).toHaveLength(10);
+    expect(HOLDOUT_CASES).toHaveLength(58);
   });
 
   it("has unique ids", () => {
@@ -163,9 +167,35 @@ describe("hold-out case table (4.1, 4.2)", () => {
     expect(count("preselection")).toBe(4);
   });
 
-  it("has two flag extras and six honest extras", () => {
+  it("has two flag extras and eight honest extras", () => {
     expect(group("extra").filter((c) => c.pattern !== undefined)).toHaveLength(2);
-    expect(group("extra").filter((c) => c.pattern === undefined)).toHaveLength(6);
+    expect(group("extra").filter((c) => c.pattern === undefined)).toHaveLength(8);
+  });
+
+  it("lists only honest extras in KNOWN_FALSE_POSITIVES, each once and each an existing case", () => {
+    expect(new Set(KNOWN_FALSE_POSITIVES).size).toBe(KNOWN_FALSE_POSITIVES.length);
+    for (const id of KNOWN_FALSE_POSITIVES) {
+      const c = caseById(id);
+      expect(c.group, id).toBe("extra");
+      expect(c.pattern, id).toBeUndefined();
+    }
+  });
+
+  it("gives the two banner cases the sentence as a captured text element inside the banner", () => {
+    for (const id of [
+      "extra-dark-banner-with-sentence-equal-weight",
+      "extra-dark-banner-with-sentence-uncaptured-wrapper",
+    ]) {
+      const { snapshot } = buildHoldoutSnapshot(caseById(id));
+      expect(snapshot.elements.map((e) => e.text), id).toContain("We use cookies to improve your experience.");
+    }
+  });
+
+  it("leaves the first two banner cases without a sentence", () => {
+    for (const id of ["honest-banner-equal-style", "extra-dark-banner"]) {
+      const texts = buildHoldoutSnapshot(caseById(id)).snapshot.elements.map((e) => e.text);
+      expect(texts, id).toEqual(["Accept all", "Reject all"]);
+    }
   });
 
   it("uses only the named markup shapes and the two languages", () => {
@@ -384,5 +414,100 @@ describe("formatHoldoutTable (4.5)", () => {
     expect(table).toContain("Flag cases");
     expect(table).toContain("Honest cases");
     expect(table).toContain("Extras");
+  });
+});
+
+describe("known false positives (second review, open under task 7)", () => {
+  const listed = caseById("extra-dark-banner-with-sentence-uncaptured-wrapper");
+  const clean = caseById("extra-dark-banner-with-sentence-equal-weight");
+  const ordinary = caseById("extra-video-under-sale");
+  const knownList = [listed.id];
+
+  it("reports a listed case with a finding as a known false positive, apart from the ordinary ones", () => {
+    const score = scoreHoldout(
+      [listed, clean, ordinary],
+      [
+        runOf(listed, (id) => [finding("visual-interference", "medium", [id])]),
+        emptyRun(clean),
+        runOf(ordinary, (id) => [finding("fake-urgency", "low", [id])]),
+      ],
+      knownList
+    );
+    expect(score.extraHonest.knownFalsePositiveIds).toEqual([listed.id]);
+    expect(score.extraHonest.knownByConfidence).toEqual({ low: 0, medium: 1, high: 0 });
+    expect(score.extraHonest.staleKnownIds).toEqual([]);
+    // The ordinary false positive count does not include the known one.
+    expect(score.extraHonest.falsePositiveIds).toEqual([ordinary.id]);
+    expect(score.extraHonest.byConfidence).toEqual({ low: 1, medium: 0, high: 0 });
+    expect(score.extraHonest.total).toBe(3);
+    expect(score.extraHonest.knownTotal).toBe(1);
+  });
+
+  it("is an error when a listed case has no finding", () => {
+    const score = scoreHoldout([listed, clean], [emptyRun(listed), emptyRun(clean)], knownList);
+    expect(score.extraHonest.staleKnownIds).toEqual([listed.id]);
+    expect(score.extraHonest.knownFalsePositiveIds).toEqual([]);
+    // It is not counted as an ordinary false positive either, and not as a clean case in the denominator.
+    expect(score.extraHonest.falsePositiveIds).toEqual([]);
+    expect(score.extraHonest.knownTotal).toBe(1);
+  });
+
+  it("leaves a case that is not listed as an ordinary false positive", () => {
+    const score = scoreHoldout(
+      [listed],
+      [runOf(listed, (id) => [finding("visual-interference", "medium", [id])])],
+      []
+    );
+    expect(score.extraHonest.falsePositiveIds).toEqual([listed.id]);
+    expect(score.extraHonest.knownFalsePositiveIds).toEqual([]);
+    expect(score.extraHonest.knownTotal).toBe(0);
+  });
+
+  it("uses KNOWN_FALSE_POSITIVES by default", () => {
+    const cases = KNOWN_FALSE_POSITIVES.map(caseById);
+    const score = scoreHoldout(
+      cases,
+      cases.map((c) => runOf(c, (id) => [finding("visual-interference", "medium", [id])]))
+    );
+    expect(score.extraHonest.knownFalsePositiveIds).toEqual([...KNOWN_FALSE_POSITIVES]);
+    expect(score.extraHonest.falsePositiveIds).toEqual([]);
+  });
+
+  it("marks a known false positive in the table and reports it on its own line", () => {
+    const score = scoreHoldout(
+      [listed, clean, ordinary],
+      [
+        runOf(listed, (id) => [finding("visual-interference", "medium", [id])]),
+        emptyRun(clean),
+        runOf(ordinary, (id) => [finding("fake-urgency", "low", [id])]),
+      ],
+      knownList
+    );
+    const table = formatHoldoutTable(score);
+    const lines = table.split("\n");
+    const caseLine = lines.find((l) => l.includes(listed.id));
+    expect(caseLine).toContain("FP (known, task 7)");
+    expect(caseLine).toContain("medium confidence");
+    const summary = lines.find((l) => l.startsWith("Known false positives"));
+    expect(summary).toContain("1/1 listed cases flagged");
+    expect(summary).toContain("never counted as clean");
+    // The ordinary line counts only the ordinary false positive, over the cases not in the list.
+    expect(table).toContain("honest 1/2 false positives (low 1, medium 0, high 0)");
+    // The clean case stays clean.
+    expect(lines.find((l) => l.includes(clean.id))).toMatch(/^ {2}ok /);
+  });
+
+  it("prints an error line for a listed case without a finding", () => {
+    const score = scoreHoldout([listed], [emptyRun(listed)], knownList);
+    const table = formatHoldoutTable(score);
+    expect(table).toContain("ERROR");
+    expect(table).toContain("update KNOWN_FALSE_POSITIVES");
+    expect(table).toContain(`ERROR, listed but no finding: ${listed.id}`);
+    expect(table).not.toMatch(new RegExp(`^ {2}ok {4}${listed.id}`, "m"));
+  });
+
+  it("prints no known-false-positive line when the list has no case in the scored cases", () => {
+    const score = scoreHoldout([ordinary], [emptyRun(ordinary)], knownList);
+    expect(formatHoldoutTable(score)).not.toContain("Known false positives");
   });
 });

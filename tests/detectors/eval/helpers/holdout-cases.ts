@@ -3,7 +3,8 @@ import type { PageNode } from "@/tests/detectors/eval/helpers/tree";
 
 /**
  * The hold-out case table (requirement 4, design section 13): 28 flag cases, 20 honest
- * look-alikes and 8 extras, written once and never changed because of a result (4.7).
+ * look-alikes and 10 extras (8 first written, 2 banner cases added after the second review),
+ * written once and never changed because of a result (4.7).
  *
  * Texts are written as the extractor delivers them: the own text of an element only.
  * Every page is a `body` with the case's elements and, where a control needs one, a
@@ -153,24 +154,33 @@ function radioGroupPage(meta: Meta, text: string): HoldoutCase {
 
 const BUTTON_BOX = { width: 160, height: 40 };
 
+/** The banner sentence of the two cases added after the second review. Fixed once, never changed. */
+const BANNER_SENTENCE = "We use cookies to improve your experience.";
+
 /** An accept and a reject button under a container without own text. */
 function bannerPage(
   meta: Meta,
   accept: { style: PageNode["style"] },
   reject: { style: PageNode["style"] },
-  container: PageNode["style"]
+  container: PageNode["style"],
+  /** A banner sentence, captured as its own text element before the two buttons. */
+  sentence?: string
 ): HoldoutCase {
+  const buttons: PageNode[] = [
+    button("Accept all", NODE, { style: { ...accept.style, fontSize: 16 }, box: { x: 0, ...BUTTON_BOX } }),
+    button("Reject all", "reject", { style: { ...reject.style, fontSize: 16 }, box: { x: 180, ...BUTTON_BOX } }),
+  ];
   return {
     ...meta,
     shape: "banner",
-    text: "Accept all / Reject all",
+    text: sentence === undefined ? "Accept all / Reject all" : `${sentence} Accept all / Reject all`,
     first: body({
       tag: "div",
       style: container,
-      children: [
-        button("Accept all", NODE, { style: { ...accept.style, fontSize: 16 }, box: { x: 0, ...BUTTON_BOX } }),
-        button("Reject all", "reject", { style: { ...reject.style, fontSize: 16 }, box: { x: 180, ...BUTTON_BOX } }),
-      ],
+      children:
+        sentence === undefined
+          ? buttons
+          : [{ tag: "p", key: "sentence", text: sentence, style: { color: "#ffffff" } }, ...buttons],
     }),
     node: NODE,
   };
@@ -301,7 +311,7 @@ const HONEST_CASES: readonly HoldoutCase[] = [
   single(honest("honest-free-returns", "en"), "Free returns within 30 days"),
 ];
 
-// ── The 8 extras ────────────────────────────────────────────────────────────
+// ── The extras ──────────────────────────────────────────────────────────────
 
 const EXTRA_CASES: readonly HoldoutCase[] = [
   {
@@ -346,6 +356,47 @@ const EXTRA_CASES: readonly HoldoutCase[] = [
     ...reloadPair(extra("extra-offer-counting-up", "en", "fake-urgency"), "Offer ends in 02:14:33", "Offer ends in 02:14:40"),
     knownMiss: COUNTING_UP_MISS,
   },
+  // Two more honest dark cookie banners, added after the second independent review (requirement
+  // 4.2, fix (a)). The first two banner cases above have no banner sentence, so the detector never
+  // compared their two buttons and their "0 false positives" is empty. These two carry the
+  // sentence as a captured text element inside the banner container. Wording fixed once before
+  // the first run and never changed. Nothing here is tuned to a result.
+  //   - equal weight: both buttons have the same style and size on a dark container;
+  //   - uncaptured wrapper: the same look as `extra-dark-banner` (filled light accept button,
+  //     transparent reject button with light text, equal boxes) on a dark container without own text.
+  // See `KNOWN_FALSE_POSITIVES` for which of them the detectors flag.
+  bannerPage(
+    extra("extra-dark-banner-with-sentence-equal-weight", "en"),
+    { style: { backgroundColor: "#ffffff", color: "#111111" } },
+    { style: { backgroundColor: "#ffffff", color: "#111111" } },
+    { position: "fixed", backgroundColor: "#111111" },
+    BANNER_SENTENCE
+  ),
+  bannerPage(
+    extra("extra-dark-banner-with-sentence-uncaptured-wrapper", "en"),
+    { style: { backgroundColor: "#ffffff", color: "#111111" } },
+    { style: { backgroundColor: "transparent", color: "#ffffff" } },
+    { position: "fixed", backgroundColor: "#111111" },
+    BANNER_SENTENCE
+  ),
+];
+
+/**
+ * Honest hold-out cases that the detectors are known to flag today (second independent review).
+ * Each id is an honest dark cookie banner on an uncaptured dark wrapper: the detector cannot see
+ * the wrapper's background, so it measures the transparent reject button against an assumed white
+ * page and reports a visual-interference finding on an honest banner. The fix is task 7 of
+ * `.kiro/specs/detectors-static-fixes/tasks.md` (unseen layers behind uncaptured wrappers,
+ * requirement 11), which has NOT been run. These cases are never counted as clean. When one stops
+ * producing a false positive (for example because task 7 is done), `holdout-eval.test.ts` fails and
+ * the entry must be removed from this list.
+ *
+ * `extra-dark-banner-with-sentence-equal-weight` is not listed: its two buttons have the same
+ * style and size, so the detector skips the pair and the case is clean.
+ */
+export const KNOWN_FALSE_POSITIVES: readonly string[] = [
+  // Open under task 7 of detectors-static-fixes (requirement 11).
+  "extra-dark-banner-with-sentence-uncaptured-wrapper",
 ];
 
 export const HOLDOUT_CASES: readonly HoldoutCase[] = [...FLAG_CASES, ...HONEST_CASES, ...EXTRA_CASES];

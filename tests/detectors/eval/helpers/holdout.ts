@@ -1,7 +1,7 @@
 import { runAllDetectors } from "@/lib/detectors/all";
 import { PageSnapshotSchema } from "@/lib/types";
 import type { Confidence, Finding, PageSnapshot, PatternId } from "@/lib/types";
-import { HOLDOUT_CASES } from "@/tests/detectors/eval/helpers/holdout-cases";
+import { HOLDOUT_CASES, KNOWN_FALSE_POSITIVES } from "@/tests/detectors/eval/helpers/holdout-cases";
 import type { HoldoutCase } from "@/tests/detectors/eval/helpers/holdout-cases";
 import { toLightSample } from "@/tests/detectors/eval/helpers/light";
 import { assertNoTestHooks } from "@/tests/detectors/eval/helpers/no-hooks";
@@ -88,8 +88,10 @@ export type CaseOutcome = {
   readonly pattern?: PatternId;
   /** Flag cases: a finding with the pattern touches the node or a child. */
   readonly hit: boolean;
-  /** Honest cases: any finding touches the page. */
+  /** Honest cases: any finding touches the page. Includes the cases of `KNOWN_FALSE_POSITIVES`. */
   readonly falsePositive: boolean;
+  /** True when the case id is in the known-false-positive list (open under task 7). */
+  readonly known: boolean;
   /** Highest confidence among the findings that count for this case. */
   readonly confidence?: Confidence;
   /** Patterns of the findings that touched an honest case. */
@@ -107,9 +109,20 @@ export type FlagScore = {
 };
 
 export type HonestScore = {
+  /** Every honest case of the group, listed known false positives included. */
   readonly total: number;
+  /** Ordinary false positives: honest cases with a finding that are not in the known list. */
   readonly falsePositiveIds: readonly string[];
+  /** Confidence split of the ordinary false positives only. */
   readonly byConfidence: Readonly<Record<Confidence, number>>;
+  /** Honest cases of this group that are in the known list, flagged or not. */
+  readonly knownTotal: number;
+  /** Known-list cases that still produce a finding. Never counted as clean, never in `falsePositiveIds`. */
+  readonly knownFalsePositiveIds: readonly string[];
+  /** Confidence split of the known false positives. */
+  readonly knownByConfidence: Readonly<Record<Confidence, number>>;
+  /** Known-list cases that no longer produce a finding. This is an error: the list must be updated. */
+  readonly staleKnownIds: readonly string[];
 };
 
 export type HoldoutScore = {
@@ -122,8 +135,14 @@ export type HoldoutScore = {
   readonly errorCount: number;
 };
 
-function outcomeOf(c: HoldoutCase, run: CaseRun): CaseOutcome {
-  const base = { id: c.id, group: c.group, text: c.text, ...(c.knownMiss !== undefined ? { knownMiss: c.knownMiss } : {}) };
+function outcomeOf(c: HoldoutCase, run: CaseRun, knownIds: ReadonlySet<string>): CaseOutcome {
+  const base = {
+    id: c.id,
+    group: c.group,
+    text: c.text,
+    known: c.pattern === undefined && knownIds.has(c.id),
+    ...(c.knownMiss !== undefined ? { knownMiss: c.knownMiss } : {}),
+  };
   if (c.pattern !== undefined) {
     const nodeId = run.keyToId.get(c.node);
     if (nodeId === undefined) throw new Error(`Case ${c.id} has no node "${c.node}".`);
@@ -168,23 +187,47 @@ function flagScore(outcomes: readonly CaseOutcome[]): FlagScore {
   };
 }
 
-function honestScore(outcomes: readonly CaseOutcome[]): HonestScore {
-  const honest = outcomes.filter((o) => o.expected === "no-flag");
-  const positives = honest.filter((o) => o.falsePositive);
-  const byConfidence: Record<Confidence, number> = { low: 0, medium: 0, high: 0 };
-  for (const o of positives) {
-    if (o.confidence !== undefined) byConfidence[o.confidence]++;
+function confidenceSplit(outcomes: readonly CaseOutcome[]): Record<Confidence, number> {
+  const by: Record<Confidence, number> = { low: 0, medium: 0, high: 0 };
+  for (const o of outcomes) {
+    if (o.confidence !== undefined) by[o.confidence]++;
   }
-  return { total: honest.length, falsePositiveIds: positives.map((o) => o.id), byConfidence };
+  return by;
 }
 
-/** Scores the runs against the cases. Throws when a case has no run. */
-export function scoreHoldout(cases: readonly HoldoutCase[], runs: readonly CaseRun[]): HoldoutScore {
+function honestScore(outcomes: readonly CaseOutcome[]): HonestScore {
+  const honest = outcomes.filter((o) => o.expected === "no-flag");
+  const ordinary = honest.filter((o) => o.falsePositive && !o.known);
+  const knownFlagged = honest.filter((o) => o.falsePositive && o.known);
+  const stale = honest.filter((o) => !o.falsePositive && o.known);
+  return {
+    total: honest.length,
+    falsePositiveIds: ordinary.map((o) => o.id),
+    byConfidence: confidenceSplit(ordinary),
+    knownTotal: knownFlagged.length + stale.length,
+    knownFalsePositiveIds: knownFlagged.map((o) => o.id),
+    knownByConfidence: confidenceSplit(knownFlagged),
+    staleKnownIds: stale.map((o) => o.id),
+  };
+}
+
+/**
+ * Scores the runs against the cases. Throws when a case has no run. `knownFalsePositives` are
+ * honest cases that are expected to be flagged today (second review, open under task 7): they are
+ * scored apart from the ordinary false positives and never counted as clean. A listed case that
+ * has no finding is reported in `staleKnownIds`.
+ */
+export function scoreHoldout(
+  cases: readonly HoldoutCase[],
+  runs: readonly CaseRun[],
+  knownFalsePositives: readonly string[] = KNOWN_FALSE_POSITIVES
+): HoldoutScore {
   const byId = new Map(runs.map((run) => [run.caseId, run] as const));
+  const knownIds = new Set(knownFalsePositives);
   const outcomes = cases.map((c) => {
     const run = byId.get(c.id);
     if (run === undefined) throw new Error(`No run for hold-out case ${c.id}.`);
-    return outcomeOf(c, run);
+    return outcomeOf(c, run, knownIds);
   });
   const ofGroup = (group: HoldoutCase["group"]) => outcomes.filter((o) => o.group === group);
   const extras = ofGroup("extra");
@@ -206,13 +249,31 @@ function flagLine(o: CaseOutcome): string {
   return `  MISS  ${o.id} [${o.pattern}]${reason}: ${o.text}`;
 }
 
+const KNOWN_FP_LABEL = "FP (known, task 7)";
+
 function honestLine(o: CaseOutcome): string {
+  if (o.known && o.falsePositive) {
+    return `  ${KNOWN_FP_LABEL}  ${o.id} [${o.patterns.join(", ")}] ${o.confidence} confidence: ${o.text}`;
+  }
+  if (o.known) {
+    return `  ERROR known false positive has no finding any more, update KNOWN_FALSE_POSITIVES: ${o.id}: ${o.text}`;
+  }
   if (!o.falsePositive) return `  ok    ${o.id}: ${o.text}`;
   return `  FP    ${o.id} [${o.patterns.join(", ")}] ${o.confidence} confidence: ${o.text}`;
 }
 
 function split(by: Readonly<Record<Confidence, number>>): string {
   return `low ${by.low}, medium ${by.medium}, high ${by.high}`;
+}
+
+/** The own line for the known false positives. Printed only when the list has a case in this group. */
+export function knownFalsePositiveLine(honest: HonestScore): string | undefined {
+  if (honest.knownTotal === 0) return undefined;
+  const base =
+    `Known false positives (open under task 7, requirement 11; listed apart, never counted as clean): ` +
+    `${honest.knownFalsePositiveIds.length}/${honest.knownTotal} listed cases flagged (${split(honest.knownByConfidence)})`;
+  if (honest.staleKnownIds.length === 0) return base;
+  return `${base}; ERROR, listed but no finding: ${honest.staleKnownIds.join(", ")}`;
 }
 
 /** The result table printed by the hold-out test. */
@@ -222,6 +283,7 @@ export function formatHoldoutTable(score: HoldoutScore): string {
   const extras = score.outcomes.filter((o) => o.group === "extra");
   const lines: string[] = [];
   lines.push("Hold-out evaluation (cases are never tuned)");
+  lines.push("A regression figure over the first review's probes, not a generalisation or accuracy figure.");
   lines.push(REVIEW_BASELINE_LINE);
   lines.push("");
   lines.push(
@@ -231,17 +293,21 @@ export function formatHoldoutTable(score: HoldoutScore): string {
   for (const o of flags) lines.push(flagLine(o));
   lines.push("");
   lines.push(
-    `Honest cases: ${score.honest.falsePositiveIds.length}/${score.honest.total} false positives ` +
+    `Honest cases: ${score.honest.falsePositiveIds.length}/${score.honest.total - score.honest.knownTotal} false positives ` +
       `(${split(score.honest.byConfidence)})`
   );
   for (const o of honest) lines.push(honestLine(o));
+  const honestKnown = knownFalsePositiveLine(score.honest);
+  if (honestKnown !== undefined) lines.push(honestKnown);
   lines.push("");
   lines.push(
     `Extras: flag ${score.extraFlag.hits}/${score.extraFlag.total} hits; ` +
-      `honest ${score.extraHonest.falsePositiveIds.length}/${score.extraHonest.total} false positives ` +
-      `(${split(score.extraHonest.byConfidence)})`
+      `honest ${score.extraHonest.falsePositiveIds.length}/${score.extraHonest.total - score.extraHonest.knownTotal} ` +
+      `false positives (${split(score.extraHonest.byConfidence)})`
   );
   for (const o of extras) lines.push(o.expected === "flag" ? flagLine(o) : honestLine(o));
+  const extrasKnown = knownFalsePositiveLine(score.extraHonest);
+  if (extrasKnown !== undefined) lines.push(extrasKnown);
   lines.push("");
   lines.push(`Detector errors: ${score.errorCount}`);
   return lines.join("\n");

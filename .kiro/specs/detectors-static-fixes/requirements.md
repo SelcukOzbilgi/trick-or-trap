@@ -220,4 +220,6 @@ Detectors must generalise to real shops. Word lists hold the phrases that are co
 12.8. WHEN the last task ends THE SYSTEM SHALL run `npm run lint` once and report its result; the owner runs the full suite, `tsc` and the build.
 12.9. WHEN the last task records the results THE SYSTEM SHALL state in its report which Boo-tique entries changed row or confidence compared with the head of the branch (17 of 19 hits, 0 false positives) and why, naming the requirement that caused each change.
 12.10. WHEN any task ends THE SYSTEM SHALL report, in its final message, every criterion it could not meet and every test it changed on purpose, each with its requirement number.
-12.11. WHEN the hold-out result is quoted anywhere THE SYSTEM SHALL name it as a hand-made hold-out of 48 review probes plus extras, not as a measure of accuracy on real shops.
+12.11. WHEN the hold-out result is quoted anywhere THE SYSTEM SHALL name it as a regression figure over the first review's probes (48 probes plus extras, used as targets by the fix round), not as a generalisation figure and not as a measure of accuracy on real shops.
+
+Second review note: the two new banner cases `extra-dark-banner-with-sentence-equal-weight` and `extra-dark-banner-with-sentence-uncaptured-wrapper` (added to requirement 4.2's extras) and the list `KNOWN_FALSE_POSITIVES` come from the second independent review. A case in that list is expected to produce a false positive until task 7 is done, and the hold-out test fails when a listed case stops producing one, so that the list is updated.
