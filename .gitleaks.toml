@@ -1,5 +1,23 @@
 # gitleaks config, used by the pre-commit hook and the CI secrets job.
-# Default rules only. No allowlist: a scan of the full history found nothing to
-# exclude (.env.example holds names with empty values).
+# Default rules plus one custom rule. No global allowlist: a scan of the full
+# history found nothing to exclude (.env.example holds names with empty values).
 [extend]
 useDefault = true
+
+# Browser Use Cloud API keys. Their public docs say a key starts with "bu_"; they
+# do not state a length, so the rule takes any token of 20 or more characters
+# after the prefix and leans on the entropy check and the allowlist below to
+# keep ordinary words out.
+[[rules]]
+id = "browser-use-api-key"
+description = "Browser Use Cloud API key"
+regex = '''\bbu_[A-Za-z0-9_-]{20,}'''
+keywords = ["bu_"]
+entropy = 3.0
+
+  [[rules.allowlists]]
+  description = "Placeholders, and plain lowercase names such as a snake_case identifier"
+  regexes = [
+    '''^bu_[a-z_]+$''',
+    '''(?i)^bu_(your|example|sample|placeholder|dummy|fake|redacted|x{4,}|0{4,})''',
+  ]
