@@ -1,67 +1,72 @@
 import type { CdpSession } from "@/lib/capture/cdp";
 
-export type CdpCall = { method: string; params: unknown; targetSessionId: string | undefined };
+export type CdpCall = { method: string; params: unknown };
 
 /** What a scripted method does: resolve with a value, reject with an `Error`, or never settle. */
 export type CdpAnswer = unknown;
 export type CdpScript = Record<string, CdpAnswer | ((call: CdpCall) => CdpAnswer)>;
 
-export type CdpEventHandler = Parameters<CdpSession["onEvent"]>[0];
-
 export interface FakeCdp extends CdpSession {
-  /** Every `send` call, in order. */
+  /** Every valid `send` call, in order. A call that broke the protocol is not in the list. */
   readonly calls: CdpCall[];
-  /** Number of registered event handlers. */
-  readonly handlerCount: number;
-  /** Number of handlers registered when the first `send` call was made, or `undefined` before it. */
-  readonly handlersAtFirstSend: number | undefined;
+  /** One text per protocol violation: a third `send` argument or a `sessionId` in the parameters. */
+  readonly violations: string[];
   /** Calls of one method, in order. */
   callsOf(method: string): CdpCall[];
   /** Replaces or adds the answer of one method. */
   script(method: string, answer: CdpAnswer | ((call: CdpCall) => CdpAnswer)): void;
-  /** Calls the registered handlers and resolves when they have all settled. */
-  emit(method: string, params: unknown, targetSessionId?: string): Promise<void>;
+  /** Throws when any protocol violation was recorded. */
+  assertNoViolations(): void;
 }
 
 /**
- * A scripted `CdpSession`. A method with no script entry resolves with `{}`. A script
+ * A scripted page `CdpSession`. A method with no script entry resolves with `{}`. A script
  * entry is a value, an `Error` (rejects), the string `"hang"` (never settles), or a
  * function of the call that returns one of those.
+ *
+ * It fails where the real client fails: `send` with a third argument, or with parameters
+ * that hold a `sessionId`, throws and is recorded. The page session has no child sessions.
  */
 export function createFakeCdp(initial: CdpScript = {}): FakeCdp {
   const scripts = new Map<string, CdpAnswer | ((call: CdpCall) => CdpAnswer)>(Object.entries(initial));
-  const handlers: CdpEventHandler[] = [];
   const calls: CdpCall[] = [];
-  let handlersAtFirstSend: number | undefined;
+  const violations: string[] = [];
+
+  function violate(text: string): never {
+    violations.push(text);
+    throw new Error(`Fake CDP session protocol violation: ${text}`);
+  }
+
+  function send(...args: unknown[]): Promise<unknown> {
+    const method = String(args[0]);
+    if (args.length > 2) {
+      violate(`send("${method}") got ${args.length} arguments; the page session takes at most two arguments.`);
+    }
+    const params = args[1];
+    if (typeof params === "object" && params !== null && "sessionId" in params) {
+      violate(`send("${method}") got a sessionId in its parameters; the page session has no child sessions.`);
+    }
+    const call: CdpCall = { method, params };
+    calls.push(call);
+    const entry = scripts.get(method);
+    const answer = typeof entry === "function" ? (entry as (c: CdpCall) => CdpAnswer)(call) : entry;
+    if (answer === "hang") return new Promise<unknown>(() => {});
+    if (answer instanceof Error) return Promise.reject(answer);
+    return Promise.resolve(answer === undefined && !scripts.has(method) ? {} : answer);
+  }
 
   return {
     calls,
-    get handlerCount() {
-      return handlers.length;
-    },
-    get handlersAtFirstSend() {
-      return handlersAtFirstSend;
-    },
+    violations,
     callsOf: (method) => calls.filter((call) => call.method === method),
     script: (method, answer) => {
       scripts.set(method, answer);
     },
-    send(method, params, targetSessionId) {
-      handlersAtFirstSend ??= handlers.length;
-      const call: CdpCall = { method, params, targetSessionId };
-      calls.push(call);
-      const entry = scripts.get(method);
-      const answer = typeof entry === "function" ? (entry as (c: CdpCall) => CdpAnswer)(call) : entry;
-      if (answer === "hang") return new Promise<unknown>(() => {});
-      if (answer instanceof Error) return Promise.reject(answer);
-      return Promise.resolve(answer === undefined && !scripts.has(method) ? {} : answer);
-    },
-    onEvent(handler) {
-      handlers.push(handler);
-    },
-    async emit(method, params, targetSessionId) {
-      const event = targetSessionId === undefined ? { method, params } : { method, params, targetSessionId };
-      await Promise.all(handlers.map((handler) => handler(event)));
+    send: send as CdpSession["send"],
+    assertNoViolations() {
+      if (violations.length > 0) {
+        throw new Error(`The fake CDP session recorded protocol violations:\n${violations.join("\n")}`);
+      }
     },
   };
 }

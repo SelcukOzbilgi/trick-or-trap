@@ -12,14 +12,10 @@
 
 export interface CdpSession {
   /**
-   * Sends one protocol command. `targetSessionId` addresses a child target that was
-   * attached with `flatten: true`; without it the command goes to the page session.
+   * Sends one protocol command to the page session. It takes exactly two arguments, as
+   * the public Playwright call does, and the parameters never hold a `sessionId`.
    */
-  send(method: string, params?: Record<string, unknown>, targetSessionId?: string): Promise<unknown>;
-  /** Registers a handler for every protocol event of the page session and its attached children. */
-  onEvent(
-    handler: (event: { method: string; params: unknown; targetSessionId?: string }) => void | Promise<void>,
-  ): void;
+  send(method: string, params?: Record<string, unknown>): Promise<unknown>;
 }
 
 /** Name given to every isolated world this module creates. */
@@ -51,15 +47,24 @@ export async function hideScrollbars(session: CdpSession): Promise<void> {
 }
 
 /**
+ * Reads the id of the main frame with `Page.getFrameTree`. Rejects when the command
+ * fails or the answer holds no frame id.
+ */
+export async function readMainFrameId(session: CdpSession): Promise<string> {
+  const tree = asRecord(await session.send("Page.getFrameTree"));
+  const frameId = asRecord(asRecord(tree?.frameTree)?.frame)?.id;
+  if (typeof frameId !== "string" || frameId === "") throw new Error("The page reported no main frame id.");
+  return frameId;
+}
+
+/**
  * Creates a fresh isolated world for the main frame and calls `fn(arg)` in it. A new
  * world per call avoids a stale execution context after a navigation or a reload.
  * `fn` is serialised with `String(fn)`, so it must be self-contained, and `arg` and the
  * result must be JSON values. Rejects when a protocol call fails or the function throws.
  */
 export async function runInIsolatedWorld<A, R>(session: CdpSession, fn: (arg: A) => R, arg: A): Promise<R> {
-  const tree = asRecord(await session.send("Page.getFrameTree"));
-  const frameId = asRecord(asRecord(tree?.frameTree)?.frame)?.id;
-  if (typeof frameId !== "string" || frameId === "") throw new Error("The page reported no main frame id.");
+  const frameId = await readMainFrameId(session);
 
   const world = asRecord(await session.send("Page.createIsolatedWorld", { frameId, worldName: ISOLATED_WORLD_NAME }));
   const executionContextId = world?.executionContextId;

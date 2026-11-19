@@ -289,6 +289,119 @@ describe("capturePage: reload sample", () => {
   });
 });
 
+describe("capturePage: a reload that shows another page", () => {
+  /** First read has `first` eligible elements, the drift re-read the same, the reload sample `second`. */
+  const counts = (first: number, second: number) => (n: number) =>
+    rawWithElements({ eligibleCount: n <= 2 ? first : second });
+
+  it("adds reload-differs when the reload ends on another URL, and keeps afterReload", async () => {
+    const { clock, deps } = setup({ reload: { finalUrl: "https://shop.example.com/login" } });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(warningCodes(result)).toContain("reload-differs");
+    expect(result.snapshot.afterReload).toBeDefined();
+    expect(result.snapshot.afterReload?.url).toBe("https://shop.example.com/login");
+    expect(PageSnapshotSchema.safeParse(result.snapshot).success).toBe(true);
+  });
+
+  it("adds no warning when the URLs differ only in the fragment", async () => {
+    const { clock, deps } = setup({ reload: { finalUrl: "https://shop.example.com/#top" } });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    expect(warningCodes(result)).not.toContain("reload-differs");
+  });
+
+  it("adds reload-differs when the reload status is 500 and records it in afterReload", async () => {
+    const { clock, deps } = setup({ gotoStatus: 200, reloadStatus: 500 });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(warningCodes(result)).toContain("reload-differs");
+    expect(warningCodes(result)).not.toContain("http-error-status");
+    expect(result.snapshot.afterReload?.capture?.httpStatus).toBe(500);
+  });
+
+  it("adds reload-differs at a reload status of exactly 400 and not at 399", async () => {
+    const at = setup({ reloadStatus: 400 });
+    const below = setup({ reloadStatus: 399 });
+    const a = await drive(capturePage(URL_OK, at.deps), at.clock);
+    const b = await drive(capturePage(URL_OK, below.deps), below.clock);
+
+    expect(warningCodes(a)).toContain("reload-differs");
+    expect(warningCodes(b)).not.toContain("reload-differs");
+  });
+
+  it("adds reload-differs for 11 eligible elements against 750 and keeps afterReload", async () => {
+    const { clock, deps } = setup({ collect: counts(11, 750) });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(warningCodes(result)).toContain("reload-differs");
+    expect(result.snapshot.afterReload?.capture?.eligibleElementCount).toBe(750);
+    expect(result.snapshot.capture?.eligibleElementCount).toBe(11);
+  });
+
+  it("adds reload-differs when the reload has far fewer elements than the first read", async () => {
+    const { clock, deps } = setup({ collect: counts(750, 11) });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    expect(warningCodes(result)).toContain("reload-differs");
+  });
+
+  it("adds reload-differs at 50 against 16 and not at 50 against 17", async () => {
+    // The larger count reaches the minimum of 50; 50 is more than 3 × 16 but not more than 3 × 17.
+    const over = setup({ collect: counts(16, 50) });
+    const within = setup({ collect: counts(17, 50) });
+    const a = await drive(capturePage(URL_OK, over.deps), over.clock);
+    const b = await drive(capturePage(URL_OK, within.deps), within.clock);
+
+    expect(warningCodes(a)).toContain("reload-differs");
+    expect(warningCodes(b)).not.toContain("reload-differs");
+  });
+
+  it("adds no warning for 40 against 10: the larger count is below the minimum of 50", async () => {
+    const { clock, deps } = setup({ collect: counts(10, 40) });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(warningCodes(result)).not.toContain("reload-differs");
+    expect(result.snapshot.afterReload).toBeDefined();
+  });
+
+  it("adds no warning for 100 against 300: exactly 3 times is not more than 3 times", async () => {
+    const { clock, deps } = setup({ collect: counts(100, 300) });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    expect(warningCodes(result)).not.toContain("reload-differs");
+  });
+
+  it("adds no warning when nothing differs", async () => {
+    const { clock, deps } = setup({ collect: rawWithElements(), gotoStatus: 200, reloadStatus: 200 });
+    const result = await drive(capturePage(URL_OK, deps), clock);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(warningCodes(result)).toEqual([]);
+  });
+
+  it("adds no reload-differs when the reload was skipped or failed", async () => {
+    const failed = setup({ reload: new Error("boom"), reloadStatus: 500 });
+    const result = await drive(capturePage(URL_OK, failed.deps), failed.clock);
+
+    expect(result.ok).toBe(true);
+    expect(warningCodes(result)).toContain("reload-failed");
+    expect(warningCodes(result)).not.toContain("reload-differs");
+  });
+});
+
 describe("capturePage: a failing reload is only a warning", () => {
   async function expectReloadFailed(script: FakeScript | ((clock: ManualClock) => FakeScript)) {
     const clock = createManualClock();

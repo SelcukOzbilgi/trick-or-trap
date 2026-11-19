@@ -4,7 +4,9 @@ import {
   ERROR_MESSAGES,
   WARNING_MESSAGES,
   type CaptureErrorCode,
+  type CaptureWarning,
   type CaptureWarningCode,
+  type GuardReasonCode,
   type UrlErrorCode,
 } from "@/lib/capture/types";
 
@@ -36,6 +38,14 @@ const OTHER_CODES: CaptureErrorCode[] = [
   "snapshot-too-large",
   "capture-timeout",
   "internal-error",
+  "guard-lost",
+];
+
+const GUARD_ONLY_REASONS: GuardReasonCode[] = [
+  "service-worker-blocked",
+  "host-limit-reached",
+  "response-too-large",
+  "response-rewrite-failed",
 ];
 
 const WARNING_CODES: CaptureWarningCode[] = [
@@ -51,6 +61,8 @@ const WARNING_CODES: CaptureWarningCode[] = [
   "request-blocked",
   "request-host-limit",
   "layout-shifted",
+  "http-error-status",
+  "reload-differs",
 ];
 
 function expectSafeText(text: string): void {
@@ -62,13 +74,18 @@ function expectSafeText(text: string): void {
 }
 
 describe("ERROR_MESSAGES", () => {
-  it("has 8 url codes and 16 other codes in the table (24 in all)", () => {
+  it("has 8 url codes and 17 other codes in the table (25 in all)", () => {
     expect(URL_CODES).toHaveLength(8);
-    expect(OTHER_CODES).toHaveLength(16);
-    expect(Object.keys(ERROR_MESSAGES)).toHaveLength(24);
+    expect(OTHER_CODES).toHaveLength(17);
+    expect(Object.keys(ERROR_MESSAGES)).toHaveLength(25);
     expect(Object.keys(ERROR_MESSAGES).sort()).toEqual(
       [...URL_CODES, ...OTHER_CODES].sort()
     );
+  });
+
+  it("has a fixed message for guard-lost that differs from connect-failed", () => {
+    expect(ERROR_MESSAGES["guard-lost"]).toBeTruthy();
+    expect(ERROR_MESSAGES["guard-lost"]).not.toBe(ERROR_MESSAGES["connect-failed"]);
   });
 
   it("has a fixed message for snapshot-too-large that differs from snapshot-invalid", () => {
@@ -89,9 +106,38 @@ describe("ERROR_MESSAGES", () => {
   });
 });
 
+describe("GuardReasonCode", () => {
+  it("holds every url error code and four guard-only reasons", () => {
+    const reasons: GuardReasonCode[] = [...URL_CODES, ...GUARD_ONLY_REASONS];
+    expect(new Set(reasons).size).toBe(12);
+  });
+
+  it("keeps the guard-only reasons out of the capture error codes", () => {
+    const errorCodes = Object.keys(ERROR_MESSAGES);
+    for (const reason of GUARD_ONLY_REASONS) expect(errorCodes).not.toContain(reason);
+    // @ts-expect-error a guard-only reason is not a capture error code
+    const notAnError: CaptureErrorCode = "service-worker-blocked";
+    expect(notAnError).toBe("service-worker-blocked");
+  });
+
+  it("accepts every url error code", () => {
+    for (const code of URL_CODES) {
+      const reason: GuardReasonCode = code;
+      expect(reason).toBe(code);
+    }
+  });
+
+  it("is accepted as the reason of a warning", () => {
+    for (const reason of GUARD_ONLY_REASONS) {
+      const warning: CaptureWarning = { code: "request-blocked", message: "x", reason, count: 1 };
+      expect(warning.reason).toBe(reason);
+    }
+  });
+});
+
 describe("WARNING_MESSAGES", () => {
-  it("has exactly the 12 warning codes", () => {
-    expect(WARNING_CODES).toHaveLength(12);
+  it("has exactly the 14 warning codes", () => {
+    expect(WARNING_CODES).toHaveLength(14);
     expect(Object.keys(WARNING_MESSAGES).sort()).toEqual([...WARNING_CODES].sort());
   });
 
@@ -102,6 +148,14 @@ describe("WARNING_MESSAGES", () => {
   it("has distinct messages for the new warning codes", () => {
     expect(WARNING_MESSAGES["request-host-limit"]).not.toBe(WARNING_MESSAGES["request-blocked"]);
     expect(WARNING_MESSAGES["layout-shifted"]).toBeTruthy();
+  });
+
+  it("has distinct fixed messages for http-error-status and reload-differs", () => {
+    expect(WARNING_MESSAGES["http-error-status"]).toBeTruthy();
+    expect(WARNING_MESSAGES["reload-differs"]).toBeTruthy();
+    expect(WARNING_MESSAGES["http-error-status"]).not.toBe(WARNING_MESSAGES["reload-differs"]);
+    const all = Object.values(WARNING_MESSAGES);
+    expect(new Set(all).size).toBe(all.length);
   });
 });
 

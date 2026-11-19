@@ -7,18 +7,32 @@
  */
 import "server-only";
 import type { Clock } from "./clock";
-import { API_FETCH_TIMEOUT_MS, STALE_SESSION_AGE_MS } from "./constants";
+import { API_FETCH_TIMEOUT_MS, SESSION_LIST_MAX_PAGES, SESSION_LIST_PAGE_SIZE, STALE_SESSION_AGE_MS } from "./constants";
 import { toDetail } from "./redact";
 import type { SessionRequest } from "./seam";
 import { CaptureFailure } from "./types";
 
 const API_BASE_URL = "https://api.browser-use.com/api/v4/browsers";
-const LIST_ACTIVE_URL = `${API_BASE_URL}?status=active`;
 const API_KEY_HEADER = "X-Browser-Use-API-Key";
 /** The value of `metadata.app` on every session this app creates. */
 const APP_TAG = "trick-or-trap";
 /** Keys under which a list answer may hold its array of sessions. */
 const LIST_KEYS = ["items", "browsers", "results"] as const;
+
+/**
+ * The URL of one page of the list of active sessions tagged with this app. The vendor
+ * ignores `status`; `filterBy=active` is the filter that works. `metadata` is an exact,
+ * repeatable AND filter, so a capture id narrows the list to that capture. Page
+ * numbers start at 1.
+ */
+export function activeSessionsUrl(pageNumber: number, captureId?: string): string {
+  const appFilter = encodeURIComponent(`app=${APP_TAG}`);
+  const captureFilter = captureId === undefined ? "" : `&metadata=${encodeURIComponent(`captureId=${captureId}`)}`;
+  return (
+    `${API_BASE_URL}?filterBy=active&metadata=${appFilter}${captureFilter}` +
+    `&pageSize=${SESSION_LIST_PAGE_SIZE}&pageNumber=${pageNumber}`
+  );
+}
 
 export type BrowserUseApiDeps = {
   fetch: typeof fetch;
@@ -195,26 +209,22 @@ export async function stopSession(deps: BrowserUseApiDeps, id: string): Promise<
 /** One entry of the list of active sessions, as far as it is trusted. */
 type ListedSession = { id: string; metadata: Record<string, unknown>; raw: Record<string, unknown> };
 
-/**
- * Reads the list answer defensively. The list is an array, or an object with an array
- * under `items`, `browsers` or `results`. An entry needs a string `id` and an object
- * `metadata`; any other entry is left out. Anything else gives an empty list.
- */
-function parseSessionList(body: unknown): ListedSession[] {
-  let list: unknown;
-  if (Array.isArray(body)) {
-    list = body;
-  } else if (isRecord(body)) {
+/** The array of entries of a list answer, or `undefined` when the answer holds none. */
+function rawListOf(body: unknown): unknown[] | undefined {
+  if (Array.isArray(body)) return body as unknown[];
+  if (isRecord(body)) {
     for (const key of LIST_KEYS) {
-      if (Array.isArray(body[key])) {
-        list = body[key];
-        break;
-      }
+      const candidate = body[key];
+      if (Array.isArray(candidate)) return candidate as unknown[];
     }
   }
-  if (!Array.isArray(list)) return [];
+  return undefined;
+}
+
+/** Keeps the entries that have a string `id` and an object `metadata`; any other entry is left out. */
+function parseSessionList(list: readonly unknown[]): ListedSession[] {
   const sessions: ListedSession[] = [];
-  for (const entry of list as unknown[]) {
+  for (const entry of list) {
     if (!isRecord(entry)) continue;
     const { id, metadata } = entry;
     if (!isNonEmptyString(id) || !isRecord(metadata)) continue;
@@ -223,13 +233,27 @@ function parseSessionList(body: unknown): ListedSession[] {
   return sessions;
 }
 
-/** Lists the active sessions. Never rejects; any failure gives an empty list. */
-async function listActiveSessions(deps: BrowserUseApiDeps): Promise<ListedSession[]> {
+/** One page of the list: its readable sessions, its raw entry count and the vendor's total, when numeric. */
+type ListPage = { sessions: ListedSession[]; rawCount: number; totalItems: number | undefined };
+
+/**
+ * Reads one page of the active list. Never rejects: a failed call, a non-2xx answer, a
+ * body that cannot be read and a body with no list all give `undefined`.
+ */
+async function readListPage(deps: BrowserUseApiDeps, url: string): Promise<ListPage | undefined> {
   try {
-    const response = await callApi(deps, LIST_ACTIVE_URL, "GET", undefined, true);
-    return response.ok ? parseSessionList(response.body) : [];
+    const response = await callApi(deps, url, "GET", undefined, true);
+    if (!response.ok) return undefined;
+    const list = rawListOf(response.body);
+    if (list === undefined) return undefined;
+    const total = isRecord(response.body) ? response.body.totalItems : undefined;
+    return {
+      sessions: parseSessionList(list),
+      rawCount: list.length,
+      totalItems: typeof total === "number" && Number.isFinite(total) ? total : undefined,
+    };
   } catch {
-    return [];
+    return undefined;
   }
 }
 
@@ -249,15 +273,15 @@ async function stopEach(deps: BrowserUseApiDeps, ids: readonly string[]): Promis
 
 /**
  * One clean-up after a create call that was aborted or failed with no HTTP answer: it
- * lists the active sessions and stops those whose `metadata.captureId` equals
- * `captureId`. It never rejects and never throws. A list that cannot be read, a failed
- * list call and a failed stop all leave things as they are.
+ * reads one page of the active sessions tagged with `captureId` and stops those whose
+ * `metadata.captureId` equals `captureId`. It never rejects and never throws. A list
+ * that cannot be read, a failed list call and a failed stop all leave things as they are.
  */
 export async function reclaimSession(deps: BrowserUseApiDeps, captureId: string): Promise<void> {
   try {
     if (!isNonEmptyString(captureId)) return;
-    const sessions = await listActiveSessions(deps);
-    const mine = sessions.filter((session) => session.metadata.captureId === captureId);
+    const page = await readListPage(deps, activeSessionsUrl(1, captureId));
+    const mine = (page?.sessions ?? []).filter((session) => session.metadata.captureId === captureId);
     await stopEach(
       deps,
       mine.map((session) => session.id),
@@ -284,23 +308,33 @@ function ageOf(session: ListedSession, now: number): number | undefined {
  * Stops every active session tagged `metadata.app === "trick-or-trap"` that is older
  * than `STALE_SESSION_AGE_MS`. A session with another or no tag, or with no usable
  * age, is left alone. Returns counts only, never an id. `listed` counts the entries of
- * the list that could be read. It never rejects: a list that cannot be read gives zero
- * counts.
+ * the pages that could be read.
+ *
+ * It pages from 1 and stops on an empty list, when `n × SESSION_LIST_PAGE_SIZE` reaches
+ * `totalItems`, after a page with no numeric `totalItems`, on a page that fails or
+ * cannot be read, and after `SESSION_LIST_MAX_PAGES`. Sessions are selected on every
+ * page and stopped only after the last page, because stopping a session shifts the
+ * later pages of an `active` list. It never rejects: a first page that cannot be read
+ * gives zero counts.
  */
 export async function sweepStaleSessions(deps: BrowserUseApiDeps & { now: () => number }): Promise<SweepResult> {
   try {
-    const sessions = await listActiveSessions(deps);
     const now = deps.now();
-    const stale = sessions.filter((session) => {
-      if (session.metadata.app !== APP_TAG) return false;
-      const age = ageOf(session, now);
-      return age !== undefined && age > STALE_SESSION_AGE_MS;
-    });
-    const { stopped, failed } = await stopEach(
-      deps,
-      stale.map((session) => session.id),
-    );
-    return { listed: sessions.length, stopped, failed };
+    const stale = new Set<string>();
+    let listed = 0;
+    for (let pageNumber = 1; pageNumber <= SESSION_LIST_MAX_PAGES; pageNumber++) {
+      const page = await readListPage(deps, activeSessionsUrl(pageNumber));
+      if (page === undefined || page.rawCount === 0) break;
+      listed += page.sessions.length;
+      for (const session of page.sessions) {
+        if (session.metadata.app !== APP_TAG) continue;
+        const age = ageOf(session, now);
+        if (age !== undefined && age > STALE_SESSION_AGE_MS) stale.add(session.id);
+      }
+      if (page.totalItems === undefined || pageNumber * SESSION_LIST_PAGE_SIZE >= page.totalItems) break;
+    }
+    const { stopped, failed } = await stopEach(deps, [...stale]);
+    return { listed, stopped, failed };
   } catch {
     return { listed: 0, stopped: 0, failed: 0 };
   }

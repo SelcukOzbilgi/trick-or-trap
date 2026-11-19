@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   hideScrollbars,
   ISOLATED_WORLD_NAME,
+  readMainFrameId,
   readPageMetrics,
   runInIsolatedWorld,
   scrollInPage,
@@ -55,10 +56,11 @@ describe("runInIsolatedWorld", () => {
     });
   });
 
-  it("addresses the page session, not a child target", async () => {
+  it("sends only a method and parameters to the page session", async () => {
     const cdp = createFakeCdp(worldScript());
     await runInIsolatedWorld(cdp, fn, { n: 1 });
-    expect(cdp.calls.every((call) => call.targetSessionId === undefined)).toBe(true);
+    expect(cdp.calls.every((call) => Object.keys(call).sort().join() === "method,params")).toBe(true);
+    expect(() => cdp.assertNoViolations()).not.toThrow();
   });
 
   it("creates a second, new world for a second call", async () => {
@@ -139,13 +141,33 @@ describe("runInIsolatedWorld", () => {
   });
 });
 
+describe("readMainFrameId", () => {
+  it("sends only Page.getFrameTree and returns the main frame id", async () => {
+    const cdp = createFakeCdp({ "Page.getFrameTree": { frameTree: { frame: { id: MAIN_FRAME_ID } } } });
+    await expect(readMainFrameId(cdp)).resolves.toBe(MAIN_FRAME_ID);
+    expect(cdp.calls.map((call) => call.method)).toEqual(["Page.getFrameTree"]);
+  });
+
+  it.each([undefined, null, {}, { frameTree: {} }, { frameTree: { frame: {} } }, { frameTree: { frame: { id: "" } } }, { frameTree: { frame: { id: 7 } } }])(
+    "rejects when the answer %j holds no frame id",
+    async (answer) => {
+      const cdp = createFakeCdp({ "Page.getFrameTree": answer });
+      await expect(readMainFrameId(cdp)).rejects.toThrow(/main frame id/);
+    },
+  );
+
+  it("rejects with the error of a failing command", async () => {
+    const cdp = createFakeCdp({ "Page.getFrameTree": new Error("tree failed") });
+    await expect(readMainFrameId(cdp)).rejects.toThrow("tree failed");
+  });
+});
+
 describe("hideScrollbars", () => {
   it("sends Emulation.setScrollbarsHidden with hidden true", async () => {
     const cdp = createFakeCdp();
     await hideScrollbars(cdp);
-    expect(cdp.calls).toEqual([
-      { method: "Emulation.setScrollbarsHidden", params: { hidden: true }, targetSessionId: undefined },
-    ]);
+    expect(cdp.calls).toEqual([{ method: "Emulation.setScrollbarsHidden", params: { hidden: true } }]);
+    expect(() => cdp.assertNoViolations()).not.toThrow();
   });
 
   it("rejects when the command fails", async () => {
@@ -254,7 +276,6 @@ describe("module boundary", () => {
         sent.push(method);
         return {};
       },
-      onEvent: () => {},
     };
     await hideScrollbars(session);
     expect(sent).toEqual(["Emulation.setScrollbarsHidden"]);

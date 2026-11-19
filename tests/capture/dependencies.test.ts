@@ -90,4 +90,25 @@ describe("capture dependencies", () => {
     );
     expect(offenders).toEqual([]);
   });
+
+  it("pins the JPEG decoder of the live test as a dev dependency at exactly 0.4.4", () => {
+    const value = pkg.devDependencies["jpeg-js"];
+    expect(value).toBe("0.4.4");
+    expect(value?.startsWith("^")).toBe(false);
+    expect(value?.startsWith("~")).toBe(false);
+    expect(value).not.toContain("latest");
+  });
+
+  it("does not list the JPEG decoder as a runtime dependency", () => {
+    expect(pkg.dependencies).not.toHaveProperty("jpeg-js");
+  });
+
+  it("mentions the JPEG decoder in no file under lib or app", () => {
+    for (const dir of ["lib", "app"]) {
+      const offenders = filesUnder(resolve(process.cwd(), dir)).filter((file) =>
+        readFileSync(file, "utf8").includes("jpeg-js")
+      );
+      expect(offenders, `files under ${dir} that mention the decoder`).toEqual([]);
+    }
+  });
 });

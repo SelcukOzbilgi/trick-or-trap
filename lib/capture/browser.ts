@@ -11,13 +11,25 @@ import { createRemoteBrowser, type RemoteBrowserDeps } from "./remote-browser";
 import type { GetBrowserResult } from "./seam";
 import { ERROR_MESSAGES } from "./types";
 
-export function getBrowser(config: CaptureConfig, deps: RemoteBrowserDeps): GetBrowserResult {
+/** What `getBrowser` accepts: the adapter's dependencies without the live-test-only `onPageReady`. */
+export type GetBrowserDeps = Omit<RemoteBrowserDeps, "onPageReady">;
+
+export function getBrowser(config: CaptureConfig, deps: GetBrowserDeps): GetBrowserResult {
   switch (config.browserMode) {
     case "remote":
       if (config.apiKey === null) {
         return { ok: false, error: { code: "config-invalid", message: ERROR_MESSAGES["config-invalid"] } };
       }
-      return { ok: true, browser: createRemoteBrowser(config, deps) };
+      // The adapter gets its dependencies field by field, so an `onPageReady` that a caller
+      // slipped in despite the type never reaches it: a capture has no gesture control.
+      return {
+        ok: true,
+        browser: createRemoteBrowser(config, {
+          fetch: deps.fetch,
+          clock: deps.clock,
+          ...(deps.loadPlaywright ? { loadPlaywright: deps.loadPlaywright } : {}),
+        }),
+      };
     default:
       return {
         ok: false,
