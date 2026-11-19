@@ -39,9 +39,32 @@ describe("capture constants", () => {
     expect(constants.MAX_HOP_URL_LENGTH).toBe(8_192);
   });
 
+  it("has the host and DNS budget values", () => {
+    expect(constants.MAX_LOOKUP_HOSTS).toBe(300);
+    expect(constants.MAX_VERDICT_CACHE_ENTRIES).toBe(1_200);
+    // Four origins per host are possible for the 300 hosts of the budget.
+    expect(constants.MAX_VERDICT_CACHE_ENTRIES).toBe(constants.MAX_LOOKUP_HOSTS * 4);
+    expect(constants.MAX_LOOKUP_HOSTS).toBeGreaterThan(constants.MAX_REQUEST_HOSTS);
+  });
+
+  it("has the guard heartbeat values", () => {
+    expect(constants.GUARD_HEARTBEAT_INTERVAL_MS).toBe(2_000);
+    expect(constants.GUARD_HEARTBEAT_TIMEOUT_MS).toBe(5_000);
+  });
+
+  it("has the WebSocket hardening values", () => {
+    expect(constants.MAX_REWRITE_BODY_BYTES).toBe(8_388_608);
+    expect(constants.HARDENING_CSP).toBe("connect-src http: https: data: blob:");
+  });
+
   it("has the stop and sweep values", () => {
     expect(constants.STOP_TIMEOUT_MS).toBe(10_000);
     expect(constants.STALE_SESSION_AGE_MS).toBe(120_000);
+  });
+
+  it("has the session list paging values", () => {
+    expect(constants.SESSION_LIST_PAGE_SIZE).toBe(100);
+    expect(constants.SESSION_LIST_MAX_PAGES).toBe(20);
   });
 
   it("has the size bounds for page data", () => {
@@ -55,6 +78,23 @@ describe("capture constants", () => {
     expect(constants.MAX_ELEMENT_ID_CHARS).toBe(2_048);
     expect(constants.RAW_SCAN_FACTOR).toBe(2);
     expect(constants.MAX_SNAPSHOT_BYTES).toBe(1_500_000);
+  });
+
+  it("has the gesture function name rule", () => {
+    const rule = constants.GESTURE_FUNCTION_NAME;
+    expect(rule).toBeInstanceOf(RegExp);
+    expect(rule.source).toBe("^[A-Za-z_$][A-Za-z0-9_$]{0,63}$");
+    // The rule has no global or sticky flag, so repeated `test` calls do not depend on `lastIndex`.
+    expect(rule.global).toBe(false);
+    expect(rule.sticky).toBe(false);
+    for (const accepted of ["openFixturePopups", "_x", "$y", "a".repeat(64)]) expect(rule.test(accepted)).toBe(true);
+    for (const refused of ["", "a.b", "x()", "1a", "a b", "a-b", "a".repeat(65)]) expect(rule.test(refused)).toBe(false);
+  });
+
+  it("has the HTTP status and reload comparison values", () => {
+    expect(constants.HTTP_ERROR_STATUS_MIN).toBe(400);
+    expect(constants.RELOAD_ELEMENT_MIN_COUNT).toBe(50);
+    expect(constants.RELOAD_ELEMENT_RATIO_MAX).toBe(3);
   });
 
   it("has the layout and plausibility values", () => {

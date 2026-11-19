@@ -404,3 +404,82 @@ describe("collectInPage on a real DOM: hostile input", () => {
     expect(result.elements[0]?.tag).toBe("x".repeat(MAX_TAG_CHARS));
   });
 });
+
+/** Members that a form input of the same name shadows (named properties of the form). */
+const CLOBBER_NAMES = [
+  "tagName",
+  "children",
+  "childNodes",
+  "attributes",
+  "getAttribute",
+  "hasAttribute",
+  "getBoundingClientRect",
+  "textContent",
+  "innerText",
+  "nodeType",
+  "parentElement",
+] as const;
+
+describe("collectInPage on a real DOM: DOM clobbering", () => {
+  it.each(CLOBBER_NAMES)("reads a form that holds an input named %s", (name) => {
+    fallback = BOX;
+    document.body.innerHTML = `<form id="f" role="group">Form text <input type="text" name="${name}"><span id="s">Span text inside</span></form>`;
+    const form = document.getElementById("f") as HTMLFormElement;
+    const input = document.getElementsByTagName("input")[0] as HTMLInputElement;
+
+    // The member must be shadowed first. Where jsdom has no form named properties, define the
+    // same own property on the form instance, which is what the named property does.
+    const holder = form as unknown as Record<string, unknown>;
+    if (holder[name] !== input) Object.defineProperty(form, name, { value: input, configurable: true });
+    expect(holder[name]).toBe(input);
+
+    const result = collect();
+    expect(result.elements.map((element) => element.tag)).toEqual(["form", "input", "span"]);
+    expect(result.eligibleCount).toBe(3);
+    expect(byTag(result, "span").text).toBe("Span text inside");
+    expect(byTag(result, "form").text).toBe("Form text Span text inside");
+    expect(byTag(result, "form").role).toBe("group");
+    expect(byTag(result, "input").attrs).toEqual({ type: "text", name });
+  });
+
+  it("reads a document whose form shadows every member at once", () => {
+    fallback = BOX;
+    document.body.innerHTML = `<form id="f" role="group">${CLOBBER_NAMES.map((n) => `<input name="${n}">`).join("")}<span>Known text</span></form>`;
+    const form = document.getElementById("f") as HTMLFormElement;
+    const holder = form as unknown as Record<string, unknown>;
+    for (const name of CLOBBER_NAMES) {
+      const input = document.getElementsByName(name)[0];
+      if (holder[name] !== input) Object.defineProperty(form, name, { value: input, configurable: true });
+      expect(holder[name]).toBe(input);
+    }
+    const result = collect();
+    expect(result.elements.filter((element) => element.tag === "input")).toHaveLength(CLOBBER_NAMES.length);
+    expect(byTag(result, "span").text).toBe("Known text");
+  });
+
+  it("falls back to textContent when the innerText getter throws for a non-HTML element", () => {
+    fallback = BOX;
+    // A browser has this getter on HTMLElement.prototype; it throws for an SVG element.
+    Object.defineProperty(HTMLElement.prototype, "innerText", {
+      configurable: true,
+      get(this: Node) {
+        if (!(this instanceof HTMLElement)) throw new TypeError("Illegal invocation");
+        return `inner:${this.textContent}`;
+      },
+    });
+    try {
+      document.body.innerHTML = '<a href="/h">Html link</a><svg><a href="/s"><text>Svg link</text></a></svg>';
+      const anchors = collect().elements.filter((element) => element.tag === "a");
+      expect(anchors.map((element) => element.text)).toEqual(["inner:Html link", "Svg link"]);
+    } finally {
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).innerText;
+    }
+  });
+
+  it("stays self-contained when serialised: no transpiler helper, dynamic import or require", () => {
+    const source = String(collectInPage);
+    expect(source).not.toContain("__name");
+    expect(source).not.toContain("import(");
+    expect(source).not.toContain("require(");
+  });
+});

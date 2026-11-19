@@ -36,7 +36,12 @@ export interface BrowserSessionHandle {
   secrets(): readonly string[];
 }
 
-export type GuardEvent = RequestGuardEvent | { kind: "download-refused" } | { kind: "popup-closed" };
+export type GuardEvent =
+  | RequestGuardEvent
+  | { kind: "download-refused" }
+  | { kind: "popup-closed" }
+  /** The guard session or the browser connection is gone: the capture must end. Never a warning. */
+  | { kind: "guard-lost" };
 
 /** Assignable to `RequestPolicy`: the request guard takes it as its policy. */
 export interface PageGuards {
@@ -47,7 +52,11 @@ export interface PageGuards {
   report(event: GuardEvent): void;
 }
 
-export type NavigationOutcome = { finalUrl: string };
+export type NavigationOutcome = {
+  finalUrl: string;
+  /** HTTP status of the main document, a plain integer from 100 to 599. Absent when unknown. */
+  status?: number;
+};
 
 export type ScreenshotRequest =
   | { kind: "clip"; clip: { x: 0; y: 0; width: number; height: number }; quality: number } // single mode

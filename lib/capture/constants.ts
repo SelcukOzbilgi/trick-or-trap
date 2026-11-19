@@ -55,6 +55,13 @@ export const LAYOUT_DRIFT_PX = 4;
 export const MAX_PLAUSIBLE_DPR = 8;
 export const MAX_PLAUSIBLE_PX = 1_000_000;
 
+/** A main-document status at or above this value gives the warning `http-error-status`. */
+export const HTTP_ERROR_STATUS_MIN = 400;
+/** The reload sample is compared by element count only when the larger count reaches this value. */
+export const RELOAD_ELEMENT_MIN_COUNT = 50;
+/** The larger eligible element count of the two samples may be at most this many times the smaller. */
+export const RELOAD_ELEMENT_RATIO_MAX = 3;
+
 /** Limits the in-page collector applies, so less data crosses CDP. */
 export const COLLECT_LIMITS: CollectLimits = {
   maxTagChars: MAX_TAG_CHARS,
@@ -71,10 +78,26 @@ export const MAX_HOP_URL_LENGTH = 8_192;
 export const GUARD_DECISION_TIMEOUT_MS = 5_000;
 /** Most distinct hosts a capture checks for non-document requests. */
 export const MAX_REQUEST_HOSTS = 100;
+/** Most distinct hosts a capture checks in all, document requests included. */
+export const MAX_LOOKUP_HOSTS = 300;
+/** Most origins the verdict cache holds. Four origins per host are possible for `MAX_LOOKUP_HOSTS` hosts. */
+export const MAX_VERDICT_CACHE_ENTRIES = 1_200;
+/** The guard sends one `Browser.getVersion` on its session this often. */
+export const GUARD_HEARTBEAT_INTERVAL_MS = 2_000;
+/** A heartbeat with no answer after this long counts as a lost guard. */
+export const GUARD_HEARTBEAT_TIMEOUT_MS = 5_000;
+/** Largest response body the WebSocket hardening re-serves, in bytes (8 MiB). Larger responses are refused. */
+export const MAX_REWRITE_BODY_BYTES = 8_388_608;
+/** The policy the hardening adds to every re-served response. It blocks `ws:` and `wss:` connections. */
+export const HARDENING_CSP = "connect-src http: https: data: blob:";
 /** Deadline for the whole stop chain (stop call and disconnect). */
 export const STOP_TIMEOUT_MS = 10_000;
 /** A tagged session older than this is stopped by the sweep helper. */
 export const STALE_SESSION_AGE_MS = 120_000;
+/** Sessions per list call: the vendor's largest page size. */
+export const SESSION_LIST_PAGE_SIZE = 100;
+/** Most pages one sweep reads, so 2,000 sessions at most. */
+export const SESSION_LIST_MAX_PAGES = 20;
 
 /**
  * Attribute names that name an outcome. A name that holds one of these fragments is
@@ -112,3 +135,10 @@ export const SESSION_TIMEOUT_MAX_MINUTES = 5;
 
 /** Longest `detail` text of an error, in characters. */
 export const MAX_DETAIL_CHARS = 200;
+
+/**
+ * The only names the gesture control of the opt-in live test may call: a plain global
+ * identifier of at most 64 characters. No dot, bracket, parenthesis or space gets through,
+ * so the name can never carry other code into `Runtime.evaluate`.
+ */
+export const GESTURE_FUNCTION_NAME: RegExp = /^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/;

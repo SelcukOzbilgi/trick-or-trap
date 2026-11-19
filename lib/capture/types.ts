@@ -17,6 +17,17 @@ export type UrlErrorCode =
   | "url-address-blocked"
   | "dns-failed";
 
+/**
+ * Why the request guard refused one request. A warning reason, never a capture error:
+ * the four extra codes are not in `CaptureErrorCode`.
+ */
+export type GuardReasonCode =
+  | UrlErrorCode
+  | "service-worker-blocked"
+  | "host-limit-reached"
+  | "response-too-large"
+  | "response-rewrite-failed";
+
 export type CaptureErrorCode =
   | UrlErrorCode
   | "config-invalid"
@@ -34,7 +45,8 @@ export type CaptureErrorCode =
   | "snapshot-invalid"
   | "snapshot-too-large"
   | "capture-timeout"
-  | "internal-error";
+  | "internal-error"
+  | "guard-lost";
 
 export type CaptureWarningCode =
   | "session-stop-failed"
@@ -48,7 +60,9 @@ export type CaptureWarningCode =
   | "popup-closed"
   | "request-blocked"
   | "request-host-limit"
-  | "layout-shifted";
+  | "layout-shifted"
+  | "http-error-status"
+  | "reload-differs";
 
 /** Fixed text per error code. The only source of `CaptureError.message`. */
 export const ERROR_MESSAGES: Record<CaptureErrorCode, string> = {
@@ -76,6 +90,7 @@ export const ERROR_MESSAGES: Record<CaptureErrorCode, string> = {
   "snapshot-too-large": "The captured page data is too large.",
   "capture-timeout": "The capture took too long.",
   "internal-error": "An internal error occurred during the capture.",
+  "guard-lost": "The safety check on the remote browser stopped working, so the capture was ended.",
 };
 
 /** Fixed text per warning code. The only source of `CaptureWarning.message`. */
@@ -92,20 +107,33 @@ export const WARNING_MESSAGES: Record<CaptureWarningCode, string> = {
   "request-blocked": "A navigation request was blocked by a safety check.",
   "request-host-limit": "The page contacted more hosts than the limit, so further requests to new hosts were blocked.",
   "layout-shifted": "The page layout moved while it was captured, so markers may be off.",
+  "http-error-status": "The page answered with an error status, so what was captured may be an error page.",
+  "reload-differs": "The page after the reload differs from the first load, so comparing the two reads may mislead.",
 };
 
 /**
- * `detail` may contain text controlled by the page or by target URLs. It is for
- * server logs only and must never be shown to a user.
+ * Internal. `detail` may contain text controlled by the page or by target URLs. It is
+ * for server logs only: never show it to a user and never put it in a public outcome.
  */
 export type CaptureError = { code: CaptureErrorCode; message: string; detail?: string };
 /** `reason` and `count` are set on `request-blocked`. No warning field holds a URL or host. */
 export type CaptureWarning = {
   code: CaptureWarningCode;
   message: string;
-  reason?: UrlErrorCode;
+  reason?: GuardReasonCode;
   count?: number;
 };
+
+/** Why a capture could not be scanned. The error code itself; see `COULD_NOT_SCAN_REASONS`. */
+export type CouldNotScanReason = CaptureErrorCode;
+
+/**
+ * The public outcome of a capture. The `could-not-scan` arm has no `detail`, no snapshot,
+ * no images and no findings, so it cannot be read as a clean result.
+ */
+export type ScanOutcome =
+  | { status: "captured"; snapshot: PageSnapshot; images: CaptureImage[]; warnings: CaptureWarning[] }
+  | { status: "could-not-scan"; reason: CouldNotScanReason; message: string; warnings: CaptureWarning[] };
 
 /** One JPEG image. All sizes are CSS px (image px equal CSS px with `scale: "css"`). */
 export type CaptureImage = {

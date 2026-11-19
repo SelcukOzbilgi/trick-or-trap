@@ -390,6 +390,35 @@ describe("capture metadata limits (6.8)", () => {
   });
 });
 
+describe("capture metadata httpStatus (page-capture-fixes-2, 12.8)", () => {
+  it("accepts an absent httpStatus and leaves it absent", () => {
+    const parsed = CaptureMetaSchema.parse(validMetaWithoutImages);
+    expect(parsed).not.toHaveProperty("httpStatus");
+  });
+
+  it.each([100, 200, 404, 599])("accepts httpStatus %s and keeps it", (httpStatus) => {
+    expect(CaptureMetaSchema.parse(metaWith({ httpStatus })).httpStatus).toBe(httpStatus);
+  });
+
+  it.each([99, 600, 200.5, 0, -1, Number.NaN])("rejects httpStatus %s", (httpStatus) => {
+    expect(CaptureMetaSchema.safeParse(metaWith({ httpStatus })).success).toBe(false);
+  });
+
+  it("rejects a httpStatus that is not a number", () => {
+    expect(CaptureMetaSchema.safeParse(metaWith({ httpStatus: "404" })).success).toBe(false);
+  });
+
+  it("accepts httpStatus inside a snapshot and inside afterReload", () => {
+    const parsed = PageSnapshotSchema.parse({
+      ...validBaseSnapshot,
+      capture: metaWith({ httpStatus: 404 }),
+      afterReload: withCapture(metaWith({ light: true, httpStatus: 500 })),
+    });
+    expect(parsed.capture?.httpStatus).toBe(404);
+    expect(parsed.afterReload?.capture?.httpStatus).toBe(500);
+  });
+});
+
 describe("old shapes still parse (6.9)", () => {
   it("parses a snapshot with the old capture metadata and no layoutWidth", () => {
     const parsed = PageSnapshotSchema.parse(withCapture(validMetaWithImages));

@@ -83,6 +83,8 @@ export const CaptureMetaSchema = z.object({
   elementsTruncated: z.boolean(),
   /** True for the lighter sample read after a reload. */
   light: z.boolean(),
+  /** HTTP status of the main document of this load. Absent when it was not known. */
+  httpStatus: z.number().int().min(100).max(599).optional(),
   /** Absent on samples without a screenshot (the reload sample). */
   images: z
     .object({

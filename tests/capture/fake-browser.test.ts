@@ -152,6 +152,50 @@ describe("fake browser scripting", () => {
   });
 });
 
+describe("fake browser navigation status", () => {
+  it("leaves status absent by default", async () => {
+    const { page } = await openPage();
+    const first = await page.goto("https://a.example/", { timeoutMs: 1 });
+    const second = await page.reload({ timeoutMs: 1 });
+    expect("status" in first).toBe(false);
+    expect("status" in second).toBe(false);
+  });
+
+  it("returns the scripted status of goto and of reload, each on its own", async () => {
+    const { page } = await openPage(createFakeBrowser({ gotoStatus: 404, reloadStatus: 503 }));
+    expect(await page.goto("https://a.example/", { timeoutMs: 1 })).toEqual({ finalUrl: "https://a.example/", status: 404 });
+    expect(await page.reload({ timeoutMs: 1 })).toEqual({ finalUrl: "https://a.example/", status: 503 });
+
+    const onlyFirst = await openPage(createFakeBrowser({ gotoStatus: 200 }));
+    expect(await onlyFirst.page.goto("https://a.example/", { timeoutMs: 1 })).toEqual({
+      finalUrl: "https://a.example/",
+      status: 200,
+    });
+    expect("status" in (await onlyFirst.page.reload({ timeoutMs: 1 }))).toBe(false);
+  });
+
+  it("keeps the status next to the final URL of the last hop", async () => {
+    const { page } = await openPage(
+      createFakeBrowser({ hops: ["https://a.example/", "https://b.example/"], gotoStatus: 410 }),
+    );
+    await page.installGuards(guardsAllowing(["https://a.example/", "https://b.example/"]).guards);
+    expect(await page.goto("https://a.example/", { timeoutMs: 1 })).toEqual({
+      finalUrl: "https://b.example/",
+      status: 410,
+    });
+  });
+
+  it("lets a scripted outcome carry its own status", async () => {
+    const { page } = await openPage(
+      createFakeBrowser({ goto: { finalUrl: "https://c.example/", status: 500 }, gotoStatus: 200 }),
+    );
+    expect(await page.goto("https://a.example/", { timeoutMs: 1 })).toEqual({
+      finalUrl: "https://c.example/",
+      status: 500,
+    });
+  });
+});
+
 describe("fake browser scrolling and screenshots", () => {
   it("returns the requested y by default and logs every scrollTo", async () => {
     const { fake, page } = await openPage();
@@ -230,6 +274,19 @@ describe("fake browser guards and hops", () => {
     await page.installGuards(guards);
     fake.emit({ kind: "download-refused" });
     expect(reported).toEqual([{ kind: "download-refused" }]);
+  });
+
+  it("lets a test lose the guard with one call", async () => {
+    const { fake, page } = await openPage();
+    const { guards, reported } = guardsAllowing([]);
+    await page.installGuards(guards);
+    fake.loseGuard();
+    expect(reported).toEqual([{ kind: "guard-lost" }]);
+  });
+
+  it("does nothing when the guard is lost before guards are installed", async () => {
+    const fake = createFakeBrowser();
+    expect(() => fake.loseGuard()).not.toThrow();
   });
 });
 

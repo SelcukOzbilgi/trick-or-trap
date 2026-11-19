@@ -29,13 +29,22 @@ import { isOutsideImages, sanitiseMetrics, toDocumentBox, type ImageBox, type Sc
 import { CaptureFailure } from "./types";
 import type { CollectOptions, RawCollection, RawElement, RawPageRead } from "./types";
 
+/** Type of a getter taken from a prototype; erased at build time. */
+type Getter<This, Result> = (this: This) => Result;
+
 /**
- * Runs inside the page (in an isolated world once task 10 lands), serialised by
- * Playwright or CDP. It must stay self-contained: no imports, no closures over
- * module scope, no named inner functions (a build step may wrap those in helpers that
- * do not exist in the page), and plain ES2017 syntax apart from `catch` without a
- * binding. One call reads every element and returns the pixel ratio. It returns no
- * other page metric: those come from CDP.
+ * Runs inside the page, in an isolated world, serialised by CDP. It must stay
+ * self-contained: no imports, no closures over module scope, no named inner functions
+ * (a build step may wrap those in helpers that do not exist in the page), and plain
+ * ES2017 syntax apart from `catch` without a binding. One call reads every element and
+ * returns the pixel ratio. It returns no other page metric: those come from CDP.
+ *
+ * DOM clobbering: a `<form>` exposes its controls as named properties that shadow its
+ * own members (`tagName`, `children`, `getAttribute`, ...), in every world. So the
+ * collector takes every getter and method it needs from the prototypes before it reads
+ * any element, and calls them with `.call`. It never reads a DOM member by name from an
+ * element. A getter that throws for an element of another kind (`innerText` on an SVG
+ * element, `checked` on a non-input) is caught and falls back.
  *
  * The collector applies `options.limits` to what it returns, so less data crosses the
  * wire. It cuts strings with `substring`, and reads styles inside `try`, so that a
@@ -43,6 +52,57 @@ import type { CollectOptions, RawCollection, RawElement, RawPageRead } from "./t
  * outside pass (`buildSample`) never trusts the result and applies the caps again.
  */
 export function collectInPage(options: CollectOptions): RawCollection {
+  // Prototype members, taken first. The `.get` of a descriptor is the getter itself.
+  const own = Object.getOwnPropertyDescriptor;
+  const documentElementGet = (own(Document.prototype, "documentElement") as PropertyDescriptor).get as Getter<
+    Document,
+    Element
+  >;
+  const tagNameGet = (own(Element.prototype, "tagName") as PropertyDescriptor).get as Getter<Element, string>;
+  const childrenGet = (own(Element.prototype, "children") as PropertyDescriptor).get as Getter<
+    Element,
+    HTMLCollection
+  >;
+  const attributesGet = (own(Element.prototype, "attributes") as PropertyDescriptor).get as Getter<
+    Element,
+    NamedNodeMap
+  >;
+  const getAttributeFn = Element.prototype.getAttribute;
+  const hasAttributeFn = Element.prototype.hasAttribute;
+  const getRectFn = Element.prototype.getBoundingClientRect;
+  const childNodesGet = (own(Node.prototype, "childNodes") as PropertyDescriptor).get as Getter<Node, NodeList>;
+  const nodeTypeGet = (own(Node.prototype, "nodeType") as PropertyDescriptor).get as Getter<Node, number>;
+  const nodeValueGet = (own(Node.prototype, "nodeValue") as PropertyDescriptor).get as Getter<Node, string | null>;
+  const textContentGet = (own(Node.prototype, "textContent") as PropertyDescriptor).get as Getter<
+    Node,
+    string | null
+  >;
+  // Some DOM implementations used in tests have no `innerText`; the fallback is `textContent`.
+  const innerTextDescriptor = own(HTMLElement.prototype, "innerText");
+  const innerTextGet = innerTextDescriptor === undefined ? undefined : (innerTextDescriptor.get as Getter<Element, unknown>);
+  const checkedGet = (own(HTMLInputElement.prototype, "checked") as PropertyDescriptor).get as Getter<
+    HTMLInputElement,
+    boolean
+  >;
+  const selectedGet = (own(HTMLOptionElement.prototype, "selected") as PropertyDescriptor).get as Getter<
+    HTMLOptionElement,
+    boolean
+  >;
+  const collectionLengthGet = (own(HTMLCollection.prototype, "length") as PropertyDescriptor).get as Getter<
+    HTMLCollection,
+    number
+  >;
+  const collectionItemFn = HTMLCollection.prototype.item;
+  const nodeListLengthGet = (own(NodeList.prototype, "length") as PropertyDescriptor).get as Getter<NodeList, number>;
+  const nodeListItemFn = NodeList.prototype.item;
+  const mapLengthGet = (own(NamedNodeMap.prototype, "length") as PropertyDescriptor).get as Getter<
+    NamedNodeMap,
+    number
+  >;
+  const mapItemFn = NamedNodeMap.prototype.item;
+  const attrNameGet = (own(Attr.prototype, "name") as PropertyDescriptor).get as Getter<Attr, string>;
+  const attrValueGet = (own(Attr.prototype, "value") as PropertyDescriptor).get as Getter<Attr, string>;
+
   const limits = options.limits;
   const full = options.attributeNames === "full";
   const names: readonly string[] = full
@@ -58,24 +118,43 @@ export function collectInPage(options: CollectOptions): RawCollection {
   // `path` is null for an element deeper than `limits.maxPathDepth`: it is still
   // visited and counted, but no path array is built for it, and it is not collected.
   const stack: { el: Element; path: number[] | null; depth: number }[] = [
-    { el: document.documentElement, path: [], depth: 0 },
+    { el: documentElementGet.call(document), path: [], depth: 0 },
   ];
 
   while (stack.length > 0) {
     const item = stack.pop() as { el: Element; path: number[] | null; depth: number };
     const el = item.el;
-    const fullTag = el.tagName.toLowerCase();
+    const fullTag = tagNameGet.call(el).toLowerCase();
     if (skipTags.indexOf(fullTag) >= 0) continue;
     const tag = fullTag.length > limits.maxTagChars ? fullTag.substring(0, limits.maxTagChars) : fullTag;
 
-    const children = el.children;
+    const children = childrenGet.call(el);
     const childPath = item.path !== null && item.depth < limits.maxPathDepth ? item.path : null;
-    for (let i = children.length - 1; i >= 0; i--) {
+    for (let i = collectionLengthGet.call(children) - 1; i >= 0; i--) {
       stack.push({
-        el: children[i],
+        el: collectionItemFn.call(children, i) as Element,
         path: childPath === null ? null : childPath.concat([i]),
         depth: item.depth + 1,
       });
+    }
+
+    // Form state. A getter throws for an element of another kind (an SVG element named
+    // "input"), which reads as not checked and not selected.
+    let checked = false;
+    if (fullTag === "input") {
+      try {
+        checked = checkedGet.call(el as HTMLInputElement) === true;
+      } catch {
+        checked = false;
+      }
+    }
+    let selected = false;
+    if (tag === "option") {
+      try {
+        selected = selectedGet.call(el as HTMLOptionElement) === true;
+      } catch {
+        selected = false;
+      }
     }
 
     // Eligibility.
@@ -83,15 +162,15 @@ export function collectInPage(options: CollectOptions): RawCollection {
     let eligible = isControl;
     let visibleText = isControl;
     if (tag === "option") {
-      isControl = (el as HTMLOptionElement).selected === true;
+      isControl = selected;
       eligible = isControl;
       visibleText = isControl;
     } else if (!eligible) {
       if (
-        (tag === "a" && el.hasAttribute("href")) ||
+        (tag === "a" && hasAttributeFn.call(el, "href")) ||
         tag === "label" ||
         tag === "summary" ||
-        el.hasAttribute("role")
+        hasAttributeFn.call(el, "role")
       ) {
         eligible = true;
         visibleText = true;
@@ -99,10 +178,12 @@ export function collectInPage(options: CollectOptions): RawCollection {
     }
     let ownText = "";
     if (!eligible) {
-      for (let i = 0; i < el.childNodes.length; i++) {
-        const node = el.childNodes[i];
-        if (node.nodeType === 3) {
-          const value = node.nodeValue || "";
+      const nodes = childNodesGet.call(el);
+      const nodeCount = nodeListLengthGet.call(nodes);
+      for (let i = 0; i < nodeCount; i++) {
+        const node = nodeListItemFn.call(nodes, i) as Node;
+        if (nodeTypeGet.call(node) === 3) {
+          const value = nodeValueGet.call(node) || "";
           if (value.trim() !== "") {
             eligible = true;
             ownText += " " + value;
@@ -112,19 +193,26 @@ export function collectInPage(options: CollectOptions): RawCollection {
     }
     if (!eligible) continue;
 
-    const rect = el.getBoundingClientRect();
+    const rect = getRectFn.call(el);
     if (!isControl && (rect.width <= 0 || rect.height <= 0)) continue;
 
     eligibleCount++;
     // An element past the depth cap or the element cap is counted and not collected.
     if (item.path === null || elements.length >= options.maxElements) continue;
 
-    // Text.
+    // Text. `innerText` throws for an element that is not an HTML element (SVG), and is
+    // missing in some DOM implementations; both fall back to `textContent`.
     let rawText = ownText;
     if (visibleText) {
-      // Some DOM implementations used in tests have no `innerText`; fall back to `textContent`.
-      const inner = (el as HTMLElement).innerText;
-      rawText = typeof inner === "string" ? inner : el.textContent || "";
+      let inner: unknown;
+      if (innerTextGet !== undefined) {
+        try {
+          inner = innerTextGet.call(el);
+        } catch {
+          inner = undefined;
+        }
+      }
+      rawText = typeof inner === "string" ? inner : textContentGet.call(el) || "";
     }
     const collapsed = rawText.replace(/\s+/g, " ").trim();
     const cut = collapsed.length > options.maxTextChars;
@@ -132,11 +220,14 @@ export function collectInPage(options: CollectOptions): RawCollection {
     // Attributes: allowlist, at most `maxAttrsPerElement`, names and values cut.
     const attrs: Record<string, string> = {};
     let attrCount = 0;
-    const inputType = (el.getAttribute("type") || "").toLowerCase();
-    for (let i = 0; i < el.attributes.length && attrCount < limits.maxAttrsPerElement; i++) {
-      const attr = el.attributes[i];
-      if (attr.name.length > limits.maxAttrNameChars) continue;
-      const name = attr.name.toLowerCase();
+    const inputType = (getAttributeFn.call(el, "type") || "").toLowerCase();
+    const attributes = attributesGet.call(el);
+    const attributeTotal = mapLengthGet.call(attributes);
+    for (let i = 0; i < attributeTotal && attrCount < limits.maxAttrsPerElement; i++) {
+      const attr = mapItemFn.call(attributes, i) as Attr;
+      const attrName = attrNameGet.call(attr);
+      if (attrName.length > limits.maxAttrNameChars) continue;
+      const name = attrName.toLowerCase();
       if (!(names.indexOf(name) >= 0 || (full && name.indexOf("aria-") === 0))) continue;
       if (
         name === "value" &&
@@ -144,13 +235,14 @@ export function collectInPage(options: CollectOptions): RawCollection {
       ) {
         continue;
       }
+      const attrValue = attrValueGet.call(attr);
       attrs[name] =
-        attr.value.length > options.maxAttrChars ? attr.value.substring(0, options.maxAttrChars) : attr.value;
+        attrValue.length > options.maxAttrChars ? attrValue.substring(0, options.maxAttrChars) : attrValue;
       attrCount++;
     }
 
     // Role and styles, cut at their caps. A style that cannot be read becomes "".
-    const roleAttr = el.getAttribute("role");
+    const roleAttr = getAttributeFn.call(el, "role");
     const role =
       roleAttr !== null && roleAttr.length > limits.maxRoleChars ? roleAttr.substring(0, limits.maxRoleChars) : roleAttr;
     let style: CSSStyleDeclaration | null = null;
@@ -179,8 +271,8 @@ export function collectInPage(options: CollectOptions): RawCollection {
       textTruncated: cut,
       rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
       style: styleOut as RawElement["style"],
-      checked: (el as HTMLInputElement).checked === true,
-      selected: (el as HTMLOptionElement).selected === true,
+      checked,
+      selected,
       attrs,
     });
   }
