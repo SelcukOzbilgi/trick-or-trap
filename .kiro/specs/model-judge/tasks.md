@@ -22,12 +22,12 @@ Rules for every task:
   - [x] 1.4 Run both test files, then `npx tsc --noEmit`.
   _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 2. Redaction
+- [x] 2. Redaction
   Uses: `lib/judge/constants.ts`. Read: requirement 4; design §10; note 2.4.
   Files: `lib/judge/redact.ts`, `tests/judge/redact.test.ts`.
-  - [ ] 2.1 Create `tests/judge/redact.test.ts` first: one case per rule of 4.1 to 4.5, including "0532 123 45 67", a card number with spaces, an 11-digit number and an IBAN; the order of 4.6; prices ("2.450,00 TL", "$24.99"), "Only 3 left", "12:45" and "Priya from Cardiff" kept; `isMostlyRedacted` above and below one half; the seeded property test of design §10.
-  - [ ] 2.2 Create `redact.ts`.
-  - [ ] 2.3 Run the test file, then `npx tsc --noEmit`.
+  - [x] 2.1 Create `tests/judge/redact.test.ts` first: one case per rule of 4.1 to 4.5, including "0532 123 45 67", a card number with spaces, an 11-digit number and an IBAN; the order of 4.6; prices ("2.450,00 TL", "$24.99"), "Only 3 left", "12:45" and "Priya from Cardiff" kept; `isMostlyRedacted` above and below one half; the seeded property test of design §10.
+  - [x] 2.2 Create `redact.ts`.
+  - [x] 2.3 Run the test file, then `npx tsc --noEmit`.
   _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9_
 
 - [ ] 3. Candidate builder I: eligibility, normalisation and structure
