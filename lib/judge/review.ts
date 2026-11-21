@@ -188,6 +188,8 @@ const LOGGED_STOP_REASONS: readonly string[] = [
   "max_tokens",
   "stop_sequence",
   "refusal",
+  "pause_turn",
+  "tool_use",
 ];
 
 /** Only values of the fixed set are logged; anything else is `other`. */
@@ -264,7 +266,11 @@ async function run(
   trace.usage = loggedUsage(response.usage);
 
   const validated = validateOutput(response, built.map, ruleFindings);
-  if (validated.kind === "invalid") return { status: "invalid-output" };
+  if (validated.kind === "invalid") {
+    // Requirement 22.9: a refused stop reason leaves its code in the record.
+    if (validated.code !== undefined) trace.anomalies = [validated.code];
+    return { status: "invalid-output" };
+  }
   trace.findingsReturned = validated.returned;
   trace.findingsKept = validated.findings.length;
   for (const verdict of validated.verdicts) trace.verdicts[verdict.decision] += 1;

@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { createMockJudge } from "@/lib/judge/mock";
+import { createCooldown, reviewFindings } from "@/lib/judge/review";
 import { DISCLAIMER, STATUS_REASONS, statusLine } from "@/lib/judge/summary";
 import { JUDGE_STATUSES } from "@/lib/judge/types";
 import type { JudgeStatus, ReviewResult } from "@/lib/judge/types";
+import { createHarness } from "@/tests/judge/helpers/harness";
+import { makeSnapshot, makeText } from "@/tests/judge/helpers/snapshot";
 
 const RULE_ERROR_SENTENCE =
   "Part of the rule check failed, so this result is incomplete.";
@@ -181,4 +185,52 @@ describe("statusLine enumeration (9 statuses x 2 list states x 2 error states)",
       expect(line.includes("No possible patterns found")).toBe(empty);
     }
   });
+});
+
+describe("statusLine for a result of a refused stop reason (22.10)", () => {
+  const PAGE = makeSnapshot([makeText("el-0", "p", "Only 3 left in stock")]);
+  const RESPONSE_TEXT = JSON.stringify({ findings: [], verdicts: [] });
+  const USAGE = { input: 10, output: 5, cacheRead: 0, cacheWrite: 0 };
+
+  async function reviewWith(stopReason: string, withFinding: boolean): Promise<ReviewResult> {
+    const harness = createHarness();
+    const finding = resultFor("ran", true, 0).findings[0].finding;
+    return reviewFindings(
+      PAGE,
+      { findings: withFinding ? [{ ...finding, elementIds: ["el-0"] }] : [], errors: [] },
+      {
+        mode: "gateway",
+        client: createMockJudge({ text: RESPONSE_TEXT, stopReason, usage: USAGE }),
+        now: harness.now,
+        deadline: harness.now() + 20_000,
+        cooldown: createCooldown(),
+        log: () => {},
+        setTimer: harness.setTimer,
+      },
+    );
+  }
+
+  it.each(["refusal", "pause_turn", "max_tokens", "tool_use", "placeholder-stop"])(
+    "gives the rules-only line with its reason for stop reason %s",
+    async (stopReason) => {
+      const result = await reviewWith(stopReason, true);
+      expect(result.judge.status).toBe("invalid-output");
+      expect(statusLine(result)).toBe(
+        "Checked by rules only. The language-model reviewer did not run (its answer could not be used), so wording outside the rules was not checked. Automated detection — may be wrong.",
+      );
+    },
+  );
+
+  it.each(["refusal", "pause_turn", "max_tokens", "tool_use", "placeholder-stop"])(
+    "gives the empty rules-only line for stop reason %s with no findings",
+    async (stopReason) => {
+      // The empty line has no reason for any status that did not run (design
+      // section 14); it says the reviewer did not run.
+      const result = await reviewWith(stopReason, false);
+      expect(result.judge.status).toBe("invalid-output");
+      expect(statusLine(result)).toBe(
+        "No possible patterns found by the rules. The reviewer did not run. Automated detection — may be wrong.",
+      );
+    },
+  );
 });

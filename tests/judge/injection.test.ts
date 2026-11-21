@@ -874,6 +874,49 @@ describe("A10: invalid responses", () => {
     expect(records).toHaveLength(1);
     expect(records[0].attempts).toBe(1);
   });
+
+  // Requirement 22.7: a refusal or another refused stop reason never gives
+  // findings or verdicts, even when its text is a valid answer.
+  it.each(["refusal", "pause_turn", "tool_use", "max_tokens", "placeholder-stop"])(
+    "gives invalid-output and the rules-only result for stop reason %s with a valid answer in its text",
+    async (stopReason) => {
+      const { result, client, records } = await scan(SIMPLE_PAGE, rules, (data) =>
+        rawAnswer(
+          JSON.stringify({
+            findings: [
+              flag(candidateIdFor(data, "Free delivery"), "fake-scarcity", "Free delivery", "vague-low-stock"),
+            ],
+            verdicts: [verdict(ruleIdFor(data, "Only 3 left"), "reject", "neutral-stock-fact")],
+          }),
+          stopReason,
+        ),
+      );
+      expect(client.calls).toBe(1);
+      expect(result.judge.status).toBe("invalid-output");
+      expectRulesOnly(result, rules);
+      expect(judgeOnly(result)).toHaveLength(0);
+      expect(records).toHaveLength(1);
+      expect(records[0].anomalies).toHaveLength(1);
+      expect(records[0].findingsReturned).toBe(0);
+      expect(records[0].verdicts).toEqual({ confirm: 0, downgrade: 0, reject: 0 });
+    },
+  );
+
+  it("answers the same text with end_turn as a run, so the stop reason alone decides", async () => {
+    const { result } = await scan(SIMPLE_PAGE, rules, (data) =>
+      rawAnswer(
+        JSON.stringify({
+          findings: [
+            flag(candidateIdFor(data, "Free delivery"), "fake-scarcity", "Free delivery", "vague-low-stock"),
+          ],
+          verdicts: [verdict(ruleIdFor(data, "Only 3 left"), "reject", "neutral-stock-fact")],
+        }),
+        "end_turn",
+      ),
+    );
+    expect(result.judge.status).toBe("ran");
+    expect(judgeOnly(result).length + result.setAside.length).toBeGreaterThan(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

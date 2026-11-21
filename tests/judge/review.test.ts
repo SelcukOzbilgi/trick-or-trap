@@ -590,11 +590,45 @@ describe("reviewFindings: a run", () => {
     expectRulesOnly(result);
   });
 
-  it("reports invalid-output for a response cut at the token limit", async () => {
-    const client = createMockJudge(response(EMPTY_OUTPUT, { stopReason: "max_tokens" }));
-    const { deps } = setup(client);
+  // Requirement 22 (replaces 9.2): every stop reason other than end_turn and
+  // stop_sequence gives invalid-output, with one call and no retry.
+  it.each([
+    ["refusal", "stop-refusal"],
+    ["pause_turn", "stop-pause-turn"],
+    ["max_tokens", "stop-max-tokens"],
+    ["tool_use", "stop-tool-use"],
+    ["", "stop-unknown"],
+    ["placeholder-stop", "stop-unknown"],
+  ])(
+    "reports invalid-output for stop reason %j with one call and the rules unchanged (22.2 to 22.8)",
+    async (stopReason, code) => {
+      const client = createMockJudge([
+        response(RAN_OUTPUT, { stopReason }),
+        response(EMPTY_OUTPUT),
+      ]);
+      const { deps, records } = setup(client);
+      const result = await reviewFindings(PAGE, ruleResult(), deps);
+      expect(client.calls).toBe(1);
+      expect(result.judge).toEqual({
+        status: "invalid-output",
+        candidateCount: CANDIDATE_COUNT,
+        truncated: false,
+      });
+      expectRulesOnly(result);
+      expect(result.findings.every((entry) => entry.source === "rules")).toBe(true);
+      expect(result.setAside).toEqual([]);
+      expect(records).toHaveLength(1);
+      expect(records[0].anomalies).toEqual([code]);
+    },
+  );
+
+  it("accepts stop_sequence like end_turn (22.1)", async () => {
+    const client = createMockJudge(response(RAN_OUTPUT, { stopReason: "stop_sequence" }));
+    const { deps, records } = setup(client);
     const result = await reviewFindings(PAGE, ruleResult(), deps);
-    expect(result.judge.status).toBe("invalid-output");
+    expect(result.judge.status).toBe("ran");
+    expect(records[0].stopReason).toBe("stop_sequence");
+    expect(records[0].anomalies).toEqual([]);
   });
 
   it("sorts the rule findings by document position when the judge did not run", async () => {
