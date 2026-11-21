@@ -55,6 +55,13 @@ describe("limits of design section 9", () => {
     expect(constants.LOWERED_MIN_RULE_FINDINGS).toBe(3);
   });
 
+  it("pins the visibility limits of design section 24.2 (requirement 21.2 to 21.5)", () => {
+    expect(constants.MIN_VISIBLE_BOX_PX).toBe(4);
+    expect(constants.MIN_FONT_PX).toBe(6);
+    expect(constants.MIN_EFFECTIVE_OPACITY).toBe(0.1);
+    expect(constants.MIN_TEXT_CONTRAST).toBe(1.2);
+  });
+
   it("pins every timing", () => {
     expect(constants.FIRST_TIMEOUT_MS).toBe(8_000);
     expect(constants.FIRST_MARGIN_MS).toBe(1_500);

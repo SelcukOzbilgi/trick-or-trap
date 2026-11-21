@@ -23,6 +23,17 @@ export const REDACTED_SHARE_MAX = 0.5;
 export const MAX_RULE_FINDINGS_SENT = 20;
 export const MAX_TOTAL_CANDIDATE_CHARS = 10_000;
 
+// -- Text the shopper cannot see (design section 24.2) ------------------------
+
+/** A box under this many pixels wide or high is not seen (21.2). */
+export const MIN_VISIBLE_BOX_PX = 4;
+/** A known font size under this many pixels is not read (21.3). */
+export const MIN_FONT_PX = 6;
+/** Own opacity times the opacities of the ancestors under this is not seen (21.4). */
+export const MIN_EFFECTIVE_OPACITY = 0.1;
+/** Text contrast under this on a known background is not read (21.5). */
+export const MIN_TEXT_CONTRAST = 1.2;
+
 // -- Request size -------------------------------------------------------------
 
 export const MAX_DATA_BLOCK_BYTES = 24_000;

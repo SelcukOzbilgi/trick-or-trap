@@ -31,18 +31,24 @@ export function makeElement(input: ElementInput, index = 0): ElementSnapshot {
   };
 }
 
-/** A snapshot over the given elements, in the given order. */
+/**
+ * A snapshot over the given elements, in the given order. `fullHeight` is at
+ * least the bottom of the last default box (requirement 21.1: a box below the
+ * page is not sent), so a page of 1,500 default rows stays on the page; an
+ * explicit `extra.fullHeight` wins.
+ */
 export function makeSnapshot(
   elements: readonly ElementInput[],
   extra: Partial<PageSnapshot> = {},
 ): PageSnapshot {
+  const lastDefaultBottom = 100 + 40 * Math.max(0, elements.length - 1) + 24;
   return PageSnapshotSchema.parse({
     url: "https://shop.example/",
     capturedAt: SNAPSHOT_CAPTURED_AT,
     viewportWidth: 1280,
     viewportHeight: 800,
     fullWidth: 1280,
-    fullHeight: 2000,
+    fullHeight: Math.max(2000, lastDefaultBottom),
     elements: elements.map((input, index) => makeElement(input, index)),
     ...extra,
   });

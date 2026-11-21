@@ -17,7 +17,11 @@ import {
   MAX_PART_CHARS,
   MAX_RULE_FINDINGS_SENT,
   MAX_TOTAL_CANDIDATE_CHARS,
+  MIN_EFFECTIVE_OPACITY,
+  MIN_FONT_PX,
   MIN_TEXT_CHARS,
+  MIN_TEXT_CONTRAST,
+  MIN_VISIBLE_BOX_PX,
   RANK_SCORES,
   ROLE_COVERAGE_MIN,
   TOAST_MAX_CHARS,
@@ -100,7 +104,14 @@ function isLineWhitespace(code: number): boolean {
   return code >= 0x09 && code <= 0x0d;
 }
 
-/** The control, zero-width and bidirectional formatting ranges of 5.5. */
+/**
+ * The control, zero-width and bidirectional formatting ranges of 5.5, and the
+ * invisible code points of 21.11: the tag block U+E0000 to U+E007F, the soft
+ * hyphen, the Arabic letter mark, the Mongolian vowel separator, the braille
+ * blank and the Hangul fillers. NFKC turns U+3164 and U+FFA0 into U+1160
+ * before this runs; the three stay listed so a change of order cannot reopen
+ * them.
+ */
 function isRemovedCharacter(code: number): boolean {
   return (
     code <= 0x1f ||
@@ -108,7 +119,16 @@ function isRemovedCharacter(code: number): boolean {
     (code >= 0x200b && code <= 0x200f) ||
     (code >= 0x202a && code <= 0x202e) ||
     (code >= 0x2060 && code <= 0x2069) ||
-    code === 0xfeff
+    code === 0xfeff ||
+    (code >= 0xe0000 && code <= 0xe007f) ||
+    code === 0x00ad ||
+    code === 0x061c ||
+    code === 0x180e ||
+    code === 0x2800 ||
+    code === 0x3164 ||
+    code === 0x115f ||
+    code === 0x1160 ||
+    code === 0xffa0
   );
 }
 
@@ -133,9 +153,10 @@ function cutAtBoundary(text: string, max: number): { text: string; cut: boolean 
 }
 
 /**
- * Normalise candidate text: NFKC, removal of control, zero-width and
- * bidirectional formatting characters, whitespace collapse, and a cut at 200
- * characters at a character boundary with `cut: true`.
+ * Normalise candidate text: NFKC, removal of control, zero-width,
+ * bidirectional formatting and other invisible characters, whitespace
+ * collapse, and a cut at 200 characters at a character boundary with
+ * `cut: true`.
  *
  * A tab and a line break are whitespace here: removing them as control
  * characters would glue the words of two lines together.
@@ -149,7 +170,7 @@ export function normaliseCandidateText(raw: string): {
 
 // -- Element classes ----------------------------------------------------------
 
-/** Controls for the zero-box rule (design section 3). */
+/** Tags of controls (design section 3); a control is never a fragment. */
 const CONTROL_TAGS: ReadonlySet<string> = new Set([
   "input",
   "button",
@@ -193,6 +214,64 @@ function isStyleHidden(el: IndexedElement): boolean {
     el.visibility === "collapse" ||
     el.opacity <= 0
   );
+}
+
+// -- Text the shopper cannot see (requirements 21.1 to 21.10, design 24.2) ----
+
+/** The page area in pixels; an edge that is not a positive number is not tested. */
+type PageArea = { width: number | null; height: number | null };
+
+function edgeOf(full: number, viewport: number): number | null {
+  const values = [full, viewport].filter((value) => Number.isFinite(value));
+  if (values.length === 0) return null;
+  const largest = Math.max(...values);
+  return largest > 0 ? largest : null;
+}
+
+/** The page area from the snapshot's own width and height fields (21.1). */
+function pageAreaOf(snapshot: PageSnapshot): PageArea {
+  return {
+    width: edgeOf(snapshot.fullWidth, snapshot.viewportWidth),
+    height: edgeOf(snapshot.fullHeight, snapshot.viewportHeight),
+  };
+}
+
+/**
+ * Tests 2 to 6 of design section 24.2 on one carrier of text: off-screen box,
+ * tiny box, tiny font, faint effective opacity and low contrast on a known
+ * background. Test 1 (style) is `isStyleHidden`. Every test uses only fields
+ * the snapshot holds. `boxExempt` skips the box tests for an element whose
+ * box says nothing about what is shown (a selected option of a closed select).
+ * The three call sites (eligibility, parts, role coverage) share this
+ * function so that they cannot differ.
+ */
+function isShopperVisible(
+  el: IndexedElement,
+  index: ElementIndex,
+  page: PageArea,
+  boxExempt: boolean,
+): boolean {
+  if (!boxExempt) {
+    const { x, y, width, height } = el.box;
+    // 2. Off-screen: entirely outside the page area.
+    if (x + width <= 0 || y + height <= 0) return false;
+    if (page.width !== null && x >= page.width) return false;
+    if (page.height !== null && y >= page.height) return false;
+    // 3. Tiny box.
+    if (width < MIN_VISIBLE_BOX_PX || height < MIN_VISIBLE_BOX_PX) return false;
+  }
+  // 4. Tiny font.
+  if (el.fontSizePx !== null && el.fontSizePx < MIN_FONT_PX) return false;
+  // 5. Faint effective opacity: own times the opacities of captured ancestors.
+  let opacity = el.opacity;
+  for (const ancestor of index.ancestors(el)) opacity *= ancestor.opacity;
+  if (opacity < MIN_EFFECTIVE_OPACITY) return false;
+  // 6. Low contrast, only on a known background and a readable colour.
+  const contrast = textContrast(index, el);
+  if (contrast !== null && !contrast.assumed && contrast.ratio < MIN_TEXT_CONTRAST) {
+    return false;
+  }
+  return true;
 }
 
 function round(value: number, places: number): number {
@@ -266,17 +345,28 @@ export function prepareCandidates(snapshot: PageSnapshot): PreparedCandidates {
   const isSelectedOption = (el: IndexedElement): boolean =>
     el.tag === "option" && rawById.get(el.id)?.selected === true;
 
-  // Requirements 5.2 and 5.3.
+  // Design section 24.2, tests 2 to 6, memoised per element. A selected option
+  // is exempt from the box tests: a closed select reports a zero box.
+  const page = pageAreaOf(snapshot);
+  const seenCache = new Map<number, boolean>();
+  const seen = (el: IndexedElement): boolean => {
+    const known = seenCache.get(el.order);
+    if (known !== undefined) return known;
+    const result = isShopperVisible(el, index, page, isSelectedOption(el));
+    seenCache.set(el.order, result);
+    return result;
+  };
+
+  // Requirements 5.3 and 21.1 to 21.8. A checkbox or a radio is sent whatever
+  // its box (it has no text of its own; its label is the carrier, tested where
+  // it is merged). Every other element is its own carrier.
   const eligible = (el: IndexedElement): boolean => {
     if (hidden[el.order]) return false;
-    if (!CONTROL_TAGS.has(el.tag) && (el.box.width === 0 || el.box.height === 0)) {
+    if (toggleType(el) !== null) return true;
+    if (fullText[el.order].length < MIN_TEXT_CHARS && !isSelectedOption(el)) {
       return false;
     }
-    return (
-      fullText[el.order].length >= MIN_TEXT_CHARS ||
-      toggleType(el) !== null ||
-      isSelectedOption(el)
-    );
+    return seen(el);
   };
 
   // Next captured sibling of every element (requirement 6.4).
@@ -297,7 +387,9 @@ export function prepareCandidates(snapshot: PageSnapshot): PreparedCandidates {
     if (toggleType(el) === null || !eligible(el)) continue;
     const wrapping = index.ancestors(el).find((a) => a.tag === "label");
     const label = wrapping ?? nextSibling.get(el.order);
-    if (!label || label.tag !== "label" || hidden[label.order]) continue;
+    if (!label || label.tag !== "label" || hidden[label.order] || !seen(label)) {
+      continue;
+    }
     labelOf.set(el.order, label);
     consumed.add(label.order);
   }
@@ -310,7 +402,7 @@ export function prepareCandidates(snapshot: PageSnapshot): PreparedCandidates {
     if (length === 0) return false;
     let covered = 0;
     for (const d of index.subtree(el.path)) {
-      if (!index.isAncestor(el, d) || hidden[d.order]) continue;
+      if (!index.isAncestor(el, d) || hidden[d.order] || !seen(d)) continue;
       covered += fullText[d.order].length;
     }
     return Math.min(covered, length) / length >= ROLE_COVERAGE_MIN;
@@ -682,12 +774,15 @@ function partsOf(
   candidate: PreparedCandidate,
   index: ElementIndex,
   children: ReadonlyMap<string, readonly IndexedElement[]>,
+  page: PageArea,
 ): { parts: Part[]; capped: boolean } {
   const owner = index.byId(candidate.elementIds[0]);
   if (!owner || owner.path === null) return { parts: [], capped: false };
   const found: Part[] = [];
   for (const child of children.get(owner.path.join("-")) ?? []) {
     if (!PART_TAGS.has(child.tag) || child.hidden) continue;
+    // Requirement 21.9: a child the shopper cannot see is not a part.
+    if (!isShopperVisible(child, index, page, false)) continue;
     const redacted = redactText(normaliseCandidateText(child.text).text);
     if (redacted === "" || isMostlyRedacted(redacted)) continue;
     found.push({
@@ -878,13 +973,14 @@ export function buildCandidates(
   // Parts, in document order: a child that became a part is not sent again,
   // and a child that is a part of an earlier fragment owns no parts itself.
   const children = childrenByParent(index);
+  const page = pageAreaOf(snapshot);
   const consumed = new Set<string>();
   const pool: PoolEntry[] = [];
   for (const candidate of prepared) {
     if (consumed.has(candidate.elementIds[0])) continue;
     let parts: Part[] = [];
     if (isFragment(candidate)) {
-      const result = partsOf(candidate, index, children);
+      const result = partsOf(candidate, index, children, page);
       parts = result.parts;
       if (result.capped) truncated = true;
     }

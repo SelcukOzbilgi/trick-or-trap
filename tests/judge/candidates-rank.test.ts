@@ -253,6 +253,41 @@ describe("7.2 to 7.4 parts", () => {
     expect(built.candidates[0].parts).toEqual(["shown"]);
   });
 
+  // Requirements 21.9 and 21.10: a child the shopper cannot see is neither a
+  // part nor a candidate, and leaves no trace or `truncated` flag.
+  it("does not attach a child the shopper cannot see as a part", () => {
+    const built = build([
+      makeText("el-0", "p", "Only  left"),
+      makeText("el-0-0", "span", "tiny text", { fontSize: "2px" }),
+      makeText("el-0-1", "span", "faint text", { opacity: "0.05" }),
+      makeText("el-0-2", "span", "far text", { boundingBox: { x: -9999, y: -9999, width: 40, height: 20 } }),
+      makeText("el-0-3", "span", "small box", { boundingBox: { x: 10, y: 100, width: 2, height: 2 } }),
+      makeText("el-0-4", "span", "shown"),
+    ]);
+    expect(built.candidates).toHaveLength(1);
+    expect(built.candidates[0].parts).toEqual(["shown"]);
+    expect(built.truncated).toBe(false);
+    const serialised = JSON.stringify(built.data);
+    for (const word of ["tiny", "faint", "far text", "small box"]) {
+      expect(serialised).not.toContain(word);
+    }
+    expect(built.map.candidates.get("c1")?.elementIds).toEqual([
+      "el-0",
+      "el-0-4",
+    ]);
+  });
+
+  it("leaves no placeholder, label or count for dropped elements and does not set truncated", () => {
+    const dropped = Array.from({ length: 80 }, (_, i) =>
+      makeText(`el-${i + 1}`, "p", `Hidden instruction ${i}`, { fontSize: "1px" }),
+    );
+    const built = build([makeText("el-0", "p", "Only 2 left"), ...dropped]);
+    expect(ids(built)).toEqual(["c1"]);
+    expect(built.truncated).toBe(false);
+    expect(Object.keys(built.data).sort()).toEqual(["candidates", "ruleFindings", "scanDate"]);
+    expect(JSON.stringify(built.data)).not.toContain("Hidden");
+  });
+
   it("redacts part text and skips a part that is mostly a placeholder", () => {
     const built = build([
       makeText("el-0", "p", "Only  left"),

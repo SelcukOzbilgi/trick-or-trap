@@ -25,6 +25,13 @@ const EXPECTED_SHA256 =
 
 const devSet = loadDevSet();
 
+/**
+ * The number of flag cases whose evidence element mapped to no candidate
+ * before task 16 (measured once, case vi-en-f-02). Printed next to the current
+ * figure, never asserted.
+ */
+const EVIDENCE_WITHOUT_CANDIDATE_BEFORE_TASK_16 = 1;
+
 function firstCaseWith(predicate: (c: DevCase) => boolean): DevCase {
   const found = devSet.cases.find(predicate);
   if (!found) throw new Error("no dev case matches");
@@ -187,9 +194,12 @@ describe("buildCandidates on every dev case", () => {
       }
     }
 
-    // Printed, not asserted: a measure of what the builder can show the model.
+    // Printed, not asserted (requirement 21.14): a measure of what the builder
+    // can show the model. A case that lost its evidence element to the
+    // visibility tests of design section 24.2 shows up here.
     console.info(
-      `dev flag cases whose evidence element maps to no candidate: ${evidenceWithoutCandidate} of ${flagCases}`,
+      `dev flag cases whose evidence element maps to no candidate: ${evidenceWithoutCandidate} of ${flagCases}` +
+        ` (before task 16: ${EVIDENCE_WITHOUT_CANDIDATE_BEFORE_TASK_16} of 60)`,
       missing.length > 0 ? missing.join(", ") : "",
     );
     expect(flagCases).toBe(60);
