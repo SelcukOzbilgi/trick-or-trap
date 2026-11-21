@@ -74,12 +74,12 @@ Rules for every task:
   - [x] 7.4 Run both test files, then `npx tsc --noEmit`.
   _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.8, 10.9, 10.10, 10.11, 10.12, 10.13, 10.14, 10.15, 10.16_
 
-- [ ] 8. Merge
+- [x] 8. Merge
   Uses: `lib/judge/candidates.ts`, `lib/judge/validate.ts`, `lib/judge/templates.ts`, `lib/judge/types.ts`, `lib/detectors/shared/finding.ts` (`lowerConfidence`, `detectedAtFrom`, `containsForbidden`), `lib/types/index.ts`, `tests/judge/helpers/snapshot.ts`. Read: requirements 10.7, 11; design §3 (reject, half, anomalous, duplicate rows), §15; note 1.1 to 1.4.
   Files: `lib/judge/merge.ts`, `tests/judge/merge.test.ts`.
-  - [ ] 8.1 Create `tests/judge/merge.test.ts` first: the power table row by row for each kind and level; reject without high is a downgrade; reject on `reload` and `measured` ignored; 3 and 4 applicable rejects, floor(n / 2) with n of 1, 2 and 7, too many rejects ignore all and add `too-many-rejects`; set-aside findings unchanged with their reason; judge-only high and medium become low, low dropped; confirm keeps level; `ruleConfidence`, `judgeReason` and `source`; duplicate by same id, ancestor and descendant id (and `el-0-1` against `el-0-12` not a duplicate); explicit verdict wins over a duplicate; collapse of same pattern and candidate; different patterns kept apart; ordering; assembled findings pass `FindingSchema` with `detectorName: "judge"`; a quote holding a forbidden word gives a finding with the mask and no forbidden word; `assembleJudgeFinding` given a test template that holds a forbidden word returns nothing; an anomalous input ignores every verdict; the seeded by-construction test of design §15.
-  - [ ] 8.2 Create `merge.ts`.
-  - [ ] 8.3 Run the test file, then `npx tsc --noEmit`.
+  - [x] 8.1 Create `tests/judge/merge.test.ts` first: the power table row by row for each kind and level; reject without high is a downgrade; reject on `reload` and `measured` ignored; 3 and 4 applicable rejects, floor(n / 2) with n of 1, 2 and 7, too many rejects ignore all and add `too-many-rejects`; set-aside findings unchanged with their reason; judge-only high and medium become low, low dropped; confirm keeps level; `ruleConfidence`, `judgeReason` and `source`; duplicate by same id, ancestor and descendant id (and `el-0-1` against `el-0-12` not a duplicate); explicit verdict wins over a duplicate; collapse of same pattern and candidate; different patterns kept apart; ordering; assembled findings pass `FindingSchema` with `detectorName: "judge"`; a quote holding a forbidden word gives a finding with the mask and no forbidden word; `assembleJudgeFinding` given a test template that holds a forbidden word returns nothing; an anomalous input ignores every verdict; the seeded by-construction test of design §15.
+  - [x] 8.2 Create `merge.ts`.
+  - [x] 8.3 Run the test file, then `npx tsc --noEmit`.
   _Requirements: 10.7, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 11.10, 11.11, 11.12, 11.13, 11.14, 11.15, 11.16, 11.17, 11.18, 11.19, 11.20_
 
 - [ ] 9. Seam, mock and configuration
