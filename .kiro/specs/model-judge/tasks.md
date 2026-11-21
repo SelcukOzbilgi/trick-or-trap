@@ -116,14 +116,14 @@ Rules for every task:
   - [x] 12.5 Run the three test files, then `npx tsc --noEmit`. If the rules-only figures differ from the baseline, do not change the expectation: stop and report the cases.
   _Requirements: 16.3, 16.4, 16.5, 16.6, 16.7, 16.8, 16.9, 16.10, 16.11, 16.12, 16.13, 16.14, 16.15_
 
-- [ ] 13. Real client, the SDK dependency and the source rules
+- [x] 13. Real client, the SDK dependency and the source rules
   Uses: `lib/judge/interface.ts`, `lib/judge/prompt.ts`, `lib/judge/config.ts`, `lib/judge/constants.ts`, `package.json`, `tests/capture/dependencies.test.ts` (read, and edited only if D1 grants it). Read: requirement 15, 1.3, 1.4, 1.16; design §4 item 11, §5, §16, §22; note 4.1, 4.2, 4.5.
   Files: `lib/judge/haiku.ts`, `tests/judge/source-rules.test.ts`, `package.json` and the lockfile (the install only).
-  - [ ] 13.1 Check D1 in design §5. Start only if the driver has already updated `tests/capture/dependencies.test.ts` or D1 records that this task may make exactly the proposed edit; otherwise stop and report.
-  - [ ] 13.2 Create `tests/judge/source-rules.test.ts` first: `@anthropic-ai/sdk` imported only in `lib/judge/haiku.ts`; `haiku.ts` imported by no file under `tests/` except `tests/judge/live/judge-live.test.ts`; `haiku.ts` starts with `import "server-only"`, uses `await import("@anthropic-ai/sdk")`, `maxRetries: 0`, `buildRequestBody` and `toJudgeHttpError`, and has no `temperature`; the test hook word (built from parts) in no file under `lib/judge` or `tests/judge`; no `Date.now` or `Math.random` and no module-level `let` under `lib/judge`; the package is pinned exactly in `dependencies`.
-  - [ ] 13.3 Run `npm install --save-exact @anthropic-ai/sdk` once. If it is denied or fails, stop and report. Check that `package.json` changed only by that one entry.
-  - [ ] 13.4 Create `haiku.ts` by design §16; if D1 lets this task do it, make the D1 edit in `tests/capture/dependencies.test.ts`.
-  - [ ] 13.5 Run `source-rules.test.ts` and `tests/capture/dependencies.test.ts`, then `npx tsc --noEmit`.
+  - [x] 13.1 Check D1 in design §5. Start only if the driver has already updated `tests/capture/dependencies.test.ts` or D1 records that this task may make exactly the proposed edit; otherwise stop and report.
+  - [x] 13.2 Create `tests/judge/source-rules.test.ts` first: `@anthropic-ai/sdk` imported only in `lib/judge/haiku.ts`; `haiku.ts` imported by no file under `tests/` except `tests/judge/live/judge-live.test.ts`; `haiku.ts` starts with `import "server-only"`, uses `await import("@anthropic-ai/sdk")`, `maxRetries: 0`, `buildRequestBody` and `toJudgeHttpError`, and has no `temperature`; the test hook word (built from parts) in no file under `lib/judge` or `tests/judge`; no `Date.now` or `Math.random` and no module-level `let` under `lib/judge`; the package is pinned exactly in `dependencies`.
+  - [x] 13.3 Run `npm install --save-exact @anthropic-ai/sdk` once. If it is denied or fails, stop and report. Check that `package.json` changed only by that one entry.
+  - [x] 13.4 Create `haiku.ts` by design §16; if D1 lets this task do it, make the D1 edit in `tests/capture/dependencies.test.ts`.
+  - [x] 13.5 Run `source-rules.test.ts` and `tests/capture/dependencies.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7, 15.8, 15.9, 1.3, 1.4, 1.16_
 
 - [ ] 14. Opt-in live test, attack fixtures, steering, `.env.example` and lint

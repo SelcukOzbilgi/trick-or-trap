@@ -43,6 +43,14 @@ describe("capture dependencies", () => {
     }
   });
 
+  it("pins the Anthropic SDK of the model judge to exactly 1.12.0", () => {
+    const value = pkg.dependencies["@anthropic-ai/sdk"];
+    expect(value).toBe("1.12.0");
+    expect(value?.startsWith("^")).toBe(false);
+    expect(value?.startsWith("~")).toBe(false);
+    expect(value).not.toContain("latest");
+  });
+
   it("has no bundled Chromium package", () => {
     expect(pkg.dependencies).not.toHaveProperty("@sparticuz/chromium-min");
   });
@@ -64,6 +72,7 @@ describe("capture dependencies", () => {
 
   it("keeps the runtime dependencies unchanged", () => {
     expect(pkg.dependencies).toEqual({
+      "@anthropic-ai/sdk": "1.12.0",
       next: "^16.4.6",
       "playwright-core": "1.64.1",
       react: "^19.3.1",
