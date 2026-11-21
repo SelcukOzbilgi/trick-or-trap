@@ -4,22 +4,42 @@ import type {
   ElementIndex,
   IndexedElement,
 } from "@/lib/detectors/shared/elements";
+import { TITLES, detectedAtFrom } from "@/lib/detectors/shared/finding";
 import {
+  BADGE_MAX_CHARS,
+  FRAGMENT_MAX_CHARS,
   GROUP_MAX_LEVELS,
+  LONG_TEXT_CHARS,
+  MAX_CANDIDATES,
   MAX_CANDIDATE_CHARS,
+  MAX_DATA_BLOCK_BYTES,
+  MAX_PARTS_PER_CANDIDATE,
+  MAX_PART_CHARS,
+  MAX_RULE_FINDINGS_SENT,
+  MAX_TOTAL_CANDIDATE_CHARS,
   MIN_TEXT_CHARS,
+  RANK_SCORES,
   ROLE_COVERAGE_MIN,
   TOAST_MAX_CHARS,
 } from "@/lib/judge/constants";
+import { encodePageData } from "@/lib/judge/prompt";
 import { isMostlyRedacted, redactText } from "@/lib/judge/redact";
-import type { ElementSnapshot, PageSnapshot } from "@/lib/types";
+import { JUDGE_PATTERN_IDS } from "@/lib/judge/types";
+import type { JudgePatternId, RuleKind } from "@/lib/judge/types";
+import type {
+  Confidence,
+  ElementSnapshot,
+  Finding,
+  PageSnapshot,
+} from "@/lib/types";
 
 /**
- * Candidate builder, part one (design section 11, note 2.1 steps 1 to 4):
- * eligibility, normalisation, redaction and structure. Pure: no clock, no
- * randomness, no state. It reads `snapshot.elements` only and, of the
- * attributes, only `type`, `name` and `disabled` (through the element index).
- * Split text, rule links, ranking, caps and ids belong to the second part.
+ * Candidate builder (design section 11, note 2.1). Part one, `prepareCandidates`:
+ * eligibility, normalisation, redaction and structure. Part two,
+ * `buildCandidates`: split-text parts, rule links, ranking, caps and ids.
+ * Pure: no clock, no randomness, no state. It reads `snapshot.elements` only
+ * and, of the attributes, only `type`, `name` and `disabled` (through the
+ * element index).
  */
 
 // -- Types --------------------------------------------------------------------
@@ -439,4 +459,511 @@ function assignGroups(
       candidates[i].facts = facts;
     }
   });
+}
+
+// =============================================================================
+// Part two: split text, rule links, ranking, caps and ids
+// (requirements 7.1 to 7.14, design section 11, note 2.1 steps 4 to 6)
+// =============================================================================
+
+// -- Wire and map types -------------------------------------------------------
+
+/** One candidate as the model sees it (note 2.2). */
+export type WireCandidate = {
+  id: string;
+  tag: string;
+  place: CandidatePlace;
+  text: string;
+  cut?: true;
+  control?: CandidateControl;
+  checked?: boolean;
+  parts?: string[];
+  group?: string;
+  facts?: CandidateFacts;
+  rules?: string[];
+};
+
+/** One rule finding as the model sees it. No description, no quote. */
+export type WireRuleFinding = {
+  id: string;
+  pattern: JudgePatternId;
+  confidence: Confidence;
+  kind: RuleKind;
+  candidates: string[];
+};
+
+/** The data block: what is encoded between the `<page_data>` tags. */
+export type PageData = {
+  scanDate?: string;
+  candidates: WireCandidate[];
+  ruleFindings: WireRuleFinding[];
+};
+
+/** What the code keeps of a sent candidate, for validation and merge. */
+export type MappedCandidate = {
+  id: string;
+  /** Snapshot element ids, primary first, then the label, then the parts. */
+  elementIds: string[];
+  /** The sent text, for the quote check. */
+  text: string;
+  /** The sent parts, for the quote check. */
+  parts: string[];
+  tag: string;
+  place: CandidatePlace;
+  control?: CandidateControl;
+  checked?: boolean;
+  group?: string;
+  /** True for a member of a button or link group (it has `facts`). */
+  inButtonGroup: boolean;
+  /** Document position of the primary element. */
+  order: number;
+};
+
+/** What the code keeps of a sent rule finding. */
+export type MappedRule = {
+  id: string;
+  /** Index of the rule finding in the array given to `buildCandidates`. */
+  index: number;
+  kind: RuleKind;
+  /** Ids of the sent candidates that cover the rule finding. */
+  candidateIds: string[];
+};
+
+export type CandidateMap = {
+  /** Keyed by `c1`, `c2`, ... in that order. */
+  candidates: ReadonlyMap<string, MappedCandidate>;
+  /** Keyed by `r1`, `r2`, ... in that order. */
+  rules: ReadonlyMap<string, MappedRule>;
+};
+
+export type BuiltCandidates = {
+  candidates: WireCandidate[];
+  ruleFindings: WireRuleFinding[];
+  map: CandidateMap;
+  /** True when a cap dropped a candidate, a part or a rule finding. */
+  truncated: boolean;
+  /** The data block, ready for `encodePageData`. */
+  data: PageData;
+};
+
+// -- Rule kinds (requirement 11.1) --------------------------------------------
+
+const RELOAD_PHRASES: readonly string[] = ["on reload", "across a reload"];
+
+/**
+ * The kind of a rule finding, from its fixed title: `reload` for the five
+ * titles that name a reload, `measured` for visual interference,
+ * `structural` for preselection and `text` for the rest. A title that is not
+ * in `TITLES` gives `null`.
+ */
+export function ruleKind(title: string): RuleKind | null {
+  for (const pattern of JUDGE_PATTERN_IDS) {
+    if (!TITLES[pattern].includes(title)) continue;
+    if (RELOAD_PHRASES.some((phrase) => title.includes(phrase))) return "reload";
+    if (pattern === "visual-interference") return "measured";
+    if (pattern === "preselection") return "structural";
+    return "text";
+  }
+  return null;
+}
+
+// -- Ranking (requirement 7.8) ------------------------------------------------
+
+const CLOCK = /\d{1,2}:\d{2}/u;
+const DIGIT = /\p{Nd}/u;
+const EMPHASIS = /[!%\p{Sc}]/u;
+const BADGE_TAGS: ReadonlySet<string> = new Set([
+  "span",
+  "strong",
+  "b",
+  "small",
+  "em",
+  "mark",
+]);
+const HEADING_TAGS: ReadonlySet<string> = new Set(["h1", "h2", "h3"]);
+
+/**
+ * The score of one candidate by the table of design section 11. Signals are
+ * language-neutral on purpose: no word list is used. The text and the parts
+ * both count for the digit, clock and emphasis signals.
+ */
+export function scoreCandidate(
+  candidate: PreparedCandidate,
+  parts: readonly string[],
+  ruleCovered: boolean,
+): number {
+  const texts = [candidate.text, ...parts];
+  let score = 0;
+  if (ruleCovered) score += RANK_SCORES.ruleCovered;
+  if (candidate.control !== undefined) score += RANK_SCORES.control;
+  const overlay = candidate.place !== "main";
+  if (candidate.facts !== undefined && overlay) score += RANK_SCORES.groupInOverlay;
+  if (overlay) score += RANK_SCORES.overlayPlace;
+  if (texts.some((text) => CLOCK.test(text))) score += RANK_SCORES.clock;
+  if (texts.some((text) => DIGIT.test(text))) score += RANK_SCORES.digit;
+  if (texts.some((text) => EMPHASIS.test(text))) score += RANK_SCORES.emphasis;
+  if (
+    candidate.text.length <= BADGE_MAX_CHARS &&
+    (BADGE_TAGS.has(candidate.tag) || candidate.role !== "")
+  ) {
+    score += RANK_SCORES.shortEmphasis;
+  }
+  if (HEADING_TAGS.has(candidate.tag)) score += RANK_SCORES.heading;
+  if (candidate.text.length > LONG_TEXT_CHARS) score += RANK_SCORES.longText;
+  if (candidate.outsideImage) score += RANK_SCORES.outsideImage;
+  return score;
+}
+
+// -- Split text (requirements 7.1 to 7.4) -------------------------------------
+
+/** Punctuation only, to stay language-neutral (design section 3). */
+const CONNECTORS = "-–—:,/+·";
+
+/** Tags whose texts may be attached to a fragment as parts. */
+const PART_TAGS: ReadonlySet<string> = new Set([
+  "span",
+  "b",
+  "strong",
+  "em",
+  "i",
+  "small",
+  "mark",
+  "s",
+  "del",
+  "ins",
+  "sup",
+  "sub",
+  "time",
+  "data",
+  "abbr",
+]);
+
+/** A non-control element whose text may be only a piece of a claim. */
+function isFragment(candidate: PreparedCandidate): boolean {
+  if (CONTROL_TAGS.has(candidate.tag)) return false;
+  const raw = candidate.rawText;
+  if (raw.includes("  ")) return true;
+  const trimmed = raw.trim();
+  if (trimmed.length <= FRAGMENT_MAX_CHARS) return true;
+  return (
+    CONNECTORS.includes(trimmed.charAt(0)) ||
+    CONNECTORS.includes(trimmed.charAt(trimmed.length - 1))
+  );
+}
+
+type Part = { id: string; text: string; box: IndexedElement["box"]; order: number };
+
+function partSort(a: Part, b: Part): number {
+  if (a.box.y !== b.box.y) return a.box.y - b.box.y;
+  if (a.box.x !== b.box.x) return a.box.x - b.box.x;
+  return a.order - b.order;
+}
+
+/** Direct children (id path plus one segment) of every element, by parent path. */
+function childrenByParent(index: ElementIndex): Map<string, IndexedElement[]> {
+  const children = new Map<string, IndexedElement[]>();
+  for (const el of index.elements) {
+    if (el.path === null || el.path.length === 0) continue;
+    const key = el.path.slice(0, -1).join("-");
+    const list = children.get(key) ?? [];
+    list.push(el);
+    children.set(key, list);
+  }
+  return children;
+}
+
+/**
+ * The parts of a fragment: the normalised and redacted texts of its direct
+ * children with a part tag, each cut to 24 characters, ordered by box top and
+ * then left. A part that is empty or mostly a placeholder is skipped. The
+ * second value says whether a part was left out because of the cap.
+ */
+function partsOf(
+  candidate: PreparedCandidate,
+  index: ElementIndex,
+  children: ReadonlyMap<string, readonly IndexedElement[]>,
+): { parts: Part[]; capped: boolean } {
+  const owner = index.byId(candidate.elementIds[0]);
+  if (!owner || owner.path === null) return { parts: [], capped: false };
+  const found: Part[] = [];
+  for (const child of children.get(owner.path.join("-")) ?? []) {
+    if (!PART_TAGS.has(child.tag) || child.hidden) continue;
+    const redacted = redactText(normaliseCandidateText(child.text).text);
+    if (redacted === "" || isMostlyRedacted(redacted)) continue;
+    found.push({
+      id: child.id,
+      text: cutAtBoundary(redacted, MAX_PART_CHARS).text,
+      box: child.box,
+      order: child.order,
+    });
+  }
+  found.sort(partSort);
+  return {
+    parts: found.slice(0, MAX_PARTS_PER_CANDIDATE),
+    capped: found.length > MAX_PARTS_PER_CANDIDATE,
+  };
+}
+
+// -- The pool, rule links and assembly ----------------------------------------
+
+type PoolEntry = {
+  candidate: PreparedCandidate;
+  parts: string[];
+  /** The element ids of the candidate, then of its parts. */
+  elementIds: string[];
+  /** Characters of text and parts together. */
+  size: number;
+};
+
+type RuleLink = {
+  /** Position of the rule finding in the array given by the caller. */
+  sourceIndex: number;
+  finding: Finding;
+  kind: RuleKind;
+  /** Document position of the first element of the finding that the page holds. */
+  position: number;
+  /** Positions in the pool, ascending. */
+  poolPositions: number[];
+};
+
+type Assembled = {
+  candidates: WireCandidate[];
+  ruleFindings: WireRuleFinding[];
+  map: CandidateMap;
+  data: PageData;
+  chars: number;
+  /** Number of rule links that have at least one kept candidate. */
+  sentRules: number;
+};
+
+/** A tag that is a plain word of letters and digits is sent; anything else is `other`. */
+const WIRE_TAG = /^[a-z][a-z0-9]{0,19}$/u;
+
+function wireTag(tag: string): string {
+  return WIRE_TAG.test(tag) ? tag : "other";
+}
+
+function wireFacts(facts: CandidateFacts): CandidateFacts {
+  return {
+    ...(facts.contrast !== undefined ? { contrast: facts.contrast } : {}),
+    areaRatio: facts.areaRatio,
+    ...(facts.fontPx !== undefined ? { fontPx: facts.fontPx } : {}),
+    disabled: facts.disabled,
+  };
+}
+
+function scanDateOf(snapshot: PageSnapshot): string | undefined {
+  const at = detectedAtFrom(snapshot);
+  return at.ms === null ? undefined : at.iso.slice(0, 10);
+}
+
+function assemble(
+  pool: readonly PoolEntry[],
+  links: readonly RuleLink[],
+  keptPositions: readonly number[],
+  scanDate: string | undefined,
+): Assembled {
+  const kept = [...keptPositions].sort((a, b) => a - b);
+  const idOf = new Map<number, string>();
+  kept.forEach((position, i) => idOf.set(position, `c${i + 1}`));
+
+  // Rule findings with at least one kept candidate, in document order.
+  const sent = links.filter((link) =>
+    link.poolPositions.some((position) => idOf.has(position)),
+  );
+  const rulesOf = new Map<number, string[]>();
+  const wireRules: WireRuleFinding[] = [];
+  const mappedRules = new Map<string, MappedRule>();
+  sent.forEach((link, i) => {
+    const id = `r${i + 1}`;
+    const candidateIds: string[] = [];
+    for (const position of link.poolPositions) {
+      const candidateId = idOf.get(position);
+      if (candidateId === undefined) continue;
+      candidateIds.push(candidateId);
+      const list = rulesOf.get(position) ?? [];
+      list.push(id);
+      rulesOf.set(position, list);
+    }
+    wireRules.push({
+      id,
+      pattern: link.finding.patternId as JudgePatternId,
+      confidence: link.finding.confidence,
+      kind: link.kind,
+      candidates: candidateIds,
+    });
+    mappedRules.set(id, {
+      id,
+      index: link.sourceIndex,
+      kind: link.kind,
+      candidateIds,
+    });
+  });
+
+  let chars = 0;
+  const wireCandidates: WireCandidate[] = [];
+  const mappedCandidates = new Map<string, MappedCandidate>();
+  for (const position of kept) {
+    const entry = pool[position];
+    const c = entry.candidate;
+    const id = idOf.get(position) as string;
+    chars += entry.size;
+
+    const wire: WireCandidate = { id, tag: wireTag(c.tag), place: c.place, text: c.text };
+    if (c.cut) wire.cut = true;
+    if (c.control !== undefined) {
+      wire.control = c.control;
+      wire.checked = c.checked === true;
+    }
+    if (entry.parts.length > 0) wire.parts = [...entry.parts];
+    if (c.group !== undefined) wire.group = c.group;
+    if (c.facts !== undefined) wire.facts = wireFacts(c.facts);
+    const rules = rulesOf.get(position);
+    if (rules !== undefined) wire.rules = rules;
+    wireCandidates.push(wire);
+
+    const mapped: MappedCandidate = {
+      id,
+      elementIds: [...entry.elementIds],
+      text: c.text,
+      parts: [...entry.parts],
+      tag: wire.tag,
+      place: c.place,
+      inButtonGroup: c.facts !== undefined,
+      order: c.order,
+    };
+    if (c.control !== undefined) {
+      mapped.control = c.control;
+      mapped.checked = c.checked === true;
+    }
+    if (c.group !== undefined) mapped.group = c.group;
+    mappedCandidates.set(id, mapped);
+  }
+
+  const data: PageData = {
+    ...(scanDate !== undefined ? { scanDate } : {}),
+    candidates: wireCandidates,
+    ruleFindings: wireRules,
+  };
+  return {
+    candidates: wireCandidates,
+    ruleFindings: wireRules,
+    map: { candidates: mappedCandidates, rules: mappedRules },
+    data,
+    chars,
+    sentRules: sent.length,
+  };
+}
+
+function encodedBytes(data: PageData): number {
+  return new TextEncoder().encode(encodePageData(data)).length;
+}
+
+/**
+ * Build the candidates, the rule findings and the map of one scan (design
+ * section 11): parts for split text, links to at most 20 rule findings,
+ * ranking, the caps of 60 candidates, 10,000 characters and the data block
+ * byte cap, document order and ids `c1`..`cN`, `r1`..`rN`.
+ *
+ * `ruleFindings` are the findings of the rules, in their own order; the map
+ * gives the index of each sent one in that array.
+ */
+export function buildCandidates(
+  snapshot: PageSnapshot,
+  ruleFindings: readonly Finding[],
+): BuiltCandidates {
+  const { candidates: prepared, index } = prepareCandidates(snapshot);
+  let truncated = false;
+
+  // Parts, in document order: a child that became a part is not sent again,
+  // and a child that is a part of an earlier fragment owns no parts itself.
+  const children = childrenByParent(index);
+  const consumed = new Set<string>();
+  const pool: PoolEntry[] = [];
+  for (const candidate of prepared) {
+    if (consumed.has(candidate.elementIds[0])) continue;
+    let parts: Part[] = [];
+    if (isFragment(candidate)) {
+      const result = partsOf(candidate, index, children);
+      parts = result.parts;
+      if (result.capped) truncated = true;
+    }
+    for (const part of parts) consumed.add(part.id);
+    pool.push({
+      candidate,
+      parts: parts.map((part) => part.text),
+      elementIds: [...candidate.elementIds, ...parts.map((part) => part.id)],
+      size:
+        candidate.text.length +
+        parts.reduce((total, part) => total + part.text.length, 0),
+    });
+  }
+
+  // Rule links (requirements 7.5 to 7.7).
+  const poolByElementId = new Map<string, number>();
+  pool.forEach((entry, position) => {
+    for (const id of entry.elementIds) {
+      if (!poolByElementId.has(id)) poolByElementId.set(id, position);
+    }
+  });
+  const found: RuleLink[] = [];
+  ruleFindings.forEach((finding, sourceIndex) => {
+    const kind = ruleKind(finding.title);
+    if (kind === null) return;
+    if (!(JUDGE_PATTERN_IDS as readonly string[]).includes(finding.patternId)) return;
+    const mapped = new Set<number>();
+    let position: number | null = null;
+    for (const id of finding.elementIds) {
+      const element = index.byId(id);
+      if (position === null && element) position = element.order;
+      const at = poolByElementId.get(id);
+      if (at !== undefined) mapped.add(at);
+    }
+    if (mapped.size === 0) return;
+    const poolPositions = [...mapped].sort((a, b) => a - b);
+    found.push({
+      sourceIndex,
+      finding,
+      kind,
+      position: position ?? pool[poolPositions[0]].candidate.order,
+      poolPositions,
+    });
+  });
+  found.sort((a, b) => a.position - b.position || a.sourceIndex - b.sourceIndex);
+  if (found.length > MAX_RULE_FINDINGS_SENT) truncated = true;
+  const links = found.slice(0, MAX_RULE_FINDINGS_SENT);
+
+  // Ranking: highest score first, ties by document order.
+  const covered = new Set<number>();
+  for (const link of links) for (const position of link.poolPositions) covered.add(position);
+  const scores = pool.map((entry, position) =>
+    scoreCandidate(entry.candidate, entry.parts, covered.has(position)),
+  );
+  const ranked = pool
+    .map((_, position) => position)
+    .sort((a, b) => scores[b] - scores[a] || a - b);
+
+  // Caps (requirements 7.10 to 7.12): drop from the bottom of the ranking.
+  const scanDate = scanDateOf(snapshot);
+  const keep = ranked.slice(0, MAX_CANDIDATES);
+  if (ranked.length > keep.length) truncated = true;
+  let result = assemble(pool, links, keep, scanDate);
+  while (
+    keep.length > 0 &&
+    (result.chars > MAX_TOTAL_CANDIDATE_CHARS ||
+      encodedBytes(result.data) > MAX_DATA_BLOCK_BYTES)
+  ) {
+    keep.pop();
+    truncated = true;
+    result = assemble(pool, links, keep, scanDate);
+  }
+  if (result.sentRules < links.length) truncated = true;
+
+  return {
+    candidates: result.candidates,
+    ruleFindings: result.ruleFindings,
+    map: result.map,
+    truncated,
+    data: result.data,
+  };
 }
