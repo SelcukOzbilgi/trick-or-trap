@@ -6,7 +6,12 @@ import {
   lowerConfidence,
 } from "@/lib/detectors/shared/finding";
 import type { BuiltCandidates } from "@/lib/judge/candidates";
-import { MAX_FINDINGS_KEPT, MAX_REJECTS } from "@/lib/judge/constants";
+import {
+  LOWERED_MIN_RULE_FINDINGS,
+  MAX_FINDINGS_KEPT,
+  MAX_REJECTS,
+  MIN_REJECTS_ALLOWED,
+} from "@/lib/judge/constants";
 import { DEFAULT_TEMPLATES } from "@/lib/judge/templates";
 import type { JudgeTemplates } from "@/lib/judge/templates";
 import { LOOK_ALIKE_CODES } from "@/lib/judge/types";
@@ -35,7 +40,7 @@ export type ValidatedOk = Extract<ValidationResult, { kind: "ok" }>;
 export type MergeOutput = {
   findings: ReviewedFinding[];
   setAside: SetAsideFinding[];
-  /** The anomalies of validation plus `too-many-rejects` found here. */
+  /** The anomalies of validation plus `too-many-rejects` and `too-many-lowered` found here. */
   anomalies: AnomalyCode[];
 };
 
@@ -142,15 +147,29 @@ function isRejectable(kind: RuleKind): boolean {
   return kind === "structural" || kind === "text";
 }
 
-/** Turn one verdict into what happens to its rule finding; `null` ignores it. */
+/**
+ * Turn one verdict into what happens to its rule finding; `null` ignores it
+ * (requirement 20.1 to 20.8, design 24.1). A confirm keeps the level. A
+ * downgrade of a `reload` or `measured` finding, or to low by a look-alike
+ * code, needs the judge's own confidence "high"; a flag code or
+ * `insufficient-context` lowers a text or structural finding one level at any
+ * confidence. A reject needs "high" and a look-alike code.
+ */
 function applyVerdict(kind: RuleKind, verdict: ValidatedVerdict): Applied | null {
   if (verdict.decision === "confirm") return { type: "confirm", reason: verdict.reason };
-  if (verdict.decision === "downgrade") return { type: "downgrade", reason: verdict.reason };
+  const high = verdict.confidence === "high";
+  if (verdict.decision === "downgrade") {
+    if (!isRejectable(kind)) {
+      return high ? { type: "downgrade", reason: verdict.reason } : null;
+    }
+    if (isLookAlike(verdict.reason) && !high) return null;
+    return { type: "downgrade", reason: verdict.reason };
+  }
   if (!isRejectable(kind)) return null;
-  if (verdict.confidence === "high" && isLookAlike(verdict.reason)) {
+  if (high && isLookAlike(verdict.reason)) {
     return { type: "set-aside", reason: verdict.reason };
   }
-  return { type: "downgrade", reason: verdict.reason };
+  return null;
 }
 
 // -- Ordering -----------------------------------------------------------------
@@ -203,19 +222,34 @@ export function mergeReview(
     if (verdict.decision === "reject" && !isRejectable(kind)) verdictByIndex.delete(index);
   }
 
-  // Steps 1 and 2: an anomalous run, or too many rejects, ignores every verdict.
+  // Steps 1 to 5: an anomalous run, too many rejects or too many lowered
+  // findings ignore every verdict (requirement 20.10, 20.11, 20.13).
   let ignoreVerdicts = anomalies.length > 0;
   if (!ignoreVerdicts) {
     let rejectable = 0;
     for (const kind of kindByIndex.values()) if (isRejectable(kind)) rejectable += 1;
     let rejects = 0;
+    let lowering = 0;
     for (const verdict of verdictByIndex.values()) {
       if (verdict.decision === "reject") rejects += 1;
+      // Every validated downgrade and every applicable reject counts, before
+      // the confidence gates, so ignored verdicts count too (20.12).
+      if (verdict.decision !== "confirm") lowering += 1;
     }
-    if (rejects > Math.min(MAX_REJECTS, Math.floor(rejectable / 2))) {
-      anomalies.push("too-many-rejects");
-      ignoreVerdicts = true;
+    // Rejects of reload and measured findings were removed above, so with no
+    // text or structural finding sent there is no reject to count (20.9).
+    const allowance =
+      rejectable === 0
+        ? 0
+        : Math.min(MAX_REJECTS, Math.max(MIN_REJECTS_ALLOWED, Math.floor(rejectable / 2)));
+    if (rejects > allowance) anomalies.push("too-many-rejects");
+    if (
+      kindByIndex.size >= LOWERED_MIN_RULE_FINDINGS &&
+      2 * lowering > kindByIndex.size
+    ) {
+      anomalies.push("too-many-lowered");
     }
+    ignoreVerdicts = anomalies.length > 0;
   }
   if (ignoreVerdicts) verdictByIndex.clear();
 

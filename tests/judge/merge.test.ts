@@ -193,25 +193,39 @@ const FLAG_REASON: Record<Kind, string> = {
 };
 
 function downgradeRows(kind: Kind): Row[] {
+  // Requirement 20.1 to 20.6 (design 24.1): the confidence gates. A look-alike
+  // code or a `reload` or `measured` finding needs judge confidence "high";
+  // a flag code or `insufficient-context` lowers a text or structural
+  // finding one level at any confidence.
   const rows: Row[] = [];
+  const reasons = [FLAG_REASON[kind], INSUFFICIENT_CONTEXT, "neutral-default"];
   for (const level of LEVELS) {
-    const lowered: Confidence = level === "high" ? "medium" : "low";
-    const reloadFloor: Confidence = level === "high" ? "medium" : level;
-    rows.push({
-      kind,
-      decision: "downgrade",
-      level,
-      reason: FLAG_REASON[kind],
-      expectLevel:
-        kind === "measured" ? "low" : kind === "reload" ? reloadFloor : lowered,
-    });
-    rows.push({
-      kind,
-      decision: "downgrade",
-      level,
-      reason: "neutral-default",
-      expectLevel: kind === "reload" ? reloadFloor : "low",
-    });
+    for (const reason of reasons) {
+      for (const judgeConfidence of LEVELS) {
+        const lookAlike = reason === "neutral-default";
+        const one: Confidence = level === "high" ? "medium" : "low";
+        const reloadFloor: Confidence = level === "high" ? "medium" : level;
+        let expectLevel: Confidence | null;
+        if (kind === "reload") {
+          expectLevel = judgeConfidence === "high" ? reloadFloor : null;
+        } else if (kind === "measured") {
+          expectLevel = judgeConfidence === "high" ? "low" : null;
+        } else if (lookAlike) {
+          expectLevel = judgeConfidence === "high" ? "low" : null;
+        } else {
+          expectLevel = one;
+        }
+        rows.push({
+          kind,
+          decision: "downgrade",
+          level,
+          reason,
+          judgeConfidence,
+          expectLevel: expectLevel ?? level,
+          expectIgnored: expectLevel === null,
+        });
+      }
+    }
   }
   return rows;
 }
@@ -239,7 +253,8 @@ for (const kind of ["text", "structural"] as Kind[]) {
       expectLevel: level,
       expectSetAside: true,
     });
-    // A reject without judge confidence "high" is a downgrade, capped at low.
+    // Requirement 20.7 (was 11.5): a reject without judge confidence "high"
+    // is ignored; it is no longer applied as a downgrade.
     for (const judgeConfidence of ["medium", "low"] as Confidence[]) {
       ROWS.push({
         kind,
@@ -247,9 +262,19 @@ for (const kind of ["text", "structural"] as Kind[]) {
         level,
         reason: "required-terms",
         judgeConfidence,
-        expectLevel: "low",
+        expectLevel: level,
+        expectIgnored: true,
       });
     }
+    // A reject with a flag code is not a look-alike reject: ignored.
+    ROWS.push({
+      kind,
+      decision: "reject",
+      level,
+      reason: FLAG_REASON[kind],
+      expectLevel: level,
+      expectIgnored: true,
+    });
   }
 }
 for (const kind of ["measured", "reload"] as Kind[]) {
@@ -345,7 +370,7 @@ describe("verdict powers by kind and level", () => {
     }
   });
 
-  it("gives a reject without high confidence a downgrade, not a set-aside", () => {
+  it("ignores a reject without high confidence: no downgrade, no set-aside (requirement 20.7)", () => {
     const rules = kindRules({
       text: "high",
       structural: "high",
@@ -355,10 +380,47 @@ describe("verdict powers by kind and level", () => {
     const { out } = run(KIND_PAGE, rules, (built) =>
       okResult([], [verdict(built, 0, "reject", "required-terms", "medium")]),
     );
+    expect(out.anomalies).toEqual([]);
     expect(out.setAside).toEqual([]);
     const reviewed = out.findings.find((f) => f.finding.title === TEXT_TITLE);
-    expect(reviewed?.finding.confidence).toBe("low");
-    expect(reviewed?.ruleConfidence).toBe("high");
+    expect(reviewed).toEqual({ finding: rules[0], source: "rules" });
+    expect(reviewed?.ruleConfidence).toBeUndefined();
+    expect(reviewed?.judgeReason).toBeUndefined();
+  });
+
+  it("applies the floors: reload high gives medium, reload medium stays, measured gives low", () => {
+    const rules = kindRules({
+      text: "medium",
+      structural: "medium",
+      measured: "high",
+      reload: "high",
+    });
+    const first = run(KIND_PAGE, rules, (built) =>
+      okResult([], [verdict(built, 3, "downgrade", "undated-deadline", "high")]),
+    );
+    const reload = first.out.findings.find((f) => f.finding.title === RELOAD_TITLE);
+    expect(reload?.finding.confidence).toBe("medium");
+    expect(reload?.ruleConfidence).toBe("high");
+
+    const mediumRules = kindRules({
+      text: "medium",
+      structural: "medium",
+      measured: "medium",
+      reload: "medium",
+    });
+    const second = run(KIND_PAGE, mediumRules, (built) =>
+      okResult([], [verdict(built, 3, "downgrade", "undated-deadline", "high")]),
+    );
+    const stays = second.out.findings.find((f) => f.finding.title === RELOAD_TITLE);
+    expect(stays?.finding.confidence).toBe("medium");
+    expect(stays?.ruleConfidence).toBeUndefined();
+
+    const third = run(KIND_PAGE, rules, (built) =>
+      okResult([], [verdict(built, 2, "downgrade", "faint-decline", "high")]),
+    );
+    const measured = third.out.findings.find((f) => f.finding.title === MEASURED_TITLE);
+    expect(measured?.finding.confidence).toBe("low");
+    expect(measured?.ruleConfidence).toBe("high");
   });
 });
 
@@ -398,6 +460,10 @@ describe("reject limits", () => {
     { n: 2, rejects: 1 },
     { n: 3, rejects: 1 },
     { n: 4, rejects: 2 },
+    // Requirement 20.9 (was 11.8): one reject over one rejectable finding is
+    // within the allowance max(1, floor(1 / 2)) = 1.
+    { n: 1, rejects: 1 },
+    { n: 6, rejects: 3 },
   ])("applies $rejects rejects over $n rejectable findings", ({ n, rejects }) => {
     const { out } = rejectRun(n, rejects);
     expect(out.anomalies).toEqual([]);
@@ -406,21 +472,77 @@ describe("reject limits", () => {
   });
 
   it.each([
-    { n: 8, rejects: 4 },
-    { n: 7, rejects: 4 },
-    { n: 1, rejects: 1 },
-    { n: 2, rejects: 2 },
-    { n: 3, rejects: 2 },
-    { n: 5, rejects: 3 },
-  ])("ignores all rejects when $rejects are asked over $n findings", ({ n, rejects }) => {
-    const { out, rules } = rejectRun(n, rejects);
-    expect(out.anomalies).toEqual(["too-many-rejects"]);
-    expect(out.setAside).toEqual([]);
-    expect(out.findings).toHaveLength(n);
-    for (const reviewed of out.findings) {
-      expect(reviewed.source).toBe("rules");
-      expect(rules).toContain(reviewed.finding);
+    { n: 8, rejects: 4, anomalies: ["too-many-rejects"] },
+    { n: 2, rejects: 2, anomalies: ["too-many-rejects"] },
+    // Requirement 20.13: when the lowering limit of 20.11 also applies
+    // (three or more findings, more than half named), both codes are reported.
+    { n: 7, rejects: 4, anomalies: ["too-many-rejects", "too-many-lowered"] },
+    { n: 3, rejects: 2, anomalies: ["too-many-rejects", "too-many-lowered"] },
+    { n: 5, rejects: 3, anomalies: ["too-many-rejects", "too-many-lowered"] },
+  ])(
+    "ignores all rejects when $rejects are asked over $n findings",
+    ({ n, rejects, anomalies }) => {
+      const { out, rules } = rejectRun(n, rejects);
+      expect(out.anomalies).toEqual(anomalies);
+      expect(out.setAside).toEqual([]);
+      expect(out.findings).toHaveLength(n);
+      for (const reviewed of out.findings) {
+        expect(reviewed.source).toBe("rules");
+        expect(rules).toContain(reviewed.finding);
+      }
+    },
+  );
+
+  it("gives the allowance min(3, max(1, floor(n / 2))) for n of 1, 2, 3, 4, 6 and 8", () => {
+    const allowance: Record<number, number> = { 1: 1, 2: 1, 3: 1, 4: 2, 6: 3, 8: 3 };
+    for (const [n, allowed] of Object.entries(allowance).map(
+      ([key, value]) => [Number(key), value] as const,
+    )) {
+      expect(rejectRun(n, allowed).out.anomalies).toEqual([]);
+      // With one finding two verdicts are impossible (one verdict per rule id).
+      if (allowed + 1 > n) continue;
+      const over = rejectRun(n, allowed + 1);
+      // One more reject than allowed gives the reject anomaly (a second code
+      // may follow for the lowering limit, 20.13).
+      expect(over.out.anomalies[0]).toBe("too-many-rejects");
+      expect(over.out.setAside).toEqual([]);
     }
+  });
+
+  it("ignores a reject when no text or structural finding was sent, without an anomaly (20.9)", () => {
+    const rules = kindRules({
+      text: "high",
+      structural: "high",
+      measured: "high",
+      reload: "high",
+    }).filter((_, i) => i >= 2);
+    const { out } = run(KIND_PAGE, rules, (built) =>
+      okResult(
+        [],
+        [
+          verdict(built, 0, "reject", "dated-deadline"),
+          verdict(built, 1, "reject", "dated-deadline"),
+        ],
+      ),
+    );
+    expect(out.anomalies).toEqual([]);
+    expect(out.setAside).toEqual([]);
+    expect(out.findings.every((f) => f.source === "rules")).toBe(true);
+  });
+
+  it("counts a reject with confidence low toward the allowance", () => {
+    const page = textPage(2);
+    const { out } = run(page.elements, page.rules, (built) =>
+      okResult(
+        [],
+        [
+          verdict(built, 0, "reject", "required-terms", "low"),
+          verdict(built, 1, "reject", "required-terms", "low"),
+        ],
+      ),
+    );
+    expect(out.anomalies).toEqual(["too-many-rejects"]);
+    expect(out.findings.every((f) => f.source === "rules")).toBe(true);
   });
 
   it("ignores every verdict, not only the rejects, when there are too many rejects", () => {
@@ -436,7 +558,9 @@ describe("reject limits", () => {
         ],
       ),
     );
-    expect(out.anomalies).toEqual(["too-many-rejects"]);
+    // Requirement 20.13: all four findings are named, so the lowering limit
+    // applies as well and both codes are reported once.
+    expect(out.anomalies).toEqual(["too-many-rejects", "too-many-lowered"]);
     expect(out.findings.every((f) => f.source === "rules")).toBe(true);
     expect(out.findings.every((f) => f.finding.confidence === "high")).toBe(true);
   });
@@ -470,6 +594,170 @@ describe("reject limits", () => {
     ]);
     expect(out.setAside[0].finding).toBe(rules[0]);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Lowering limit (requirement 20.11 to 20.13, design 24.1 step 4)
+// ---------------------------------------------------------------------------
+
+function wideTextPage(count: number): { elements: ElementInput[]; rules: Finding[] } {
+  const elements = Array.from({ length: count }, (_, i) =>
+    makeText(`el-${i}`, "p", `Stock notice number ${i}`),
+  );
+  const rules = elements.map((element) =>
+    ruleFinding("fake-scarcity", TEXT_TITLE, [element.id], "high"),
+  );
+  return { elements, rules };
+}
+
+function downgradeRun(m: number, downgrades: number, reason = "vague-low-stock", conf: Confidence = "high") {
+  const page = wideTextPage(m);
+  const result = run(page.elements, page.rules, (built) =>
+    okResult(
+      [],
+      Array.from({ length: downgrades }, (_, i) =>
+        verdict(built, i, "downgrade", reason as ReasonCode, conf),
+      ),
+    ),
+  );
+  return { ...result, rules: page.rules };
+}
+
+describe("lowering limit", () => {
+  it.each([
+    { m: 2, downgrades: 2 },
+    { m: 3, downgrades: 1 },
+    { m: 4, downgrades: 2 },
+    { m: 20, downgrades: 10 },
+  ])("applies $downgrades downgrades over $m rule findings", ({ m, downgrades }) => {
+    const { out } = downgradeRun(m, downgrades);
+    expect(out.anomalies).toEqual([]);
+    expect(out.findings).toHaveLength(m);
+    const lowered = out.findings.filter((f) => f.source === "rules+judge");
+    expect(lowered).toHaveLength(downgrades);
+    expect(lowered.every((f) => f.finding.confidence === "medium")).toBe(true);
+  });
+
+  it.each([
+    { m: 3, downgrades: 2 },
+    { m: 4, downgrades: 3 },
+    { m: 20, downgrades: 11 },
+  ])(
+    "voids the answer when $downgrades of $m rule findings are named (20.11)",
+    ({ m, downgrades }) => {
+      const { out, rules } = downgradeRun(m, downgrades);
+      expect(out.anomalies).toEqual(["too-many-lowered"]);
+      expect(out.setAside).toEqual([]);
+      expect(out.findings).toHaveLength(m);
+      for (const reviewed of out.findings) {
+        expect(reviewed.source).toBe("rules");
+        expect(reviewed.ruleConfidence).toBeUndefined();
+        expect(reviewed.judgeReason).toBeUndefined();
+        expect(rules).toContain(reviewed.finding);
+      }
+    },
+  );
+
+  it("counts two rejects and two downgrades together (m = 5)", () => {
+    const page = wideTextPage(5);
+    const { out, rules } = run(page.elements, page.rules, (built) =>
+      okResult(
+        [],
+        [
+          verdict(built, 0, "reject", "required-terms"),
+          verdict(built, 1, "reject", "required-terms"),
+          verdict(built, 2, "downgrade", "vague-low-stock"),
+          verdict(built, 3, "downgrade", "vague-low-stock"),
+        ],
+      ),
+    );
+    expect(out.anomalies).toEqual(["too-many-lowered"]);
+    expect(out.setAside).toEqual([]);
+    expect(out.findings.map((f) => f.finding)).toEqual(rules);
+    expect(out.findings.every((f) => f.source === "rules")).toBe(true);
+  });
+
+  it("counts ignored low-confidence downgrades (20.12)", () => {
+    // A look-alike downgrade with judge confidence low is ignored by 20.4,
+    // but it still counts: 2 of 3 findings are named.
+    const { out } = downgradeRun(3, 2, "neutral-default", "low");
+    expect(out.anomalies).toEqual(["too-many-lowered"]);
+    expect(out.findings.every((f) => f.source === "rules")).toBe(true);
+  });
+
+  it("does not count a reject of a reload or measured finding (20.12)", () => {
+    const rules = kindRules({
+      text: "high",
+      structural: "high",
+      measured: "high",
+      reload: "high",
+    });
+    const { out } = run(KIND_PAGE, rules, (built) =>
+      okResult(
+        [],
+        [
+          verdict(built, 2, "reject", "dated-deadline"),
+          verdict(built, 3, "reject", "dated-deadline"),
+          verdict(built, 0, "downgrade", "vague-low-stock"),
+          verdict(built, 1, "downgrade", "prechecked-paid-addon"),
+        ],
+      ),
+    );
+    expect(out.anomalies).toEqual([]);
+    expect(out.findings.filter((f) => f.source === "rules+judge")).toHaveLength(2);
+  });
+
+  it("counts a distinct rule finding once even if two verdicts name it", () => {
+    const page = wideTextPage(3);
+    const { out } = run(page.elements, page.rules, (built) =>
+      okResult(
+        [],
+        [
+          verdict(built, 0, "downgrade", "vague-low-stock"),
+          verdict(built, 0, "downgrade", "selling-fast-claim"),
+        ],
+      ),
+    );
+    expect(out.anomalies).toEqual([]);
+  });
+
+  it.each(["too-many-rejects", "too-many-lowered"] as const)(
+    "clears every verdict on %s, including a confirm from a duplicate, and keeps the new findings",
+    (code) => {
+      const page = wideTextPage(3);
+      const elements = [...page.elements, makeText("el-9", "p", "Only 3 left in stock")];
+      const { out } = run(elements, page.rules, (built) => {
+        const verdicts =
+          code === "too-many-rejects"
+            ? [
+                verdict(built, 0, "reject", "required-terms"),
+                verdict(built, 1, "reject", "required-terms"),
+              ]
+            : [
+                verdict(built, 0, "downgrade", "vague-low-stock"),
+                verdict(built, 1, "downgrade", "vague-low-stock"),
+              ];
+        return okResult(
+          [
+            // A duplicate of the rule finding on el-2: it would be a confirm.
+            judged(built, "el-2", "fake-scarcity", "vague-low-stock"),
+            judged(built, "el-9", "fake-scarcity", "vague-low-stock"),
+          ],
+          verdicts,
+        );
+      });
+      expect(out.anomalies).toContain(code);
+      expect(out.setAside).toEqual([]);
+      const ruleSourced = out.findings.filter((f) => f.source !== "judge");
+      expect(ruleSourced).toHaveLength(3);
+      expect(ruleSourced.every((f) => f.source === "rules")).toBe(true);
+      expect(ruleSourced.every((f) => f.ruleConfidence === undefined)).toBe(true);
+      expect(ruleSourced.every((f) => f.judgeReason === undefined)).toBe(true);
+      const added = out.findings.filter((f) => f.source === "judge");
+      expect(added).toHaveLength(1);
+      expect(added[0].finding.elementIds).toEqual(["el-9"]);
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

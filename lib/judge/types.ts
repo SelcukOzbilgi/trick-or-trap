@@ -205,7 +205,8 @@ export type LoggedStopReason =
 export type AnomalyCode =
   | "too-many-findings"
   | "too-many-flagged"
-  | "too-many-rejects";
+  | "too-many-rejects"
+  | "too-many-lowered";
 
 /**
  * The one record logged per scan (design section 17). It holds counts, codes

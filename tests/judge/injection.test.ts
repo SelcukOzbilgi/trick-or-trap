@@ -269,6 +269,81 @@ describe("A1: instruction text next to a countdown", () => {
 });
 
 // ---------------------------------------------------------------------------
+// A1b: one answer that lowers every rule finding (requirement 20.11, 20.12)
+// ---------------------------------------------------------------------------
+
+describe("A1b: mass downgrade", () => {
+  const page = makeSnapshot([
+    makeText("el-0", "p", "Only 3 left in stock"),
+    makeText("el-1", "p", "Selling fast, order today"),
+    makeText("el-2", "p", "12 people are viewing this right now"),
+    makeText("el-3", "p", "Hurry, the offer ends soon"),
+  ]);
+  const rules = [
+    ruleFinding("fake-scarcity", TEXT_SCARCITY, ["el-0"], "high"),
+    ruleFinding("fake-scarcity", TEXT_SCARCITY, ["el-1"], "high"),
+    ruleFinding("fake-activity", TEXT_ACTIVITY, ["el-2"], "high"),
+    ruleFinding("fake-urgency", TEXT_URGENCY, ["el-3"], "high"),
+  ];
+
+  it.each<Confidence>(["low", "high"])(
+    "voids an answer that downgrades every rule finding with confidence %s",
+    async (confidence) => {
+      const { result, client, records } = await scan(page, rules, (data) =>
+        answer({
+          findings: [],
+          verdicts: data.ruleFindings.map((entry) =>
+            verdict(entry.id, "downgrade", "insufficient-context", confidence),
+          ),
+        }),
+      );
+      expect(client.calls).toBe(1);
+      expect(result.judge.status).toBe("ran-anomalous");
+      expectRulesOnly(result, rules);
+      expect(result.findings.every((entry) => entry.ruleConfidence === undefined)).toBe(true);
+      expect(records).toHaveLength(1);
+      expect(records[0].anomalies).toContain("too-many-lowered");
+    },
+  );
+
+  it("voids a mass downgrade of look-alike codes that the gates would ignore", async () => {
+    const { result } = await scan(page, rules, (data) =>
+      answer({
+        findings: [],
+        verdicts: data.ruleFindings.map((entry) =>
+          verdict(entry.id, "downgrade", "neutral-stock-fact", "low"),
+        ),
+      }),
+    );
+    expect(result.judge.status).toBe("ran-anomalous");
+    expectRulesOnly(result, rules);
+  });
+
+  it.each<Confidence>(["low", "high"])(
+    "applies the same answer within the table over two sent rule findings (confidence %s)",
+    async (confidence) => {
+      const two = rules.slice(0, 2);
+      const { result } = await scan(page, two, (data) =>
+        answer({
+          findings: [],
+          verdicts: data.ruleFindings.map((entry) =>
+            verdict(entry.id, "downgrade", "insufficient-context", confidence),
+          ),
+        }),
+      );
+      expect(result.judge.status).toBe("ran");
+      expect(result.setAside).toEqual([]);
+      expect(result.findings).toHaveLength(2);
+      for (const entry of result.findings) {
+        expect(entry.source).toBe("rules+judge");
+        expect(entry.finding.confidence).toBe("medium");
+        expect(entry.ruleConfidence).toBe("high");
+      }
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
 // A2: fake markers that try to close the data block
 // ---------------------------------------------------------------------------
 
@@ -434,7 +509,9 @@ describe("A4: a model that rejects every rule finding", () => {
   }
 
   it.each([
-    [1, 1, 0],
+    // Requirement 20.9 (was 11.8): one reject over one rejectable finding is
+    // within the allowance max(1, floor(1 / 2)) = 1, so it is applied.
+    [1, 1, 1],
     [2, 1, 1],
     [2, 2, 0],
     [4, 2, 2],
@@ -475,6 +552,8 @@ describe("A4: a model that rejects every rule finding", () => {
     );
     expect(result.setAside).toEqual([]);
     expect(result.findings).toHaveLength(4);
+    // Requirement 20.7: the reject without "high" is ignored, not a downgrade.
+    expectRulesOnly(result, rules);
   });
 });
 

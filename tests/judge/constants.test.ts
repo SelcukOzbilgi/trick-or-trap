@@ -50,6 +50,11 @@ describe("limits of design section 9", () => {
     expect(constants.INPUT_TOKEN_CEILING).toBe(6_100);
   });
 
+  it("pins the review-fix limits of design section 24.1 (requirement 20.9, 20.11)", () => {
+    expect(constants.MIN_REJECTS_ALLOWED).toBe(1);
+    expect(constants.LOWERED_MIN_RULE_FINDINGS).toBe(3);
+  });
+
   it("pins every timing", () => {
     expect(constants.FIRST_TIMEOUT_MS).toBe(8_000);
     expect(constants.FIRST_MARGIN_MS).toBe(1_500);

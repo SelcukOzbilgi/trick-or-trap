@@ -204,9 +204,11 @@ describe("fake judges through the mock (16.13, 16.14)", () => {
       let both: RunScore;
       let bothResults: ReviewResult[] = [];
       let judgeOnlyResults: ReviewResult[] = [];
+      let rulesOnlyResults: ReviewResult[] = [];
 
       beforeAll(async () => {
-        rulesOnly = scoreRun(cases, await reviewAll({ mode: "off" }, withRules));
+        rulesOnlyResults = await reviewAll({ mode: "off" }, withRules);
+        rulesOnly = scoreRun(cases, rulesOnlyResults);
         judgeOnlyResults = await reviewAll({ mode: "gateway", step: fake.step }, withoutRules);
         bothResults = await reviewAll({ mode: "gateway", step: fake.step }, withRules);
         judgeOnly = scoreRun(cases, judgeOnlyResults);
@@ -236,6 +238,33 @@ describe("fake judges through the mock (16.13, 16.14)", () => {
         for (const status of statuses) {
           expect(["ran", "ran-anomalous"]).toContain(status);
         }
+      });
+
+      // Requirement 20.15, 20.16: the merge ignores or voids the downgrade-all
+      // answer, and a downgrade never removes a finding.
+      it("never removes a finding, and leaves an anomalous review equal to rules-only", () => {
+        const key = (entry: ReviewResult["findings"][number]) => JSON.stringify(entry.finding);
+        let anomalous = 0;
+        bothResults.forEach((result, index) => {
+          const rules = rulesOnlyResults[index];
+          expect(result.findings.length + result.setAside.length, cases[index].id).toBeGreaterThanOrEqual(
+            rules.findings.length,
+          );
+          if (fake.name !== "downgradeAllJudge") return;
+          expect(result.findings.length, cases[index].id).toBeGreaterThanOrEqual(
+            rules.findings.length,
+          );
+          expect(result.setAside, cases[index].id).toEqual([]);
+          if (result.judge.status !== "ran-anomalous") return;
+          anomalous += 1;
+          expect(result.findings.map(key).sort(), cases[index].id).toEqual(
+            rules.findings.map(key).sort(),
+          );
+          expect(result.findings.every((entry) => entry.source === "rules")).toBe(true);
+        });
+        // Dev cases have at most two rule findings, so the lowering limit does
+        // not apply here; the injection test A1b covers the anomalous case.
+        console.info(`${fake.name}: ${anomalous} anomalous reviews`);
       });
 
       it("finds no more medium or high false positives than rules-only", () => {

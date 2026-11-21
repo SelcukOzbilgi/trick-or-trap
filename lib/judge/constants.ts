@@ -36,6 +36,10 @@ export const MAX_VERDICTS = 20;
 export const JUDGE_QUOTE_MIN_CHARS = 3;
 export const JUDGE_QUOTE_MAX_CHARS = 120;
 export const MAX_REJECTS = 3;
+/** Smallest reject allowance when at least one text or structural finding was sent (20.9). */
+export const MIN_REJECTS_ALLOWED = 1;
+/** Fewest sent rule findings for which the lowering limit applies (20.11). */
+export const LOWERED_MIN_RULE_FINDINGS = 3;
 export const ANOMALY_FLAGGED_SHARE = 0.5;
 export const ANOMALY_FLAGGED_MIN = 6;
 

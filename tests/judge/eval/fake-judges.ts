@@ -62,7 +62,11 @@ export function noisyJudge(request: JudgeRequest): JudgeRawResponse {
   return respond({ findings, verdicts });
 }
 
-/** No finding, and a downgrade with `insufficient-context` for every rule finding. */
+/**
+ * No finding, and a downgrade with `insufficient-context` for every rule finding.
+ * The merge ignores or voids this answer (requirement 20.15): with three or more
+ * sent rule findings it is `ran-anomalous` and changes nothing.
+ */
 export function downgradeAllJudge(request: JudgeRequest): JudgeRawResponse {
   const data = readPageData(request);
   const verdicts = data.ruleFindings.map((rule) => ({
