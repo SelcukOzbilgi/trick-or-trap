@@ -1,8 +1,8 @@
 # Artwork provenance and licence
 
-All images under `public/monsters`, `public/art` and `public/boo-tique/products` were **generated on 2026-11-17 with the OpenAI image model (GPT Image 2.6 Flare) through the Wiro API**, then prepared (cropped, resized, converted, transparent cut-outs, one recolour) with local Python/Pillow scripts by **Claude Code** (Anthropic). Ten plate files, six stamp files and the five README images were added or replaced on 2026-11-21 with the same image model; see "Update 2026-11-21" below. They were **not written by the Kiro CLI**. Claude Code inspected every image and rejected or regenerated off-brief results (the rejected attempts are not in the repo), and the project owner reviewed and approved the final set.
+All images under `public/monsters`, `public/art` and `public/boo-tique/products` were **generated on 2026-11-17 with the OpenAI image model (GPT Image 2.6 Flare) through the Wiro API**, then prepared (cropped, resized, converted, transparent cut-outs, one recolour) with local Python/Pillow scripts by **Claude Code** (Anthropic). Ten plate files, eight stamp files and the five README images were added or replaced on 2026-11-21 with the same image model; see "Update 2026-11-21" below. They were **not written by the Kiro CLI**. Claude Code inspected every image and rejected or regenerated off-brief results (the rejected attempts are not in the repo), and the project owner reviewed and approved the final set.
 
-56 image files under `public/`, 5,681,847 bytes in total (README excluded).
+56 image files under `public/`, 5,714,834 bytes in total (README excluded).
 
 ## What was used as input
 
@@ -28,7 +28,7 @@ Settings: model `openai/gpt-image-2-6-flare`, 1k, 1:1, quality medium, PNG, `bac
 
 ## Monsters (per-file prompt subjects and Wiro task ids)
 
-This table records the 2026-11-17 generation. For werewolf, vampire, zombie, spider and mummy, the plates now in the repo are the redrawn ones described under "Update 2026-11-21"; the vampire, spider and mummy stamps were replaced too. The werewolf and zombie stamps are still the ones from this table. Skeleton, ghost, witch and bats are unchanged.
+This table records the 2026-11-17 generation. For werewolf, vampire, zombie, spider and mummy, the plates now in the repo are the redrawn ones described under "Update 2026-11-21"; the werewolf, vampire, spider and mummy stamps were replaced too. The zombie stamp is still the one from this table; the werewolf stamp was redrawn on 2026-11-21 (see the update below). Skeleton, ghost, witch and bats are unchanged.
 
 | monster | pattern | plate task | stamp task | plate SUBJECT | stamp SUBJECT |
 |---|---|---|---|---|---|
@@ -46,7 +46,7 @@ The vampire plate (task 6252891) used the same recipe on a flat chroma-key green
 
 ### How the transparent cut-outs were made
 
-In the 2026-11-17 set, eight plates and nine stamps came straight from the model's transparent-background output (alpha cleaned: >=240 to 255, <8 to 0) and were checked on #F3EBDD and #13101E at full size and on a 44 px badge: no halos. The vampire plate was chroma-keyed as described above. Plates are exported as lossy WebP (quality 80 to 83, alpha quality 100), stamps as optimised PNG. The 2026-11-21 replacements follow the same export rules (see below); of the files now in the repo, the plates of werewolf, vampire, zombie, spider and mummy and the stamps of vampire, spider and mummy are from that update.
+In the 2026-11-17 set, eight plates and nine stamps came straight from the model's transparent-background output (alpha cleaned: >=240 to 255, <8 to 0) and were checked on #F3EBDD and #13101E at full size and on a 44 px badge: no halos. The vampire plate was chroma-keyed as described above. Plates are exported as lossy WebP (quality 80 to 83, alpha quality 100), stamps as optimised PNG. The 2026-11-21 replacements follow the same export rules (see below); of the files now in the repo, the plates of werewolf, vampire, zombie, spider and mummy and the stamps of werewolf, vampire, spider and mummy are from that update.
 
 ## Update 2026-11-21: README artwork and five redrawn monsters
 
@@ -55,16 +55,17 @@ Same image model as above (`openai/gpt-image-2-6-flare` through the Wiro API), r
 ### What was added or replaced
 
 - Added `docs/images/banner.webp`, `how-it-works.webp`, `monsters.webp`, `built-with-kiro.webp` (README images, WebP web copies) and `social-preview.jpg` (1280x640, kept for the repository's social preview setting). Not yet used by the README.
-- Replaced the plates (`-512.webp`, `-1024.webp`) of werewolf, vampire, zombie, spider and mummy, and the stamps (`-88.png`, `-256.png`) of vampire, spider and mummy. Same file names, pixel sizes and formats; no code change needed.
-- Not replaced: the werewolf and zombie stamps. The redrawn full-figure stamps read worse than the old busts inside a 44 px marker badge, so the 2026-11-17 stamps stay; only the plates of those two changed. A visual comparison sheet was made outside the repo for the owner.
+- Replaced the plates (`-512.webp`, `-1024.webp`) of werewolf, vampire, zombie, spider and mummy, and the stamps (`-88.png`, `-256.png`) of werewolf, vampire, spider and mummy. Same file names, pixel sizes and formats; no code change needed.
+- Werewolf stamp: redrawn as a simplified bust of the new werewolf plate, so that stamp and plate show the same character. The owner approved it after a visual comparison.
+- Not replaced: the zombie stamp. It intentionally stays as the earlier drawing (a bust with an iron ball and chain) by the owner's choice, while its plate shows the newer drawing (a zombie chained to a turnstile); only the zombie plate changed.
 
 ### The five redrawn monsters
 
 | monster | what changed | plate runs (Wiro task ids) | stamp runs |
 |---|---|---|---|
-| werewolf | redrawn: a low crouch seen from the side, glancing back with a sly grin, one paw to its lips, the other slipping a wrapped box into an orange wicker basket behind its back | 6364570 | none used (old stamp kept) |
+| werewolf | redrawn: a low crouch seen from the side, glancing back with a sly grin, one paw to its lips, the other slipping a wrapped box into an orange wicker basket behind its back | 6364570 | redrawn on 2026-11-21 as a simplified bust of the new plate |
 | vampire | redrawn: frontal and symmetric, cape spread wide, pink collar lining, coins dripping from a raised hand into an orange goblet; then an edit that turned the coins into separate heavy coins with edges and highlights | 6364615 (chroma-key green background, keyed locally as described above), then edit 6513256 | 6364713, then edit 6513326 |
-| zombie | redrawn: side view, leaning forward and dragging a foot, arms reaching ahead, ankle shackled by an orange chain to a small orange turnstile | 6364636 | none used (old stamp kept) |
+| zombie | redrawn: side view, leaning forward and dragging a foot, arms reaching ahead, ankle shackled by an orange chain to a small orange turnstile | 6364636 | none used (earlier stamp kept by the owner's choice) |
 | spider | edit of the 2026-11-17 plate: only the face, now cold and watchful with real fangs and no smile | 6513263 (edit of 6252423) | 6513304 (edit of 6252492) |
 | mummy | edit of the 2026-11-17 plate: only the mouth, now a grim gap instead of a smile | 6513273 (edit of 6252494) | 6513319 (edit of 6252503) |
 
@@ -124,8 +125,8 @@ The product names are the fictional Boo-tique catalogue entries from `lib/boo-ti
 | `public/monsters/stamp/spider-256.png` | 256x256 | 91,987 | marker badge (2x) / legend | Cold-eyed violet spider holding an orange checkbox with a tick in its web (preselection) |
 | `public/monsters/stamp/mummy-88.png` | 88x88 | 13,445 | map marker badge | Bandaged mummy with a grim mouth and wrapped eyes, holding an orange button half wrapped in bandage (visual interference) |
 | `public/monsters/stamp/mummy-256.png` | 256x256 | 80,190 | marker badge (2x) / legend | Bandaged mummy with a grim mouth and wrapped eyes, holding an orange button half wrapped in bandage (visual interference) |
-| `public/monsters/stamp/werewolf-88.png` | 88x88 | 14,310 | map marker badge | Werewolf dropping a small box into an orange shopping basket (sneaking an item into the basket) |
-| `public/monsters/stamp/werewolf-256.png` | 256x256 | 84,750 | marker badge (2x) / legend | Werewolf dropping a small box into an orange shopping basket (sneaking an item into the basket) |
+| `public/monsters/stamp/werewolf-88.png` | 88x88 | 18,227 | map marker badge | Werewolf bust with a finger to its lips, a paw slipping a wrapped box into an orange wicker basket (sneaking an item into the basket) |
+| `public/monsters/stamp/werewolf-256.png` | 256x256 | 113,820 | marker badge (2x) / legend | Werewolf bust with a finger to its lips, a paw slipping a wrapped box into an orange wicker basket (sneaking an item into the basket) |
 | `public/monsters/stamp/vampire-88.png` | 88x88 | 16,354 | map marker badge | Vampire in a pink-collared cape dropping heavy orange coins one by one into a goblet (drip pricing) |
 | `public/monsters/stamp/vampire-256.png` | 256x256 | 104,035 | marker badge (2x) / legend | Vampire in a pink-collared cape dropping heavy orange coins one by one into a goblet (drip pricing) |
 | `public/monsters/stamp/zombie-88.png` | 88x88 | 13,121 | map marker badge | Zombie with an iron shackle chained to a large orange ball (hard to cancel) |
@@ -183,4 +184,4 @@ For decorative uses (a monster next to its own visible name) an empty `alt` is f
 - Monster ids: skeleton, ghost, witch, spider, mummy, werewolf, vampire, zombie, bats. Bats are the ninth monster (fake activity); the ghost covers fake scarcity only.
 - Stamps are drawn for a round 44 px badge. In tests a dark fill (#28213F) with the 3 px white and 2 px #13101E rings reads best for every monster; orange fills hide the orange props, lilac fills hide the violet bodies. The zombie and the bats are the lowest-contrast on dark, so encode severity with the number chip or ring colour and add a thin light inner ring if needed.
 - Hero: the left third is intentionally empty for a headline.
-- Werewolf and zombie keep their 2026-11-17 stamps (a bust with a basket; a bust with a ball and chain), while their plates show the redrawn figures (a crouching werewolf, a zombie chained to a turnstile). The props differ between the two sizes only for the zombie.
+- The werewolf stamp is a simplified bust of the redrawn plate, so both show the same character. The zombie keeps its 2026-11-17 stamp (a bust with a ball and chain) by the owner's choice, while its plate shows the redrawn figure (a zombie chained to a turnstile); the props differ between stamp and plate only for the zombie.
