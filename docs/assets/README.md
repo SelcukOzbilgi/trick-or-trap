@@ -1,12 +1,12 @@
 # Artwork provenance and licence
 
-All images under `public/monsters`, `public/art` and `public/boo-tique/products` were **generated on 2026-11-17 with the OpenAI image model (GPT Image 2.6 Flare) through the Wiro API**, then prepared (cropped, resized, converted, transparent cut-outs, one recolour) with local Python/Pillow scripts by **Claude Code** (Anthropic). They were **not written by the Kiro CLI**. Claude Code inspected every image and rejected or regenerated off-brief results (the rejected attempts are not in the repo), and the project owner reviewed and approved the final set.
+All images under `public/monsters`, `public/art` and `public/boo-tique/products` were **generated on 2026-11-17 with the OpenAI image model (GPT Image 2.6 Flare) through the Wiro API**, then prepared (cropped, resized, converted, transparent cut-outs, one recolour) with local Python/Pillow scripts by **Claude Code** (Anthropic). Ten plate files, six stamp files and the five README images were added or replaced on 2026-11-21 with the same image model; see "Update 2026-11-21" below. They were **not written by the Kiro CLI**. Claude Code inspected every image and rejected or regenerated off-brief results (the rejected attempts are not in the repo), and the project owner reviewed and approved the final set.
 
-56 image files, 5,665,049 bytes in total (README excluded).
+56 image files under `public/`, 5,681,847 bytes in total (README excluded).
 
 ## What was used as input
 
-Text prompts only (below). No third-party copyrighted material, artwork, photographs, brands, logos, characters or likenesses were supplied as input, and the prompts ask for no text, no logos and no real brands. The fictional Boo-tique products are plain, unbranded objects.
+Text prompts only (below), except for the 2026-11-21 update, where some runs also took the project's own earlier approved images as style references (see "Update 2026-11-21"). No third-party copyrighted material, artwork, photographs, brands, logos, characters or likenesses were supplied as input, and the prompts ask for no text, no logos and no real brands. The fictional Boo-tique products are plain, unbranded objects.
 
 ## Licence
 
@@ -28,6 +28,8 @@ Settings: model `openai/gpt-image-2-6-flare`, 1k, 1:1, quality medium, PNG, `bac
 
 ## Monsters (per-file prompt subjects and Wiro task ids)
 
+This table records the 2026-11-17 generation. For werewolf, vampire, zombie, spider and mummy, the plates now in the repo are the redrawn ones described under "Update 2026-11-21"; the vampire, spider and mummy stamps were replaced too. The werewolf and zombie stamps are still the ones from this table. Skeleton, ghost, witch and bats are unchanged.
+
 | monster | pattern | plate task | stamp task | plate SUBJECT | stamp SUBJECT |
 |---|---|---|---|---|---|
 | skeleton | fake urgency | 6252388 | 6252356 | a grinning skeleton in a violet hooded cloak, skull with round eye sockets, bony hands holding up a large orange alarm clock, small violet carved radiating lines behind the clock | a grinning skeleton skull with round eye sockets, shoulders in a violet hood, holding a large orange alarm clock in front of its chest |
@@ -44,7 +46,50 @@ The vampire plate (task 6252891) used the same recipe on a flat chroma-key green
 
 ### How the transparent cut-outs were made
 
-Eight plates and nine stamps came straight from the model's transparent-background output (alpha cleaned: >=240 to 255, <8 to 0) and were checked on #F3EBDD and #13101E at full size and on a 44 px badge: no halos. The vampire plate was chroma-keyed as described above. Plates are exported as lossy WebP (quality 80 to 83, alpha quality 100), stamps as optimised PNG.
+In the 2026-11-17 set, eight plates and nine stamps came straight from the model's transparent-background output (alpha cleaned: >=240 to 255, <8 to 0) and were checked on #F3EBDD and #13101E at full size and on a 44 px badge: no halos. The vampire plate was chroma-keyed as described above. Plates are exported as lossy WebP (quality 80 to 83, alpha quality 100), stamps as optimised PNG. The 2026-11-21 replacements follow the same export rules (see below); of the files now in the repo, the plates of werewolf, vampire, zombie, spider and mummy and the stamps of vampire, spider and mummy are from that update.
+
+## Update 2026-11-21: README artwork and five redrawn monsters
+
+Same image model as above (`openai/gpt-image-2-6-flare` through the Wiro API), runs between 2026-11-19 and 2026-11-21. Prepared by a **Claude agent** with local Python/Pillow scripts, approved by the project owner. Not written by the Kiro CLI.
+
+### What was added or replaced
+
+- Added `docs/images/banner.webp`, `how-it-works.webp`, `monsters.webp`, `built-with-kiro.webp` (README images, WebP web copies) and `social-preview.jpg` (1280x640, kept for the repository's social preview setting). Not yet used by the README.
+- Replaced the plates (`-512.webp`, `-1024.webp`) of werewolf, vampire, zombie, spider and mummy, and the stamps (`-88.png`, `-256.png`) of vampire, spider and mummy. Same file names, pixel sizes and formats; no code change needed.
+- Not replaced: the werewolf and zombie stamps. The redrawn full-figure stamps read worse than the old busts inside a 44 px marker badge, so the 2026-11-17 stamps stay; only the plates of those two changed. A visual comparison sheet was made outside the repo for the owner.
+
+### The five redrawn monsters
+
+| monster | what changed | plate runs (Wiro task ids) | stamp runs |
+|---|---|---|---|
+| werewolf | redrawn: a low crouch seen from the side, glancing back with a sly grin, one paw to its lips, the other slipping a wrapped box into an orange wicker basket behind its back | 6364570 | none used (old stamp kept) |
+| vampire | redrawn: frontal and symmetric, cape spread wide, pink collar lining, coins dripping from a raised hand into an orange goblet; then an edit that turned the coins into separate heavy coins with edges and highlights | 6364615 (chroma-key green background, keyed locally as described above), then edit 6513256 | 6364713, then edit 6513326 |
+| zombie | redrawn: side view, leaning forward and dragging a foot, arms reaching ahead, ankle shackled by an orange chain to a small orange turnstile | 6364636 | none used (old stamp kept) |
+| spider | edit of the 2026-11-17 plate: only the face, now cold and watchful with real fangs and no smile | 6513263 (edit of 6252423) | 6513304 (edit of 6252492) |
+| mummy | edit of the 2026-11-17 plate: only the mouth, now a grim gap instead of a smile | 6513273 (edit of 6252494) | 6513319 (edit of 6252503) |
+
+Runs for the redrawn plates and stamps (1k, 1:1, high quality) took the approved skeleton and witch stamps and the new plate as `inputImage` references for style only, and repeated the recipe above. The edit runs took the earlier image of the same monster as the input and changed only the named part. All reference images are this project's own earlier outputs.
+
+How the files were prepared: each new plate and stamp was trimmed to its content, scaled so that the longer side fills 94 percent of the 1024 px plate frame (97 percent for stamps, 92 percent for the vampire stamp, whose cape would otherwise touch the badge ring), centred, alpha cleaned (>=240 to 255, <8 to 0), then resized with Lanczos to the existing sizes. Plates are WebP (quality 82, alpha quality 100), stamps optimised PNG. No colour or detail was changed by script. The plates were checked on #F3EBDD and #13101E: no halos and no green fringe on the vampire.
+
+### The README images
+
+Generated as scenes or pages without any lettering, then lettered by script. Prompts (all start with the same flat-ink recipe: near-black #13101E, soft violet #B99BFF, off-white #F4F0FF and pumpkin orange #FF9A3C, carved gouge lines, hand-cut edges, "No text, letters, numbers or logos"):
+
+| image | what the model drew | Wiro task ids used |
+|---|---|---|
+| `banner.webp` | a night shop scene with a sly vampire and a werewolf peeking over one counter and a bandaged mummy and a zombie over the other, centre left empty; the mummy's eyes were covered with one bandage strip by a follow-up edit | 6362787, 6365528 |
+| `social-preview.jpg` | a shop window with one hooded skeleton among jars and two hanging bats, left side empty; the magnifier is not generated: it was drawn alone (brass ring, glove, no glass) and the enlarged lens view was built by script from the base scene | 6513087, 6513157 |
+| `how-it-works.webp` | three panels, a visitor's hand posting a blank card, an inspector studying a shop page through a lens, empty orange-ringed badges landing on the page; the monster stamps in the badges are the project's own | 6365616 / 6365631, 6513360, 6513414 (earlier tries 6363938 to 6365069 were not used) |
+| `monsters.webp` | an almanac page with a 3x3 grid of empty frames and name plaques; the nine monster plates were placed into the frames by script | 6365196, plus the plates above |
+| `built-with-kiro.webp` | one printing workshop with four stations; the three main characters were swapped by an edit with the vampire, werewolf and ghost plates as references | 6513533, 6514010 |
+
+Lettering was set by script, not generated: real fonts were rendered as masks, roughened and worn to look hand-cut, and printed in the ink colours. Fonts, both under the SIL Open Font License 1.1:
+
+- Rye (Sorkin Type Co): titles and the "Trick or Trap" lettering.
+- IM Fell English, in its italic and small-caps cuts (Igino Marini): captions, names and sub-lines.
+
+Other images in the same working set that were not selected are not in the repo. Each of the five finished images is under 400 KB.
 
 ## Landing hero and spot illustrations
 
@@ -75,14 +120,14 @@ The product names are the fictional Boo-tique catalogue entries from `lib/boo-ti
 | `public/monsters/stamp/ghost-256.png` | 256x256 | 89,080 | marker badge (2x) / legend | Ghost holding up a blank orange price tag beside an almost empty crate with one gem left (fake scarcity) |
 | `public/monsters/stamp/witch-88.png` | 88x88 | 14,751 | map marker badge | Scolding witch in a pointed hat wagging a finger, with a blank orange scroll (confirmshaming) |
 | `public/monsters/stamp/witch-256.png` | 256x256 | 92,188 | marker badge (2x) / legend | Scolding witch in a pointed hat wagging a finger, with a blank orange scroll (confirmshaming) |
-| `public/monsters/stamp/spider-88.png` | 88x88 | 15,326 | map marker badge | Friendly violet spider holding an orange checkbox with a tick in its web (preselection) |
-| `public/monsters/stamp/spider-256.png` | 256x256 | 82,154 | marker badge (2x) / legend | Friendly violet spider holding an orange checkbox with a tick in its web (preselection) |
-| `public/monsters/stamp/mummy-88.png` | 88x88 | 12,968 | map marker badge | Bandaged mummy with its eyes wrapped shut, holding an orange button half wrapped in bandage (visual interference) |
-| `public/monsters/stamp/mummy-256.png` | 256x256 | 77,551 | marker badge (2x) / legend | Bandaged mummy with its eyes wrapped shut, holding an orange button half wrapped in bandage (visual interference) |
+| `public/monsters/stamp/spider-88.png` | 88x88 | 16,557 | map marker badge | Cold-eyed violet spider holding an orange checkbox with a tick in its web (preselection) |
+| `public/monsters/stamp/spider-256.png` | 256x256 | 91,987 | marker badge (2x) / legend | Cold-eyed violet spider holding an orange checkbox with a tick in its web (preselection) |
+| `public/monsters/stamp/mummy-88.png` | 88x88 | 13,445 | map marker badge | Bandaged mummy with a grim mouth and wrapped eyes, holding an orange button half wrapped in bandage (visual interference) |
+| `public/monsters/stamp/mummy-256.png` | 256x256 | 80,190 | marker badge (2x) / legend | Bandaged mummy with a grim mouth and wrapped eyes, holding an orange button half wrapped in bandage (visual interference) |
 | `public/monsters/stamp/werewolf-88.png` | 88x88 | 14,310 | map marker badge | Werewolf dropping a small box into an orange shopping basket (sneaking an item into the basket) |
 | `public/monsters/stamp/werewolf-256.png` | 256x256 | 84,750 | marker badge (2x) / legend | Werewolf dropping a small box into an orange shopping basket (sneaking an item into the basket) |
-| `public/monsters/stamp/vampire-88.png` | 88x88 | 15,274 | map marker badge | Vampire in a pink-collared cape letting orange coins drip from his hand (drip pricing) |
-| `public/monsters/stamp/vampire-256.png` | 256x256 | 89,589 | marker badge (2x) / legend | Vampire in a pink-collared cape letting orange coins drip from his hand (drip pricing) |
+| `public/monsters/stamp/vampire-88.png` | 88x88 | 16,354 | map marker badge | Vampire in a pink-collared cape dropping heavy orange coins one by one into a goblet (drip pricing) |
+| `public/monsters/stamp/vampire-256.png` | 256x256 | 104,035 | marker badge (2x) / legend | Vampire in a pink-collared cape dropping heavy orange coins one by one into a goblet (drip pricing) |
 | `public/monsters/stamp/zombie-88.png` | 88x88 | 13,121 | map marker badge | Zombie with an iron shackle chained to a large orange ball (hard to cancel) |
 | `public/monsters/stamp/zombie-256.png` | 256x256 | 78,991 | marker badge (2x) / legend | Zombie with an iron shackle chained to a large orange ball (hard to cancel) |
 | `public/monsters/stamp/bats-88.png` | 88x88 | 13,318 | map marker badge | Cluster of bats with wide staring eyes, the middle one with orange eyes (fake activity) |
@@ -93,16 +138,16 @@ The product names are the fictional Boo-tique catalogue entries from `lib/boo-ti
 | `public/monsters/plate/ghost-1024.webp` | 1024x1024 | 140,950 | field-guide card | Ghost holding up a blank orange price tag beside an almost empty crate with one gem left (fake scarcity) |
 | `public/monsters/plate/witch-512.webp` | 512x512 | 58,514 | field-guide card | Scolding witch in a pointed hat wagging a finger, with a blank orange scroll (confirmshaming) |
 | `public/monsters/plate/witch-1024.webp` | 1024x1024 | 167,630 | field-guide card | Scolding witch in a pointed hat wagging a finger, with a blank orange scroll (confirmshaming) |
-| `public/monsters/plate/spider-512.webp` | 512x512 | 78,888 | field-guide card | Friendly violet spider holding an orange checkbox with a tick in its web (preselection) |
-| `public/monsters/plate/spider-1024.webp` | 1024x1024 | 214,016 | field-guide card | Friendly violet spider holding an orange checkbox with a tick in its web (preselection) |
-| `public/monsters/plate/mummy-512.webp` | 512x512 | 62,260 | field-guide card | Bandaged mummy with its eyes wrapped shut, holding an orange button half wrapped in bandage (visual interference) |
-| `public/monsters/plate/mummy-1024.webp` | 1024x1024 | 161,686 | field-guide card | Bandaged mummy with its eyes wrapped shut, holding an orange button half wrapped in bandage (visual interference) |
-| `public/monsters/plate/werewolf-512.webp` | 512x512 | 66,494 | field-guide card | Werewolf dropping a small box into an orange shopping basket (sneaking an item into the basket) |
-| `public/monsters/plate/werewolf-1024.webp` | 1024x1024 | 180,990 | field-guide card | Werewolf dropping a small box into an orange shopping basket (sneaking an item into the basket) |
-| `public/monsters/plate/vampire-512.webp` | 512x512 | 51,598 | field-guide card | Vampire in a pink-collared cape letting orange coins drip from his hand (drip pricing) |
-| `public/monsters/plate/vampire-1024.webp` | 1024x1024 | 134,506 | field-guide card | Vampire in a pink-collared cape letting orange coins drip from his hand (drip pricing) |
-| `public/monsters/plate/zombie-512.webp` | 512x512 | 57,896 | field-guide card | Zombie with an iron shackle chained to a large orange ball (hard to cancel) |
-| `public/monsters/plate/zombie-1024.webp` | 1024x1024 | 156,002 | field-guide card | Zombie with an iron shackle chained to a large orange ball (hard to cancel) |
+| `public/monsters/plate/spider-512.webp` | 512x512 | 67,704 | field-guide card | Cold-eyed violet spider holding an orange checkbox with a tick in its web (preselection) |
+| `public/monsters/plate/spider-1024.webp` | 1024x1024 | 175,234 | field-guide card | Cold-eyed violet spider holding an orange checkbox with a tick in its web (preselection) |
+| `public/monsters/plate/mummy-512.webp` | 512x512 | 57,456 | field-guide card | Bandaged mummy with a grim mouth and wrapped eyes, holding an orange button half wrapped in bandage (visual interference) |
+| `public/monsters/plate/mummy-1024.webp` | 1024x1024 | 143,218 | field-guide card | Bandaged mummy with a grim mouth and wrapped eyes, holding an orange button half wrapped in bandage (visual interference) |
+| `public/monsters/plate/werewolf-512.webp` | 512x512 | 73,734 | field-guide card | Werewolf crouching with a finger to its lips while slipping a wrapped gift into an orange basket (sneaking an item into the basket) |
+| `public/monsters/plate/werewolf-1024.webp` | 1024x1024 | 205,552 | field-guide card | Werewolf crouching with a finger to its lips while slipping a wrapped gift into an orange basket (sneaking an item into the basket) |
+| `public/monsters/plate/vampire-512.webp` | 512x512 | 69,618 | field-guide card | Vampire in a pink-collared cape dropping heavy orange coins one by one into a goblet (drip pricing) |
+| `public/monsters/plate/vampire-1024.webp` | 1024x1024 | 178,196 | field-guide card | Vampire in a pink-collared cape dropping heavy orange coins one by one into a goblet (drip pricing) |
+| `public/monsters/plate/zombie-512.webp` | 512x512 | 48,338 | field-guide card | Zombie dragging a foot, its ankle chained by an orange chain to a small turnstile (hard to cancel) |
+| `public/monsters/plate/zombie-1024.webp` | 1024x1024 | 132,378 | field-guide card | Zombie dragging a foot, its ankle chained by an orange chain to a small turnstile (hard to cancel) |
 | `public/monsters/plate/bats-512.webp` | 512x512 | 97,294 | field-guide card | Cluster of bats with wide staring eyes, the middle one with orange eyes (fake activity) |
 | `public/monsters/plate/bats-1024.webp` | 1024x1024 | 240,060 | field-guide card | Cluster of bats with wide staring eyes, the middle one with orange eyes (fake activity) |
 | `public/art/hero-2400.webp` | 2400x1350 | 419,206 | landing hero | Woodcut night scene: a lantern lights a shop window where a skeleton, a ghost, a witch, a spider and bats peek over the ledge |
@@ -125,6 +170,11 @@ The product names are the fictional Boo-tique catalogue entries from `lib/boo-ti
 | `public/boo-tique/products/raven-feather-quill-pen-600.jpg` | 600x450 | 30,445 | product card | Black raven-feather quill pen with a brass nib, next to a small brass inkwell |
 | `public/boo-tique/products/ghost-pepper-candle-1200.jpg` | 1200x900 | 89,411 | product page | Red-orange candle in a glass jar, lit, next to a dried red ghost pepper |
 | `public/boo-tique/products/ghost-pepper-candle-600.jpg` | 600x450 | 29,134 | product card | Red-orange candle in a glass jar, lit, next to a dried red ghost pepper |
+| `docs/images/banner.webp` | 2400x964 | 335,824 | README banner | Trick or Trap banner: friendly woodcut monsters peeking over two shop counters under a hanging lantern |
+| `docs/images/how-it-works.webp` | 1920x1080 | 387,238 | README, how it works | Three woodcut panels: a hand posts a card, an inspector studies a shop page through a lens, monster badges land on the page |
+| `docs/images/monsters.webp` | 1600x1600 | 378,512 | README, the monsters | Almanac page with the nine woodcut monsters in framed plates with their names |
+| `docs/images/built-with-kiro.webp` | 1600x900 | 379,534 | README, how it was built with Kiro | Printing workshop with four stations: spec, tasks, code and review |
+| `docs/images/social-preview.jpg` | 1280x640 | 272,406 | repository social preview (kept for reference) | A magnifier over a night shop window reveals a hooded skeleton with an alarm clock |
 
 For decorative uses (a monster next to its own visible name) an empty `alt` is fine.
 
@@ -133,3 +183,4 @@ For decorative uses (a monster next to its own visible name) an empty `alt` is f
 - Monster ids: skeleton, ghost, witch, spider, mummy, werewolf, vampire, zombie, bats. Bats are the ninth monster (fake activity); the ghost covers fake scarcity only.
 - Stamps are drawn for a round 44 px badge. In tests a dark fill (#28213F) with the 3 px white and 2 px #13101E rings reads best for every monster; orange fills hide the orange props, lilac fills hide the violet bodies. The zombie and the bats are the lowest-contrast on dark, so encode severity with the number chip or ring colour and add a thin light inner ring if needed.
 - Hero: the left third is intentionally empty for a headline.
+- Werewolf and zombie keep their 2026-11-17 stamps (a bust with a basket; a bust with a ball and chain), while their plates show the redrawn figures (a crouching werewolf, a zombie chained to a turnstile). The props differ between the two sizes only for the zombie.
