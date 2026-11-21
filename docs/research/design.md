@@ -1,5 +1,7 @@
 # Design direction
 
+> Superseded in part: the icon plan (game-icons.net) and the eight-monster list below were replaced by the project's own woodcut stamps and nine monsters (Bats for fake activity). See `docs/assets/README.md` and `.kiro/steering/design.md`.
+
 Date: 2026-11-15
 
 Research input prepared before implementation (not written by Kiro). Items marked unverified or "from memory" must be checked before use (font licenses, emoji coverage, the game-icons spider glyph).

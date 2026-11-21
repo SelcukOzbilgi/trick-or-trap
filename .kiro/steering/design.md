@@ -86,7 +86,7 @@ z-index:
 
 Each finding is pinned with a 44 px circular badge:
 
-- **Glyph:** a game-icons.net SVG silhouette, white, centred inside the fill circle.
+- **Glyph:** the project's own woodcut monster stamp (`public/monsters/stamp/`, 88 and 256 px PNG), centred inside the fill circle. The plates under `public/monsters/plate/` are for the field-guide cards. Both are image-model output prepared for the project; provenance and licence are in `docs/assets/README.md`.
 - **Fill colour:** severity — high `#FF9A3C`, medium `#B99BFF`, low `#8C84A8`.
 - **Rings:** 3 px white inner ring, then 2 px `#13101E` outer ring (white-on-dark gives 18.7:1 contrast on any background).
 - **Shadow:** `0 4px 12px rgba(0,0,0,.5)`.
@@ -106,18 +106,16 @@ Each finding is pinned with a 44 px circular badge:
 7. `prefers-reduced-motion`: disable float, pulse, wobble, and the scanning scene animation; fall back to static text steps with `aria-live="polite"`.
 8. Scan progress is announced via `aria-live="polite"`; errors use `role="alert"`.
 9. Touch targets are at least 44 × 44 px.
-10. The screenshot `<img>` has alt text summarising the page and finding count. Glyphs used purely as decoration are `aria-hidden` when a text label is present.
+10. The screenshot `<img>` has alt text summarising the page and finding count. Stamps used purely as decoration are `aria-hidden` when a text label is present.
 11. All finding copy uses "Possible" framing (see `findings-wording.md`).
 
 ## The Boo-tique theme
 
 The Boo-tique uses a visibly different **light theme**: warm cream background, blood-red primary, Cormorant Garamond headings, Jost body. This contrast is intentional — viewers must immediately recognise they are on the demo target, not on the main Trick or Trap UI.
 
-## Font and icon licensing
+## Font and artwork licensing
 
-Font licenses and the icon set must be verified before use:
+Font licenses must be verified before use:
 
 - Fraunces, Space Grotesk, and JetBrains Mono are listed as SIL OFL on Google Fonts. Confirm the OFL applies to Space Grotesk and JetBrains Mono by reading their individual Google Fonts pages before shipping.
-- game-icons.net icons are CC BY 3.0. Attribution is required: add a credit in the footer, the README, and the demo video description.
-- The spider icon specifically must be verified — search game-icons.net for "spider" or "web" before committing, as the expected slug returned a 404 during research.
-- Do not use AI-generated raster images as marker glyphs. If a game-icons glyph is unsuitable, use a hand-built SVG instead (see `docs/research/design.md` option (c)).
+- The monster artwork (stamps, plates, hero, product images) is image-model output prepared for the project, published under the repository licence. Provenance and terms are in `docs/assets/README.md`.
