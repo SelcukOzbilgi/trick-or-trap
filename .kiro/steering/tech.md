@@ -64,7 +64,15 @@ Detectors are pure TypeScript functions. Each detector receives a `PageSnapshot`
 
 ## LLM judge
 
-One small language model (default: Claude Haiku 5.5; fallback: Gemini 2.5 Flash-Lite) is used for confirmshaming classification and borderline visual-interference cases. It sits behind a `Judge` interface so tests can inject a mock that returns deterministic results without any network call.
+One small language model, Claude Haiku 5.5, reviews the findings of the six static detectors (`lib/judge`, spec `model-judge`). There is no fallback model.
+
+- **Seam:** the orchestrator `reviewFindings(snapshot, ruleResult, deps)` calls a `JudgeClient` function (`lib/judge/interface.ts`). `lib/judge/haiku.ts` is the only file that touches the network or the Anthropic SDK; it loads the SDK with `await import(...)` and sets `maxRetries: 0`. Tests inject the deterministic mock from `lib/judge/mock.ts`, and no unit test imports `haiku.ts` or the SDK.
+- **Modes:** `JUDGE_MODE` is `off` (the default, also when it is unset, unknown or its key is missing), `gateway` (Vercel AI Gateway, key `AI_GATEWAY_API_KEY`) or `anthropic` (direct, key `ANTHROPIC_API_KEY`). `readJudgeConfig(env)` in `lib/judge/config.ts` reads them and never echoes a value.
+- **Roles:** the rules run first. The judge builds at most 60 redacted candidates from the snapshot, sends them in one `<page_data>` block, validates the structured answer in code, and merges it under fixed verdict powers. It adds findings at the level `low` only, and it can only lower a rule level or set a rule finding aside. A finding the judge sets aside is listed separately, not deleted. It never decides about reload or measured findings.
+- **Failure gives rules-only:** when the judge is off, skipped (no time, spend limit, cooldown), times out, errors or returns an unusable answer, the result is the rule findings unchanged, and the status line says the reviewer did not run. The text "nothing found" is never shown when the reviewer did not run or a rule check failed.
+- **Wording and text:** titles, descriptions and reasons come from fixed templates (`lib/judge/templates.ts`); the only model-chosen text shown is a quote that is checked as a substring of the sent page text. Page text and attributes stay untrusted data for the model.
+- **Logging:** exactly one record per scan with counts, codes and fixed strings. No page text, quote, prompt, URL, raw answer, key or header is ever logged or put in an error.
+- **Live test:** `tests/judge/live/judge-live.test.ts` calls the real model, is opt-in (`RUN_LIVE_JUDGE=1`) and is run by the owner only; agents never run it. The sealed evaluation split is never in the repository; `JUDGE_EVAL_SEALED_PATH` names it for that test alone.
 
 ## Flow walker (phase 2)
 

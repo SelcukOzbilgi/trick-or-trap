@@ -126,10 +126,10 @@ Rules for every task:
   - [x] 13.5 Run `source-rules.test.ts` and `tests/capture/dependencies.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7, 15.8, 15.9, 1.3, 1.4, 1.16_
 
-- [ ] 14. Opt-in live test, attack fixtures, steering, `.env.example` and lint
+- [x] 14. Opt-in live test, attack fixtures, steering, `.env.example` and lint
   Uses: `lib/judge/haiku.ts`, `lib/judge/config.ts`, `lib/judge/review.ts`, `tests/judge/eval/*`, `tests/detectors/eval/helpers/pages.ts` and `score.ts` (read-only), `.kiro/steering/tech.md`, `.kiro/steering/structure.md`, `.env.example`, `tests/capture/lib-text-rules.test.ts` and `tests/capture/config.test.ts` (read-only). Read: requirements 18, 19; design §20, §21; note 7.5, 7.6.
   Files: `tests/judge/live/judge-live.test.ts`, `tests/judge/live/attacks.json`, `.kiro/steering/tech.md`, `.kiro/steering/structure.md`, `.env.example`.
-  - [ ] 14.1 Write `tests/judge/live/attacks.json` (about 12 fixtures with clean twins, original wording, no eval case text) and `judge-live.test.ts` by design §20. Do not run it.
-  - [ ] 14.2 Edit `tech.md` (the "LLM judge" section; the Gemini fallback removed), `structure.md` (the judge trees) and `.env.example` (design §21). Write no test hook word in either steering file.
-  - [ ] 14.3 Run `tests/capture/lib-text-rules.test.ts`, `tests/capture/config.test.ts` and `tests/judge/source-rules.test.ts`, then `npx tsc --noEmit`, then `npm run lint`.
+  - [x] 14.1 Write `tests/judge/live/attacks.json` (about 12 fixtures with clean twins, original wording, no eval case text) and `judge-live.test.ts` by design §20. Do not run it.
+  - [x] 14.2 Edit `tech.md` (the "LLM judge" section; the Gemini fallback removed), `structure.md` (the judge trees) and `.env.example` (design §21). Write no test hook word in either steering file.
+  - [x] 14.3 Run `tests/capture/lib-text-rules.test.ts`, `tests/capture/config.test.ts` and `tests/judge/source-rules.test.ts`, then `npx tsc --noEmit`, then `npm run lint`.
   _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 18.6, 18.7, 18.8, 19.1, 19.2, 19.3, 19.4, 19.5_
