@@ -65,13 +65,13 @@ Rules for every task:
   - [x] 6.3 Run the test file, then `npx tsc --noEmit`.
   _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12_
 
-- [ ] 7. Templates, status lines and the wording test
+- [x] 7. Templates, status lines and the wording test
   Uses: `lib/judge/types.ts`, `lib/detectors/shared/text.ts` (`quote`), `lib/detectors/shared/finding.ts` (`containsForbidden`, `EXPLANATIONS`), `lib/detectors/data/forbidden-words.ts` (read-only), `lib/judge/prompt.ts`. Read: requirement 10; design §14; note 1.6, 6.
   Files: `lib/judge/templates.ts`, `lib/judge/summary.ts`, `tests/judge/wording.test.ts`, `tests/judge/summary.test.ts`.
-  - [ ] 7.1 Create `tests/judge/wording.test.ts` first: every title starts with "Possible"; one sentence per reason code; `containsForbidden` is false for every title, sentence, description built with a neutral quote, status sentence, reason template, the set-aside heading and the system prompt; a description built from a quote holding a forbidden word holds the mask, not the word.
-  - [ ] 7.2 Create `tests/judge/summary.test.ts` first: each row of the status table; the enumeration of 10.15 over 9 statuses × 2 list states × 2 error states, with no "nothing found" in any letter case; the disclaimer last in every line.
-  - [ ] 7.3 Create `templates.ts` and `summary.ts`.
-  - [ ] 7.4 Run both test files, then `npx tsc --noEmit`.
+  - [x] 7.1 Create `tests/judge/wording.test.ts` first: every title starts with "Possible"; one sentence per reason code; `containsForbidden` is false for every title, sentence, description built with a neutral quote, status sentence, reason template, the set-aside heading and the system prompt; a description built from a quote holding a forbidden word holds the mask, not the word.
+  - [x] 7.2 Create `tests/judge/summary.test.ts` first: each row of the status table; the enumeration of 10.15 over 9 statuses × 2 list states × 2 error states, with no "nothing found" in any letter case; the disclaimer last in every line.
+  - [x] 7.3 Create `templates.ts` and `summary.ts`.
+  - [x] 7.4 Run both test files, then `npx tsc --noEmit`.
   _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.8, 10.9, 10.10, 10.11, 10.12, 10.13, 10.14, 10.15, 10.16_
 
 - [ ] 8. Merge
