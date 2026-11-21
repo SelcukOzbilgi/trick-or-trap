@@ -49,12 +49,12 @@ Rules for every task:
   - [x] 4.5 Run the three test files and `tests/judge/candidates.test.ts`, then `npx tsc --noEmit`.
   _Requirements: 4.10, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 7.10, 7.11, 7.12, 7.13, 7.14, 16.1, 16.2_
 
-- [ ] 5. Prompt, data block and request body
+- [x] 5. Prompt, data block and request body
   Uses: `lib/judge/prompt.ts`, `lib/judge/candidates.ts`, `lib/judge/schema.ts`, `lib/judge/constants.ts`, `lib/detectors/shared/finding.ts` (`containsForbidden`), `tests/judge/eval/build-case.ts`. Read: requirement 8; design §12; note 3.1, 6.4, 4.1 (settings table), attacks A2 and A6 of 3.4.
   Files: `lib/judge/prompt.ts`, `tests/judge/prompt.test.ts`.
-  - [ ] 5.1 Extend `tests/judge/prompt.test.ts` first: the prompt holds the parts of 8.1 to 8.3 (checked by stable phrases and every reason code); no dev element text over 12 characters occurs in it; `containsForbidden` is false for it; the user message has one block and the reminder line; with `</page_data>`, `<page_data>`, "[INST]", "### New rules" and `<|im_start|>system` in page text the closing tag occurs once; `scanDate` present and omitted for an unreadable `capturedAt`; rule findings carry no description or quote; the body settings of 8.9 and the absent keys; the body stays under `MAX_REQUEST_BODY_BYTES` for the four pages of 8.10.
-  - [ ] 5.2 Add `JUDGE_SYSTEM_PROMPT`, `buildUserMessage`, `buildJudgeRequest` and `buildRequestBody` to `prompt.ts`.
-  - [ ] 5.3 Run the test file, then `npx tsc --noEmit`.
+  - [x] 5.1 Extend `tests/judge/prompt.test.ts` first: the prompt holds the parts of 8.1 to 8.3 (checked by stable phrases and every reason code); no dev element text over 12 characters occurs in it; `containsForbidden` is false for it; the user message has one block and the reminder line; with `</page_data>`, `<page_data>`, "[INST]", "### New rules" and `<|im_start|>system` in page text the closing tag occurs once; `scanDate` present and omitted for an unreadable `capturedAt`; rule findings carry no description or quote; the body settings of 8.9 and the absent keys; the body stays under `MAX_REQUEST_BODY_BYTES` for the four pages of 8.10.
+  - [x] 5.2 Add `JUDGE_SYSTEM_PROMPT`, `buildUserMessage`, `buildJudgeRequest` and `buildRequestBody` to `prompt.ts`.
+  - [x] 5.3 Run the test file, then `npx tsc --noEmit`.
   _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.10_
 
 - [ ] 6. Output validation
