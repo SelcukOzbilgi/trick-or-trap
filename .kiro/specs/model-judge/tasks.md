@@ -57,12 +57,12 @@ Rules for every task:
   - [x] 5.3 Run the test file, then `npx tsc --noEmit`.
   _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.10_
 
-- [ ] 6. Output validation
+- [x] 6. Output validation
   Uses: `lib/judge/schema.ts`, `lib/judge/types.ts`, `lib/judge/candidates.ts` (the map), `lib/judge/constants.ts`, `tests/judge/helpers/snapshot.ts`. Read: requirement 9; design §3 (anomalous and "8 kept" rows), §13; note 3.2, 3.3.
   Files: `lib/judge/validate.ts`, `tests/judge/validate.test.ts`.
-  - [ ] 6.1 Create `tests/judge/validate.test.ts` first, on fake responses over a built map: invalid JSON, truncated JSON with `max_tokens`, empty text, extra key and wrong enum each give `invalid`; unknown candidate and rule ids dropped; quote substring of text and of a part kept, NFC and spacing differences accepted, a URL or markup quote dropped, quotes of 2 and 121 characters dropped; structural checks for preselection and visual interference; a flag code of another pattern dropped; verdict families of design §13; repeated rule id, first wins; 20 verdicts at most; 8 kept by the order of design §13; each anomaly code with its threshold (12 and 13 findings, 5 and 6 flagged).
-  - [ ] 6.2 Create `validate.ts`.
-  - [ ] 6.3 Run the test file, then `npx tsc --noEmit`.
+  - [x] 6.1 Create `tests/judge/validate.test.ts` first, on fake responses over a built map: invalid JSON, truncated JSON with `max_tokens`, empty text, extra key and wrong enum each give `invalid`; unknown candidate and rule ids dropped; quote substring of text and of a part kept, NFC and spacing differences accepted, a URL or markup quote dropped, quotes of 2 and 121 characters dropped; structural checks for preselection and visual interference; a flag code of another pattern dropped; verdict families of design §13; repeated rule id, first wins; 20 verdicts at most; 8 kept by the order of design §13; each anomaly code with its threshold (12 and 13 findings, 5 and 6 flagged).
+  - [x] 6.2 Create `validate.ts`.
+  - [x] 6.3 Run the test file, then `npx tsc --noEmit`.
   _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12_
 
 - [ ] 7. Templates, status lines and the wording test
