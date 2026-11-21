@@ -106,14 +106,14 @@ Rules for every task:
   - [x] 11.2 Run the test file and any test file of a module it made you fix, then `npx tsc --noEmit`.
   _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7, 17.8, 17.9, 17.10, 17.11_
 
-- [ ] 12. Evaluation harness and the rules-only regression
+- [x] 12. Evaluation harness and the rules-only regression
   Uses: `tests/judge/eval/build-case.ts`, `lib/judge/review.ts`, `lib/judge/mock.ts`, `lib/detectors/all.ts` (`runAllDetectors`), `tests/fixtures/judge-eval/README.md`, `dev.json`, `judge-eval-dev-baseline.json` (read-only). Read: requirement 16; design §3 (outcome strings, judge-only rows), §18; note 7.2 to 7.4.
   Files: `tests/judge/eval/score.ts`, `tests/judge/eval/fake-judges.ts`, `tests/judge/eval/score.test.ts`, `tests/judge/eval/dev-eval.test.ts`, `tests/judge/eval/replay.test.ts`.
-  - [ ] 12.1 Create `tests/judge/eval/score.test.ts` first: hit on the evidence id and on a related id, misplaced hit as a miss, false positive at low and at medium, tolerated low, off-pattern reported, `setAside` ignored, per-language and per-pattern totals, outcome strings.
-  - [ ] 12.2 Create `tests/judge/eval/dev-eval.test.ts` first: rules-only over dev, table printed, 18/60 hits, 3/60 and 3/60 false positives, 1 tolerated low, every per-case outcome, off-pattern list and detector error count equal to the baseline file, with a failure message naming each differing case; both fake judges through the mock, tables printed, every case scored, medium-or-high false positives not above rules-only.
-  - [ ] 12.3 Create `tests/judge/eval/replay.test.ts`, skipped while `tests/fixtures/judge-dev-responses.json` does not exist.
-  - [ ] 12.4 Create `score.ts` and `fake-judges.ts`.
-  - [ ] 12.5 Run the three test files, then `npx tsc --noEmit`. If the rules-only figures differ from the baseline, do not change the expectation: stop and report the cases.
+  - [x] 12.1 Create `tests/judge/eval/score.test.ts` first: hit on the evidence id and on a related id, misplaced hit as a miss, false positive at low and at medium, tolerated low, off-pattern reported, `setAside` ignored, per-language and per-pattern totals, outcome strings.
+  - [x] 12.2 Create `tests/judge/eval/dev-eval.test.ts` first: rules-only over dev, table printed, 18/60 hits, 3/60 and 3/60 false positives, 1 tolerated low, every per-case outcome, off-pattern list and detector error count equal to the baseline file, with a failure message naming each differing case; both fake judges through the mock, tables printed, every case scored, medium-or-high false positives not above rules-only.
+  - [x] 12.3 Create `tests/judge/eval/replay.test.ts`, skipped while `tests/fixtures/judge-dev-responses.json` does not exist.
+  - [x] 12.4 Create `score.ts` and `fake-judges.ts`.
+  - [x] 12.5 Run the three test files, then `npx tsc --noEmit`. If the rules-only figures differ from the baseline, do not change the expectation: stop and report the cases.
   _Requirements: 16.3, 16.4, 16.5, 16.6, 16.7, 16.8, 16.9, 16.10, 16.11, 16.12, 16.13, 16.14, 16.15_
 
 - [ ] 13. Real client, the SDK dependency and the source rules
