@@ -82,12 +82,12 @@ Rules for every task:
   - [x] 8.3 Run the test file, then `npx tsc --noEmit`.
   _Requirements: 10.7, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 11.10, 11.11, 11.12, 11.13, 11.14, 11.15, 11.16, 11.17, 11.18, 11.19, 11.20_
 
-- [ ] 9. Seam, mock and configuration
+- [x] 9. Seam, mock and configuration
   Uses: `lib/judge/constants.ts`, `lib/judge/prompt.ts`. Read: requirement 12; design §3 (environment, error mapping rows), §16 (without the real client); note 4.4, 4.5.
   Files: `lib/judge/interface.ts`, `lib/judge/mock.ts`, `lib/judge/config.ts`, `tests/judge/interface.test.ts`, `tests/judge/mock.test.ts`, `tests/judge/config.test.ts`.
-  - [ ] 9.1 Create the three test files first: `toJudgeHttpError` for each retryable status, 400 to 404, a connection error, an existing `JudgeHttpError` and a non-error value; the mock's canned, error, hang (settles on abort), function and sequence scripts, recorded requests, and `readPageData` round trip; `readJudgeConfig` for unset, empty, unknown, `gateway` and `anthropic` with and without keys, empty and space-only keys, and no key value in any returned string.
-  - [ ] 9.2 Create `interface.ts`, `mock.ts` and `config.ts` (`import "server-only"` first in `config.ts`).
-  - [ ] 9.3 Run the three test files, then `npx tsc --noEmit`.
+  - [x] 9.1 Create the three test files first: `toJudgeHttpError` for each retryable status, 400 to 404, a connection error, an existing `JudgeHttpError` and a non-error value; the mock's canned, error, hang (settles on abort), function and sequence scripts, recorded requests, and `readPageData` round trip; `readJudgeConfig` for unset, empty, unknown, `gateway` and `anthropic` with and without keys, empty and space-only keys, and no key value in any returned string.
+  - [x] 9.2 Create `interface.ts`, `mock.ts` and `config.ts` (`import "server-only"` first in `config.ts`).
+  - [x] 9.3 Run the three test files, then `npx tsc --noEmit`.
   _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8_
 
 - [ ] 10. Orchestrator and the log record
