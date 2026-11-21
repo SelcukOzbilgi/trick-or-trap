@@ -4,12 +4,22 @@
 
 # Trick or Trap
 
-Paste an online shop URL. The page is opened in a real browser, possible manipulative design patterns are flagged, and each one is marked with a monster. Built for Kiroween 2026 with Kiro.
+Paste an online shop URL. The page is meant to open in a real browser, with possible manipulative design patterns marked by monsters. Today the capture and the detectors exist; the interface does not (see [Status](#status)). Built for Kiroween 2026 with Kiro.
 
 [![CI](https://github.com/SelcukOzbilgi/trick-or-trap/actions/workflows/ci.yml/badge.svg)](https://github.com/SelcukOzbilgi/trick-or-trap/actions/workflows/ci.yml)
 **[MIT licence](LICENSE)**
 
-Try it: not available yet (link coming with the first deployment) · Watch the demo: not available yet (link coming)
+## What it does
+
+<p align="center">
+  <img src="docs/images/how-it-works.webp" alt="Three woodcut panels with the captions Paste a shop URL (a hand posts a card with a shop URL through a door slot), A real browser opens it (a witch studies a shop page through a magnifying glass) and Monsters mark it (monsters mark the page)" width="100%">
+</p>
+
+1. You paste a shop URL.
+2. A real browser opens it and takes a screenshot.
+3. A monster marks each possible pattern, with the evidence and a confidence level.
+
+There are no accounts or payments, no shop rankings, no scanning of pages behind a login, and no browser extension. These are the non-goals in `.kiro/steering/product.md`.
 
 ## Status
 
@@ -21,34 +31,7 @@ Nothing is deployed yet. This is what is on `main` today.
 - Page capture through a remote browser (Browser Use Cloud, driven by `playwright-core`) with a browser-level request guard (`lib/capture`).
 - Six rule-based detectors (`lib/detectors`).
 
-**Not built yet** (all open issues):
-
-- The main interface: [#5](https://github.com/SelcukOzbilgi/trick-or-trap/issues/5)
-- The public scan route: [#4](https://github.com/SelcukOzbilgi/trick-or-trap/issues/4)
-- The model reviewer for borderline findings: [#6](https://github.com/SelcukOzbilgi/trick-or-trap/issues/6)
-- The flow walker for the three flow patterns: [#7](https://github.com/SelcukOzbilgi/trick-or-trap/issues/7)
-- Abuse guards and results privacy: [#8](https://github.com/SelcukOzbilgi/trick-or-trap/issues/8)
-- Joining text that is split across elements, in capture: [#3](https://github.com/SelcukOzbilgi/trick-or-trap/issues/3)
-- A third capture hardening round: [#15](https://github.com/SelcukOzbilgi/trick-or-trap/issues/15)
-- A detector generalisation round: [#17](https://github.com/SelcukOzbilgi/trick-or-trap/issues/17)
-
-The first release is tracked in [#9](https://github.com/SelcukOzbilgi/trick-or-trap/issues/9). No public route calls the capture module or the detectors yet. The landing page (`app/page.tsx`) is a placeholder.
-
-## What it does
-
-<p align="center">
-  <img src="docs/images/how-it-works.webp" alt="Three woodcut panels: a hand posts a card with a shop URL through a door slot, a witch studies a shop page through a magnifying glass, and monsters mark the page" width="100%">
-</p>
-
-The intended flow has three steps:
-
-1. You paste a shop URL.
-2. A real browser opens it and takes a screenshot.
-3. A monster marks each possible pattern, with the evidence and a confidence level.
-
-Capture and the detectors (step 2 and the finding logic of step 3) exist. The URL form and the results page with markers are planned. See [Status](#status).
-
-It does not have accounts or payments. It does not rank shops. It cannot scan pages behind a login. It is not a browser extension. These are the non-goals in `.kiro/steering/product.md`.
+Not built yet: the interface ([#5](https://github.com/SelcukOzbilgi/trick-or-trap/issues/5)), the scan route ([#4](https://github.com/SelcukOzbilgi/trick-or-trap/issues/4)), the model reviewer ([#6](https://github.com/SelcukOzbilgi/trick-or-trap/issues/6)), the flow walker ([#7](https://github.com/SelcukOzbilgi/trick-or-trap/issues/7)), abuse guards ([#8](https://github.com/SelcukOzbilgi/trick-or-trap/issues/8)); capture and detector follow-ups in [#3](https://github.com/SelcukOzbilgi/trick-or-trap/issues/3), [#15](https://github.com/SelcukOzbilgi/trick-or-trap/issues/15) and [#17](https://github.com/SelcukOzbilgi/trick-or-trap/issues/17). The first release is tracked in [#9](https://github.com/SelcukOzbilgi/trick-or-trap/issues/9). Nothing is deployed, and no public route calls the capture module or the detectors yet; the landing page (`app/page.tsx`) is a placeholder.
 
 ## The monsters
 
@@ -68,19 +51,17 @@ It does not have accounts or payments. It does not rank shops. It cannot scan pa
 | Vampire | drip pricing (`drip-pricing`) | Fees that appear late in checkout | planned |
 | Zombie | hard to cancel (`hard-to-cancel`) | One click to sign up, a maze to cancel | planned |
 
-Six patterns have detectors today. The last three are flow patterns. They exist only as planted patterns in the demo shop, and a flow walker is meant to find them there. That walker would walk only the demo shop, never a third-party site. It is planned ([#7](https://github.com/SelcukOzbilgi/trick-or-trap/issues/7)).
-
-What the demo shop has today for the flow patterns: a cart page with an "Insurance" row that you did not add, a checkout page that shows "Handling" and "Haunting fee" rows, and a membership page that says "To cancel, call us during opening hours." These are the end states only. The steps that lead to them (adding to the cart, the multi-screen cancel flow) are not built. The ground-truth fixture marks these three entries as not scored by the static detectors.
+The last three are flow patterns. A flow walker is meant to find them, on the demo shop only and never on a third-party site ([#7](https://github.com/SelcukOzbilgi/trick-or-trap/issues/7)). The demo shop has only their end states today: an "Insurance" row in the cart that you did not add, "Handling" and "Haunting fee" rows in checkout, and a membership page that says "To cancel, call us during opening hours." The steps that lead there are not built, and the ground-truth fixture marks these three entries as not scored by the static detectors.
 
 ## How it was built with Kiro
 
 <p align="center">
-  <img src="docs/images/built-with-kiro.webp" alt="A printing workshop with four stations labelled Spec, Tasks, Code and Review" width="100%">
+  <img src="docs/images/built-with-kiro.webp" alt="A printing workshop with four stations labelled Spec, Tasks, Code and Review" width="70%">
 </p>
 
 ### Specs
 
-`.kiro/specs/` holds `requirements.md`, `design.md` and `tasks.md` for each spec. Every spec ending in `-fixes`, and `boo-tique-polish`, answers an independent review of the work before it.
+`.kiro/specs/` holds `requirements.md`, `design.md` and `tasks.md` for each spec. Every `-fixes` spec (including `page-capture-fixes-2`), and `boo-tique-polish`, answers an independent review of the work before it.
 
 | Spec | What it covers | Pull request |
 |---|---|---|
@@ -94,11 +75,11 @@ What the demo shop has today for the flow patterns: a cart page with an "Insuran
 | [`detectors-static`](.kiro/specs/detectors-static/) | Six detectors, English and Turkish word lists, evaluation against the ground truth | [#16](https://github.com/SelcukOzbilgi/trick-or-trap/pull/16) |
 | [`detectors-static-fixes`](.kiro/specs/detectors-static-fixes/) | Common phrases restored, generality rule and phrase corpus, hold-out evaluation, error channel | [#16](https://github.com/SelcukOzbilgi/trick-or-trap/pull/16) |
 
-"Committed directly to `main`" means before the pull request flow existed (it starts at pull request #11).
+"Committed directly to `main`" means before the pull request flow was in use. As `.kiro/steering/workflow.md` says, the flow is one spec, one branch and one pull request, one commit per task, the spec's own commit first so the pull request shows the spec before the code, and merge commits, never squashed.
 
 ### Steering
 
-`.kiro/steering/` holds the rules Kiro reads on every run:
+`.kiro/steering/` holds the rules Kiro reads: seven files on every run, `design.md` only when Kiro edits UI files.
 
 | File | What it fixes |
 |---|---|
@@ -113,33 +94,22 @@ What the demo shop has today for the flow patterns: a cart page with an "Insuran
 
 ### Builder agent profile
 
-`.kiro/agents/builder.json` limits what Kiro can do in this repository.
-
-- It may read and write files inside the repository.
-- It may not read or write `.env` files (`.env.example` is allowed).
-- It may not write `.kiro/agents/`, `.kiro/hooks/`, `.kiro/settings/`, `.git/`, `.gitattributes`, `.npmrc`, `.githooks/`, `.github/`, `scripts/enable-hooks.mjs`, `scripts/kiro-related-tests.mjs`, `.gitleaks.toml` or `SECURITY.md`.
-- Its shell is limited to an allow list: `npm install`, `npm ci`, `npm run`, `npm test`, a few `npx` tools (`tsc`, `vitest`, `eslint`, `playwright`, `next`, `shadcn`, `create-next-app`) and `node --test`. Dev servers, watch mode and command chaining are excluded.
-
-The file says it is not a hard sandbox, because allowed npm and npx commands can run arbitrary code.
+`.kiro/agents/builder.json` limits what Kiro can do in this repository. It may read and write files inside the repository, except `.env` files (`.env.example` is allowed). It may not write `.kiro/agents/`, `.kiro/hooks/`, `.kiro/settings/`, `.git/`, `.gitattributes`, `.npmrc`, `.githooks/`, `.github/`, `scripts/enable-hooks.mjs`, `scripts/kiro-related-tests.mjs`, `.gitleaks.toml` or `SECURITY.md`. Its shell is limited to an allow list (`npm install`, `npm ci`, `npm run`, `npm test`, a few `npx` tools and `node --test`); dev servers, watch mode and command chaining are excluded. The file says it is not a hard sandbox, because allowed npm and npx commands can run arbitrary code.
 
 ### Hook
 
 `.kiro/hooks/test-on-save.json` has the trigger `PostFileSave`. When Kiro saves a `.ts` or `.tsx` file under `lib/` or `components/`, `scripts/kiro-related-tests.mjs` runs only the vitest files that import it. If more than 8 test files are affected, it skips the run with one line.
 
-The hook was written and checked against Kiro's hook documentation and loader. It has not been observed firing in a Kiro session so far: pull request [#11](https://github.com/SelcukOzbilgi/trick-or-trap/pull/11) says Kiro itself had not run it.
-
-### Workflow
-
-As `.kiro/steering/workflow.md` says: one spec is one branch and one pull request, with one commit per task. The spec's own commit goes first, so the pull request shows the spec before the code. Pull requests are merged with a merge commit, never squashed. The first four specs landed on `main` before this flow was in place.
+The hook was written against Kiro's hook documentation and loader (pull request [#11](https://github.com/SelcukOzbilgi/trick-or-trap/pull/11)). It has been seen firing once: on 2026-11-21, during the first task of the model-judge spec, on a branch not yet merged, Kiro ran it five times ("Run related tests after a source save"), and each run completed.
 
 ## Who made what
 
-- Product code, tests, specs and steering text: written by the Kiro CLI (the commit bodies name the model, `claude-sonnet-5.5`), driven by prompts from a Claude agent.
-- Repository infrastructure (CI workflow, issue and pull request templates, the hook script, the secret-scanning rules, `SECURITY.md`) and the workflow steering file: written by a Claude agent, as the commit bodies say. The builder profile denies Kiro writing every one of these paths except the steering file, which is a convention.
+- Product code, tests and specs: written by the Kiro CLI, driven by prompts from a Claude agent. Steering: the steering files were written by the Kiro CLI on 2026-11-15, except `.kiro/steering/workflow.md`, which a Claude agent wrote. Commit bodies name the author and model for most of the work from 17 November on (`claude-sonnet-5.5` for the implementation, `claude-opus-5.5` for one spec); earlier commits often have no body.
+- Repository infrastructure (CI workflow, issue and pull request templates, the hook script, the secret-scanning rules, `SECURITY.md`) and the workflow steering file: written by a Claude agent; the commit bodies from that work say so. The builder profile denies Kiro writing every one of these paths except the steering file, which is a convention.
 - Research and review notes under `docs/research/`: written by Claude agents. The earliest notes were prepared before implementation, and `docs/research/README.md` says they were not written by Kiro.
 - Independent reviews, including runs against the real remote browser: done by a separate Claude agent.
 - Artwork: generated with an image model and prepared by a Claude agent (cropping, resizing, conversion). The lettering on the README images was set by script. Details and licence are in `docs/assets/README.md`.
-- Decisions, direction and the approval of every image: the owner's.
+- Direction and approval: the owner chose the direction and approved each image.
 
 ## What we measured
 
@@ -152,20 +122,25 @@ As `.kiro/steering/workflow.md` says: one spec is one branch and one pull reques
 | Independent stress probe of 50 new cases, flag cases | 12 of 30 found | The cases lean on wording outside the word lists. A stress probe, not a recall estimate. |
 | Independent stress probe, honest cases | 3 of 20 flagged | Same probe. |
 
-The demo shop has 22 planted entries in total: 19 for the six detectors and 3 flow patterns that the detectors do not cover. The demo-shop figures are scored on snapshots built by a test harness (`tests/detectors/eval/`), not on live captures.
+Figures from the run recorded in `.kiro/specs/detectors-static-fixes/design.md` (2026-11-19) and in pull request [#16](https://github.com/SelcukOzbilgi/trick-or-trap/pull/16). The tests enforce floors, not these exact counts. The 50-case stress probe is described in the spec and steering text (`.kiro/specs/detectors-static-fixes/design.md`, `.kiro/steering/tech.md`); its cases are not in the repository.
 
-Matching by listed phrases does not generalise well yet. This is why a model reviewer ([#6](https://github.com/SelcukOzbilgi/trick-or-trap/issues/6)) and a generalisation round with a frozen independent evaluation set ([#17](https://github.com/SelcukOzbilgi/trick-or-trap/issues/17)) are next.
+The demo shop has 22 planted entries in total: 19 for the six detectors and 3 flow patterns that the detectors do not cover. The demo-shop figures are scored on snapshots built by a test harness (`tests/detectors/eval/`), not on live captures. Matching by listed phrases does not generalise well yet, which is why a model reviewer ([#6](https://github.com/SelcukOzbilgi/trick-or-trap/issues/6)) and a generalisation round with a frozen independent evaluation set ([#17](https://github.com/SelcukOzbilgi/trick-or-trap/issues/17)) are next.
 
-**Tests.** CI at the merge of pull request #16 passed 4,220 tests (8 skipped) in 92 files (1 skipped). This is the figure from that pull request's description, not a promise for today.
+CI at the merge of pull request #16 passed 4,220 tests (8 skipped) in 92 files (1 skipped). This is the figure from that pull request's description, not a promise for today.
 
-**Known gaps**, from the pull requests [#13](https://github.com/SelcukOzbilgi/trick-or-trap/pull/13), [#14](https://github.com/SelcukOzbilgi/trick-or-trap/pull/14) and [#16](https://github.com/SelcukOzbilgi/trick-or-trap/pull/16):
+<details>
+<summary>Known gaps</summary>
+
+From the pull requests [#13](https://github.com/SelcukOzbilgi/trick-or-trap/pull/13), [#14](https://github.com/SelcukOzbilgi/trick-or-trap/pull/14) and [#16](https://github.com/SelcukOzbilgi/trick-or-trap/pull/16):
 
 - WebSocket hardening misses some worker scripts: a worker script served with a content type the rewrite does not match could still open a WebSocket.
 - A failed session stop is not retried. It is reported as a warning.
-- Tiled screenshots of very tall pages can be cut short (at most 10 tiles).
+- Tiled screenshots stop at 10 tiles, and on pages with smooth scrolling the tile loop can stop early.
 - The remote-browser tests that use the fixture pages have not run, and the fixture pages are not deployed anywhere.
 - Outside what the guard can see: WebTransport, WebRTC, preconnect and DNS rebinding.
 - A known false positive: an honest dark cookie banner on an uncaptured dark wrapper gets a medium visual-interference finding. Claims split across elements are missed until capture joins text ([#3](https://github.com/SelcukOzbilgi/trick-or-trap/issues/3)).
+
+</details>
 
 ## How it works
 
@@ -181,9 +156,9 @@ Matching by listed phrases does not generalise well yet. This is why a model rev
 
 What is built, as `lib/capture` does it:
 
-- The URL is checked for syntax, ports 80 and 443 only, and blocked address ranges, and its host name is resolved by DNS, before any browser exists.
+- The URL is checked before any browser exists: syntax, no credentials, ports 80 and 443 only, no local host names, and no private, loopback, link-local or similar addresses, with the host name resolved by DNS (`url-check.ts`, `ip-ranges.ts`).
 - The remote browser runs under a browser-level request guard. It pauses and checks every request of every target (the page, frames, workers and popups), including each redirect hop.
-- If the guard is lost, the capture fails closed: the session is stopped and no snapshot or image is returned. A failed scan is shown as "could not scan", never as clean.
+- If the guard is lost, the capture fails closed: the session is stopped and no snapshot or image is returned. The public outcome for a failed scan is "could not scan", never clean (an outcome type in `lib/capture`; no page shows it yet).
 - A successful capture returns an element snapshot with boxes and styles, screenshots, and a second sample taken after a reload. The overall capture deadline is 45 seconds.
 - Detectors are pure functions over that snapshot. Each returns findings. A detector that throws is reported as an error and never turns into "no finding".
 - Page text in a snapshot is untrusted data for every consumer, including the planned model reviewer.
@@ -204,10 +179,9 @@ lib/
 tests/          unit tests, fixtures (ground truth, phrase corpus, snapshots) and the detector evaluation
 public/         artwork: monsters, hero and spot art, Boo-tique product photos
 .kiro/          specs, steering, the builder agent profile, the save hook
-docs/           research/ (pre-implementation notes), images/ (README images), assets/ (artwork provenance)
+docs/           research/ (pre-implementation notes, later review and spike notes), images/ (README images), assets/ (artwork provenance)
 scripts/        enable-hooks.mjs and kiro-related-tests.mjs
-.github/        CI workflow, issue and pull request templates, dependabot config
-.githooks/      optional pre-commit secret scan
+.github/        CI workflow, issue and pull request templates, dependabot config (.githooks/: optional pre-commit secret scan)
 ```
 
 ## Run locally
@@ -224,9 +198,10 @@ npm run build      # production build; downloads Google Fonts, so it needs netwo
 npm run hooks:enable   # optional pre-commit secret scan, see below
 ```
 
-### Environment variables
+<details>
+<summary>Environment variables (names only)</summary>
 
-Names only, as listed in `.env.example`. Set them in your shell or in a local env file that you never commit.
+Names as listed in `.env.example`. Set them in your shell or in a local env file that you never commit.
 
 Read by page capture today (`lib/capture/config.ts`):
 
@@ -237,7 +212,6 @@ Read by page capture today (`lib/capture/config.ts`):
 | `BROWSER_USE_SESSION_TIMEOUT_MINUTES` | Whole number from 1 to 5. Default 1. |
 | `CAPTURE_BROWSER_MODE` | Default `remote`. Only `remote` is implemented. |
 | `CAPTURE_WEBSOCKET_HARDENING` | `on` or `off`. Default `on`. |
-| `NEXT_PUBLIC_APP_URL` | The app's canonical public origin (absolute links and `og:` tags). It bypasses no capture check. |
 
 Test-only fixture switches:
 
@@ -250,20 +224,24 @@ Test-only fixture switches:
 
 Listed for later features (no code reads them yet): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`.
 
+`NEXT_PUBLIC_APP_URL` is parsed by `lib/capture/config.ts` but not used yet. It is meant for the app's public origin (absolute links, `og:` tags) and it bypasses no capture check. The opt-in remote-browser test reads it to find a running Boo-tique.
+
 The remote-browser capture test (`tests/capture/remote-capture.test.ts`) is opt-in. It is skipped unless `RUN_REMOTE_CAPTURE=1` and a Browser Use API key are set.
 
-### Optional secret scan before commits
+</details>
 
-Every push and pull request is scanned for secrets in CI. To also scan staged changes on your own machine, run `npm run hooks:enable` once. It sets `core.hooksPath` to `.githooks` for this checkout only. The hook runs `gitleaks` over staged changes if the binary is on your PATH. To turn it off, run `git config --unset core.hooksPath`. See `SECURITY.md`.
+<details>
+<summary>Optional secret scan before commits</summary>
+
+Every push to `main` and every pull request is scanned for secrets in CI. To also scan staged changes on your own machine, run `npm run hooks:enable` once. It sets `core.hooksPath` to `.githooks` for this checkout only. The hook runs `gitleaks` over staged changes if the binary is on your PATH. Without `gitleaks` on your PATH the hook lets the commit through. To turn it off, run `git config --unset core.hooksPath`. See `SECURITY.md`.
+
+</details>
 
 ## Safety and wording
 
-- Every finding is titled "Possible ...", states the on-page evidence, and gives a confidence level (high, medium or low) as a word. Every result carries the line "Automated detection — may be wrong." and a scan date. These rules are in `.kiro/steering/findings-wording.md`.
+- Every finding is titled "Possible ...", states the on-page evidence, and gives a confidence level (high, medium or low) as a word. Every result must carry the line "Automated detection — may be wrong." and a scan date. These rules are in `.kiro/steering/findings-wording.md`.
 - Findings describe what is on the screen. They do not state intent and do not make legal judgements. A list of forbidden words is masked by stem, and `tests/detectors/wording.test.ts` checks that no finding string holds a forbidden word, that every title starts with "Possible" and that quoted page text is masked.
-- The product does not rank shops.
-- The scanner refuses URLs that use credentials, ports other than 80 and 443, local host names, and private, loopback, link-local and similar addresses (`lib/capture/url-check.ts`, `lib/capture/ip-ranges.ts`).
 - Results pages are meant to be non-indexable. That is a steering rule. The results page is not built yet ([#5](https://github.com/SelcukOzbilgi/trick-or-trap/issues/5), [#8](https://github.com/SelcukOzbilgi/trick-or-trap/issues/8)). The demo shop already sets `robots` to no-index.
-- The demo shop's patterns are planted on purpose.
 - Removal requests: there is no contact address in the repository and no removal route is built yet ([#8](https://github.com/SelcukOzbilgi/trick-or-trap/issues/8)). Security reports go through `SECURITY.md`.
 
 ## Security and licence
