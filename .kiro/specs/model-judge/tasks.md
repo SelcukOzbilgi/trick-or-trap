@@ -99,11 +99,11 @@ Rules for every task:
   - [x] 10.4 Run both test files, then `npx tsc --noEmit`.
   _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8, 13.9, 13.10, 13.11, 13.12, 13.13, 13.14, 13.15, 13.16, 13.17, 14.1, 14.2, 14.3, 14.4_
 
-- [ ] 11. Code-layer attack suite
+- [x] 11. Code-layer attack suite
   Uses: `lib/judge/review.ts`, `lib/judge/mock.ts`, `tests/judge/helpers/snapshot.ts`. Read: requirement 17; design §19; note 3.4.
   Files: `tests/judge/injection.test.ts`; a fix in a `lib/judge/` module only if a case finds a defect (named in the final reply).
-  - [ ] 11.1 Create `tests/judge/injection.test.ts` first: one `describe` per attack A1 to A11 through `reviewFindings` and the mock, with the hostile page text and the hostile model output, asserting 17.1 to 17.11.
-  - [ ] 11.2 Run the test file and any test file of a module it made you fix, then `npx tsc --noEmit`.
+  - [x] 11.1 Create `tests/judge/injection.test.ts` first: one `describe` per attack A1 to A11 through `reviewFindings` and the mock, with the hostile page text and the hostile model output, asserting 17.1 to 17.11.
+  - [x] 11.2 Run the test file and any test file of a module it made you fix, then `npx tsc --noEmit`.
   _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5, 17.6, 17.7, 17.8, 17.9, 17.10, 17.11_
 
 - [ ] 12. Evaluation harness and the rules-only regression
