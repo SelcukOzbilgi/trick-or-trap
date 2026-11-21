@@ -30,13 +30,13 @@ Rules for every task:
   - [x] 2.3 Run the test file, then `npx tsc --noEmit`.
   _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9_
 
-- [ ] 3. Candidate builder I: eligibility, normalisation and structure
+- [x] 3. Candidate builder I: eligibility, normalisation and structure
   Uses: `lib/judge/redact.ts`, `lib/judge/constants.ts`, `lib/detectors/shared/colour.ts`, `lib/detectors/shared/elements.ts` (`buildIndex`, read-only), `lib/types/index.ts`. Read: requirements 4.7, 5, 6; design §2, §3 (control, labels, groups rows), §11 up to "Facts"; note 2.1 steps 1 to 4.
   Files: `lib/judge/candidates.ts` (`normaliseCandidateText`, `prepareCandidates`), `tests/judge/candidates.test.ts`, `tests/judge/helpers/snapshot.ts`.
-  - [ ] 3.1 Create `tests/judge/helpers/snapshot.ts` (small builders of elements and snapshots that pass `PageSnapshotSchema`, with no test hook attribute).
-  - [ ] 3.2 Create `tests/judge/candidates.test.ts` first: only the first sample is read; each visibility rule and the zero-box rule for controls and non-controls; the eligibility rule; `outsideImage` kept; NFKC, each removed character range, whitespace collapse, the 200-character cut with `cut: true` on a surrogate pair; a mostly redacted candidate dropped; a dialog container at 80 % coverage skipped and at 79 % sent, still giving place and group; a `role="status"` toast sent; wrapping and next-sibling labels merged (input id first, label not sent again); radios grouped by `name`, the value absent from the output; buttons and links grouped within 3 levels and not at 4; `g1`, `g2` in document order; place dialog, toast (role, and fixed with 160 and 161 characters), main; facts rounded, `contrast` omitted on an assumed background, `areaRatio` against the largest member.
-  - [ ] 3.3 Create `candidates.ts` with `normaliseCandidateText` and `prepareCandidates`.
-  - [ ] 3.4 Run the test file, then `npx tsc --noEmit`.
+  - [x] 3.1 Create `tests/judge/helpers/snapshot.ts` (small builders of elements and snapshots that pass `PageSnapshotSchema`, with no test hook attribute).
+  - [x] 3.2 Create `tests/judge/candidates.test.ts` first: only the first sample is read; each visibility rule and the zero-box rule for controls and non-controls; the eligibility rule; `outsideImage` kept; NFKC, each removed character range, whitespace collapse, the 200-character cut with `cut: true` on a surrogate pair; a mostly redacted candidate dropped; a dialog container at 80 % coverage skipped and at 79 % sent, still giving place and group; a `role="status"` toast sent; wrapping and next-sibling labels merged (input id first, label not sent again); radios grouped by `name`, the value absent from the output; buttons and links grouped within 3 levels and not at 4; `g1`, `g2` in document order; place dialog, toast (role, and fixed with 160 and 161 characters), main; facts rounded, `contrast` omitted on an assumed background, `areaRatio` against the largest member.
+  - [x] 3.3 Create `candidates.ts` with `normaliseCandidateText` and `prepareCandidates`.
+  - [x] 3.4 Run the test file, then `npx tsc --noEmit`.
   _Requirements: 4.7, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13_
 
 - [ ] 4. Candidate builder II: split text, rule links, ranking, caps and ids
