@@ -90,13 +90,13 @@ Rules for every task:
   - [x] 9.3 Run the three test files, then `npx tsc --noEmit`.
   _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8_
 
-- [ ] 10. Orchestrator and the log record
+- [x] 10. Orchestrator and the log record
   Uses: every module of tasks 1 to 9, `lib/detectors/index.ts` (types), `tests/judge/helpers/snapshot.ts`. Read: requirements 13, 14; design §3 (timeout, timers, URL hash, missing-key rows), §17; note 4.3, 5.
   Files: `lib/judge/review.ts`, `tests/judge/review.test.ts`, `tests/judge/review-log.test.ts`.
-  - [ ] 10.1 Create `tests/judge/review.test.ts` first, with a manual clock and timer: `off` and absent client make no call; cooldown; 2,999 and 3,000 ms left; first timeout values near the deadline; first-attempt timeout aborts and does not retry; each retryable status retries once with the second timeout; 4,999 ms left does not retry; 400 to 404 do not retry; 402 gives `skipped-over-budget` and starts the cooldown, and a second scan within 10 minutes gives `skipped-cooldown` while one after it calls again; a timed-out retry gives `timeout`; a throwing builder or merge gives `error`; every non-`ran` status returns the rule findings unchanged and an empty `setAside`; `ruleErrors`, `candidateCount` and `truncated`; at most two calls; the result passes `ReviewResultSchema`; `reviewFindings` never rejects.
-  - [ ] 10.2 Create `tests/judge/review-log.test.ts` first: exactly one record per scan for every status; the field set of design §17; `offReason: "missing-key"`; sentinel page text, quote, URL, key, header and raw response absent from the serialised record and from any error.
-  - [ ] 10.3 Create `review.ts` with `reviewFindings`, `createCooldown` and `defaultCooldown`.
-  - [ ] 10.4 Run both test files, then `npx tsc --noEmit`.
+  - [x] 10.1 Create `tests/judge/review.test.ts` first, with a manual clock and timer: `off` and absent client make no call; cooldown; 2,999 and 3,000 ms left; first timeout values near the deadline; first-attempt timeout aborts and does not retry; each retryable status retries once with the second timeout; 4,999 ms left does not retry; 400 to 404 do not retry; 402 gives `skipped-over-budget` and starts the cooldown, and a second scan within 10 minutes gives `skipped-cooldown` while one after it calls again; a timed-out retry gives `timeout`; a throwing builder or merge gives `error`; every non-`ran` status returns the rule findings unchanged and an empty `setAside`; `ruleErrors`, `candidateCount` and `truncated`; at most two calls; the result passes `ReviewResultSchema`; `reviewFindings` never rejects.
+  - [x] 10.2 Create `tests/judge/review-log.test.ts` first: exactly one record per scan for every status; the field set of design §17; `offReason: "missing-key"`; sentinel page text, quote, URL, key, header and raw response absent from the serialised record and from any error.
+  - [x] 10.3 Create `review.ts` with `reviewFindings`, `createCooldown` and `defaultCooldown`.
+  - [x] 10.4 Run both test files, then `npx tsc --noEmit`.
   _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8, 13.9, 13.10, 13.11, 13.12, 13.13, 13.14, 13.15, 13.16, 13.17, 14.1, 14.2, 14.3, 14.4_
 
 - [ ] 11. Code-layer attack suite
