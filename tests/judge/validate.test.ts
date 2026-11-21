@@ -63,7 +63,8 @@ const PAGE: ElementInput[] = [
   makeText("el-4", "label", "Subscribe to the newsletter"),
   makeText("el-5-0", "button", "Yes, save 10% today"),
   makeText("el-5-1", "button", "No thanks, I like paying full price"),
-  { id: "el-6", tag: "option", text: "Express delivery", selected: true },
+  { id: "el-6", tag: "select", text: "" },
+  { id: "el-6-0", tag: "option", text: "Express delivery", selected: true },
   makeText("el-7", "div", "Offer ends soon"),
   makeText("el-7-0", "span", "SALE50"),
 ];

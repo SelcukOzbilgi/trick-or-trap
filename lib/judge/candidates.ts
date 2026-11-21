@@ -31,8 +31,8 @@ import { isMostlyRedacted, redactText } from "@/lib/judge/redact";
 import { JUDGE_PATTERN_IDS } from "@/lib/judge/types";
 import type { JudgePatternId, RuleKind } from "@/lib/judge/types";
 import type {
+  BoundingBox,
   Confidence,
-  ElementSnapshot,
   Finding,
   PageSnapshot,
 } from "@/lib/types";
@@ -95,6 +95,8 @@ export type PreparedCandidates = {
   candidates: PreparedCandidate[];
   /** The element index of the first sample, for the second part. */
   index: ElementIndex;
+  /** What the shopper sees, for the second part (parts use the same tests). */
+  view: ShopperView;
 };
 
 // -- Normalisation (requirements 5.5 and 5.6) ---------------------------------
@@ -236,30 +238,42 @@ function pageAreaOf(snapshot: PageSnapshot): PageArea {
   };
 }
 
+/** Tests 2 and 3 of design section 24.2 on one box: off-screen, then tiny. */
+function boxIsVisible(box: BoundingBox, page: PageArea): boolean {
+  const { x, y, width, height } = box;
+  // 2. Off-screen: entirely outside the page area.
+  if (x + width <= 0 || y + height <= 0) return false;
+  if (page.width !== null && x >= page.width) return false;
+  if (page.height !== null && y >= page.height) return false;
+  // 3. Tiny box.
+  return width >= MIN_VISIBLE_BOX_PX && height >= MIN_VISIBLE_BOX_PX;
+}
+
 /**
- * Tests 2 to 6 of design section 24.2 on one carrier of text: off-screen box,
- * tiny box, tiny font, faint effective opacity and low contrast on a known
- * background. Test 1 (style) is `isStyleHidden`. Every test uses only fields
- * the snapshot holds. `boxExempt` skips the box tests for an element whose
- * box says nothing about what is shown (a selected option of a closed select).
- * The three call sites (eligibility, parts, role coverage) share this
- * function so that they cannot differ.
+ * Tests 2 to 6 of design section 24.2 on one carrier of text. The box tests
+ * (2 and 3) are decided by the caller, because they are not a property of the
+ * element alone: a box is only seen when every captured ancestor's box is
+ * seen too, and a selected option takes them from its select (`boxOk`). This
+ * function then runs the tests that are about the element's own style: tiny
+ * font, faint effective opacity and low contrast on a known background. Test 1
+ * (style) is `isStyleHidden`. Every test uses only fields the snapshot holds.
+ *
+ * Which tests look at ancestors: the box tests (all captured ancestors), the
+ * style test (ancestors' display, visibility and opacity 0) and the opacity
+ * test (own opacity times the ancestors') are inherited. The font size and the
+ * text colour are the element's own computed values, so a readable child of a
+ * tiny-font parent stays readable and the font test is not inherited; the
+ * contrast test takes the background from the ancestors (`textContrast`).
+ * The call sites (eligibility, parts, label merging, role coverage and the
+ * text of every carrier) all go through the one `ShopperView` built from this
+ * function, so that they cannot differ.
  */
 function isShopperVisible(
   el: IndexedElement,
   index: ElementIndex,
-  page: PageArea,
-  boxExempt: boolean,
+  boxOk: boolean,
 ): boolean {
-  if (!boxExempt) {
-    const { x, y, width, height } = el.box;
-    // 2. Off-screen: entirely outside the page area.
-    if (x + width <= 0 || y + height <= 0) return false;
-    if (page.width !== null && x >= page.width) return false;
-    if (page.height !== null && y >= page.height) return false;
-    // 3. Tiny box.
-    if (width < MIN_VISIBLE_BOX_PX || height < MIN_VISIBLE_BOX_PX) return false;
-  }
+  if (!boxOk) return false;
   // 4. Tiny font.
   if (el.fontSizePx !== null && el.fontSizePx < MIN_FONT_PX) return false;
   // 5. Faint effective opacity: own times the opacities of captured ancestors.
@@ -272,6 +286,189 @@ function isShopperVisible(
     return false;
   }
   return true;
+}
+
+/** The first characters of a hidden text that are looked for when all of it is not found. */
+const HIDDEN_ANCHOR_CHARS = 16;
+
+function pathStartsWith(path: readonly number[], prefix: readonly number[]): boolean {
+  if (prefix.length > path.length) return false;
+  for (let i = 0; i < prefix.length; i += 1) {
+    if (path[i] !== prefix[i]) return false;
+  }
+  return true;
+}
+
+const WORD_CHARACTER = /[\p{L}\p{N}]/u;
+
+function isWordBoundary(text: string, start: number, end: number): boolean {
+  const before = start > 0 ? text.charAt(start - 1) : "";
+  const after = end < text.length ? text.charAt(end) : "";
+  return !WORD_CHARACTER.test(before) && !WORD_CHARACTER.test(after);
+}
+
+/**
+ * `text` without one occurrence of `part`, or null when `part` is not in it.
+ * An occurrence between word boundaries is preferred, so that a hidden "ly"
+ * does not take the end of a visible "Only". Nothing is put in its place: the
+ * shopper sees the words on either side of invisible text as they are, and
+ * the whitespace that surrounded it collapses.
+ */
+function withoutOnce(text: string, part: string): string | null {
+  let first = -1;
+  let chosen = -1;
+  let from = 0;
+  for (;;) {
+    const at = text.indexOf(part, from);
+    if (at < 0) break;
+    if (first < 0) first = at;
+    if (isWordBoundary(text, at, at + part.length)) {
+      chosen = at;
+      break;
+    }
+    from = at + 1;
+  }
+  if (chosen < 0) chosen = first;
+  if (chosen < 0) return null;
+  return (text.slice(0, chosen) + text.slice(chosen + part.length))
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+/**
+ * What the shopper can see, decided once per snapshot. All members are
+ * memoised and every candidate path (eligibility, parts, label merging, role
+ * coverage, place) asks this one object.
+ */
+export type ShopperView = {
+  /** Hidden by its own style or by an ancestor's (requirement 5.2). */
+  hidden(el: IndexedElement): boolean;
+  /** Tests 2 to 6 of design section 24.2, with inherited box tests. */
+  seen(el: IndexedElement): boolean;
+  /**
+   * The normalised text of the element with the text of its unseen captured
+   * descendants taken out; null when that cannot be done reliably.
+   *
+   * Choice (design 24.2, residual risk of a hidden descendant in a visible
+   * carrier): the text of an element is the page's own text of the whole
+   * subtree, so it holds what a hidden span says. The snapshot has no
+   * per-node text, but it has the text of every captured descendant, so the
+   * text of each topmost unseen descendant is cut out of the carrier's text.
+   * That is reliable when the descendant's text is in the carrier's text as a
+   * whole. When it is only partly there (the capture cut one of the texts at
+   * its cap, or the page changed the text), the part that is left cannot be
+   * located, and the carrier is dropped (null) rather than sent with what may
+   * be a piece of hidden text. When no part of it is there, the descendant
+   * was never in the carrier's text (a browser leaves display:none out) and
+   * nothing is taken out. The options of a select are not unseen descendants:
+   * a closed select reports a zero box for each, and their text is the text of
+   * the control.
+   */
+  textOf(el: IndexedElement): string | null;
+  isSelectedOption(el: IndexedElement): boolean;
+};
+
+function createShopperView(snapshot: PageSnapshot, index: ElementIndex): ShopperView {
+  const elements = index.elements;
+  const page = pageAreaOf(snapshot);
+
+  const selectedById = new Map<string, boolean>();
+  for (const raw of snapshot.elements) {
+    if (!selectedById.has(raw.id)) selectedById.set(raw.id, raw.selected === true);
+  }
+  const isSelectedOption = (el: IndexedElement): boolean =>
+    el.tag === "option" && selectedById.get(el.id) === true;
+
+  const fullText: string[] = elements.map((el) => normaliseFull(el.text));
+
+  // Own style, then ancestors' style: text under a hidden parent is not seen.
+  const ownHidden = elements.map(isStyleHidden);
+  const hiddenFlags: boolean[] = elements.map(
+    (el) =>
+      ownHidden[el.order] ||
+      index.ancestors(el).some((ancestor) => ownHidden[ancestor.order]),
+  );
+  const hidden = (el: IndexedElement): boolean => hiddenFlags[el.order];
+
+  // Tests 2 and 3 are inherited: an element is not seen when its own box or the
+  // box of any captured ancestor is off the page or under MIN_VISIBLE_BOX_PX.
+  // A box that clips (a 1 px wrapper) hides everything inside it, whatever the
+  // size of the inner box.
+  const chainCache = new Map<number, boolean>();
+  const boxChainOk = (el: IndexedElement): boolean => {
+    const known = chainCache.get(el.order);
+    if (known !== undefined) return known;
+    let ok = boxIsVisible(el.box, page);
+    if (ok) {
+      const parent = index.ancestors(el)[0];
+      if (parent !== undefined) ok = boxChainOk(parent);
+    }
+    chainCache.set(el.order, ok);
+    return ok;
+  };
+
+  // Requirement 21.8, amended: a selected option reports a zero box in a closed
+  // select, so its own box says nothing. What the shopper sees is the select, so
+  // the box tests run on the nearest captured select (and its ancestors); an
+  // option with no captured select is not seen.
+  const boxOk = (el: IndexedElement): boolean => {
+    if (!isSelectedOption(el)) return boxChainOk(el);
+    const select = index.ancestors(el).find((ancestor) => ancestor.tag === "select");
+    return select !== undefined && boxChainOk(select);
+  };
+
+  const seenCache = new Map<number, boolean>();
+  const seen = (el: IndexedElement): boolean => {
+    const known = seenCache.get(el.order);
+    if (known !== undefined) return known;
+    const result = isShopperVisible(el, index, boxOk(el));
+    seenCache.set(el.order, result);
+    return result;
+  };
+
+  const unseen = (el: IndexedElement): boolean => hidden(el) || !seen(el);
+
+  const isOptionOfSelect = (el: IndexedElement): boolean =>
+    (el.tag === "option" || el.tag === "optgroup") &&
+    index.ancestors(el).some((ancestor) => ancestor.tag === "select");
+
+  const compute = (el: IndexedElement): string | null => {
+    let text = fullText[el.order];
+    const path = el.path;
+    if (text === "" || path === null) return text;
+    let blocked: IndexedElement | null = null;
+    for (let i = el.order + 1; i < elements.length; i += 1) {
+      const d = elements[i];
+      if (d.path === null || !pathStartsWith(d.path, path)) break;
+      if (d.path.length === path.length) continue;
+      // Only the topmost unseen descendant is cut out: its text already holds
+      // the text of everything inside it.
+      if (blocked !== null && index.isAncestor(blocked, d)) continue;
+      blocked = null;
+      if (isOptionOfSelect(d) || !unseen(d)) continue;
+      blocked = d;
+      const hiddenText = fullText[d.order];
+      if (hiddenText === "") continue;
+      const rest = withoutOnce(text, hiddenText);
+      if (rest !== null) {
+        text = rest;
+        continue;
+      }
+      const anchor = cutAtBoundary(hiddenText, HIDDEN_ANCHOR_CHARS).text;
+      if (text.includes(anchor)) return null;
+    }
+    return text;
+  };
+
+  const textCache = new Map<number, string | null>();
+  const textOf = (el: IndexedElement): string | null => {
+    if (textCache.has(el.order)) return textCache.get(el.order) ?? null;
+    const result = compute(el);
+    textCache.set(el.order, result);
+    return result;
+  };
+
+  return { hidden, seen, textOf, isSelectedOption };
 }
 
 function round(value: number, places: number): number {
@@ -326,47 +523,21 @@ function makeUnionFind(size: number): {
 export function prepareCandidates(snapshot: PageSnapshot): PreparedCandidates {
   const index = buildIndex(snapshot, false);
   const elements = index.elements;
-
-  const rawById = new Map<string, ElementSnapshot>();
-  for (const raw of snapshot.elements) {
-    if (!rawById.has(raw.id)) rawById.set(raw.id, raw);
-  }
-
-  const fullText: string[] = elements.map((el) => normaliseFull(el.text));
-
-  // Own style, then ancestors' style: text under a hidden parent is not seen.
-  const ownHidden = elements.map(isStyleHidden);
-  const hidden: boolean[] = elements.map(
-    (el) =>
-      ownHidden[el.order] ||
-      index.ancestors(el).some((ancestor) => ownHidden[ancestor.order]),
-  );
-
-  const isSelectedOption = (el: IndexedElement): boolean =>
-    el.tag === "option" && rawById.get(el.id)?.selected === true;
-
-  // Design section 24.2, tests 2 to 6, memoised per element. A selected option
-  // is exempt from the box tests: a closed select reports a zero box.
-  const page = pageAreaOf(snapshot);
-  const seenCache = new Map<number, boolean>();
-  const seen = (el: IndexedElement): boolean => {
-    const known = seenCache.get(el.order);
-    if (known !== undefined) return known;
-    const result = isShopperVisible(el, index, page, isSelectedOption(el));
-    seenCache.set(el.order, result);
-    return result;
-  };
+  const view = createShopperView(snapshot, index);
+  const { hidden, seen, textOf, isSelectedOption } = view;
 
   // Requirements 5.3 and 21.1 to 21.8. A checkbox or a radio is sent whatever
   // its box (it has no text of its own; its label is the carrier, tested where
-  // it is merged). Every other element is its own carrier.
+  // it is merged). Every other element is its own carrier, and its text is the
+  // text the shopper can see (`textOf`): a carrier whose visible text cannot be
+  // told is not sent.
   const eligible = (el: IndexedElement): boolean => {
-    if (hidden[el.order]) return false;
+    if (hidden(el)) return false;
     if (toggleType(el) !== null) return true;
-    if (fullText[el.order].length < MIN_TEXT_CHARS && !isSelectedOption(el)) {
-      return false;
-    }
-    return seen(el);
+    if (!seen(el)) return false;
+    const visible = textOf(el);
+    if (visible === null) return false;
+    return visible.length >= MIN_TEXT_CHARS || isSelectedOption(el);
   };
 
   // Next captured sibling of every element (requirement 6.4).
@@ -380,14 +551,21 @@ export function prepareCandidates(snapshot: PageSnapshot): PreparedCandidates {
     lastOfParent.set(key, el);
   }
 
-  // Pass one: labels of eligible checkboxes and radios.
+  // Pass one: labels of eligible checkboxes and radios. A label is merged only
+  // when the shopper sees it and its visible text can be told.
   const labelOf = new Map<number, IndexedElement>();
   const consumed = new Set<number>();
   for (const el of elements) {
     if (toggleType(el) === null || !eligible(el)) continue;
     const wrapping = index.ancestors(el).find((a) => a.tag === "label");
     const label = wrapping ?? nextSibling.get(el.order);
-    if (!label || label.tag !== "label" || hidden[label.order] || !seen(label)) {
+    if (
+      !label ||
+      label.tag !== "label" ||
+      hidden(label) ||
+      !seen(label) ||
+      textOf(label) === null
+    ) {
       continue;
     }
     labelOf.set(el.order, label);
@@ -395,15 +573,15 @@ export function prepareCandidates(snapshot: PageSnapshot): PreparedCandidates {
   }
 
   // Requirements 6.1 to 6.3: a role container whose captured descendants
-  // cover its text is not sent.
+  // cover its text is not sent. Both sides count the text the shopper sees.
   const isCoveredContainer = (el: IndexedElement): boolean => {
     if (el.role === "" || el.path === null) return false;
-    const length = fullText[el.order].length;
+    const length = textOf(el)?.length ?? 0;
     if (length === 0) return false;
     let covered = 0;
     for (const d of index.subtree(el.path)) {
-      if (!index.isAncestor(el, d) || hidden[d.order] || !seen(d)) continue;
-      covered += fullText[d.order].length;
+      if (!index.isAncestor(el, d) || hidden(d) || !seen(d)) continue;
+      covered += textOf(d)?.length ?? 0;
     }
     return Math.min(covered, length) / length >= ROLE_COVERAGE_MIN;
   };
@@ -416,9 +594,9 @@ export function prepareCandidates(snapshot: PageSnapshot): PreparedCandidates {
     const label = labelOf.get(el.order) ?? null;
     const full = toggleType(el) !== null
       ? label
-        ? fullText[label.order]
+        ? (textOf(label) ?? "")
         : ""
-      : fullText[el.order];
+      : (textOf(el) ?? "");
     const cut = cutAtBoundary(full, MAX_CANDIDATE_CHARS);
     const redacted = redactText(cut.text);
     if (redacted !== "" && isMostlyRedacted(redacted)) continue;
@@ -448,6 +626,12 @@ export function prepareCandidates(snapshot: PageSnapshot): PreparedCandidates {
 
   const candidates: PreparedCandidate[] = drafts.map((draft, i) => {
     const { el, label } = draft;
+    // The raw text is the text as read, unless text the shopper cannot see was
+    // taken out of it: then it is the visible text, so that no hidden word
+    // stays on the candidate (it only steers the split-text step).
+    const visible = textOf(el);
+    const rawText =
+      visible === null || visible === normaliseFull(el.text) ? el.text : visible;
     const candidate: PreparedCandidate = {
       elementIds: label ? [el.id, label.id] : [el.id],
       order: el.order,
@@ -456,7 +640,7 @@ export function prepareCandidates(snapshot: PageSnapshot): PreparedCandidates {
       place: placeOf(draft),
       text: texts[i].text,
       cut: texts[i].cut,
-      rawText: el.text,
+      rawText,
       outsideImage: el.outsideImage,
     };
     const toggle = toggleType(el);
@@ -471,7 +655,7 @@ export function prepareCandidates(snapshot: PageSnapshot): PreparedCandidates {
   });
 
   assignGroups(candidates, drafts, index);
-  return { candidates, index };
+  return { candidates, index, view };
 }
 
 // -- Groups and facts (requirements 6.5 to 6.7, 6.11 to 6.13) -----------------
@@ -774,16 +958,22 @@ function partsOf(
   candidate: PreparedCandidate,
   index: ElementIndex,
   children: ReadonlyMap<string, readonly IndexedElement[]>,
-  page: PageArea,
+  view: ShopperView,
 ): { parts: Part[]; capped: boolean } {
   const owner = index.byId(candidate.elementIds[0]);
   if (!owner || owner.path === null) return { parts: [], capped: false };
   const found: Part[] = [];
   for (const child of children.get(owner.path.join("-")) ?? []) {
     if (!PART_TAGS.has(child.tag) || child.hidden) continue;
-    // Requirement 21.9: a child the shopper cannot see is not a part.
-    if (!isShopperVisible(child, index, page, false)) continue;
-    const redacted = redactText(normaliseCandidateText(child.text).text);
+    // Requirement 21.9: a child the shopper cannot see is not a part. The same
+    // view as for candidates decides, ancestors' boxes included.
+    if (view.hidden(child) || !view.seen(child)) continue;
+    // The part's text is what the shopper sees of it: hidden text inside the
+    // child is not part of it, and a child whose visible text cannot be told
+    // is not a part.
+    const visible = view.textOf(child);
+    if (visible === null) continue;
+    const redacted = redactText(cutAtBoundary(visible, MAX_CANDIDATE_CHARS).text);
     if (redacted === "" || isMostlyRedacted(redacted)) continue;
     found.push({
       id: child.id,
@@ -967,20 +1157,19 @@ export function buildCandidates(
   snapshot: PageSnapshot,
   ruleFindings: readonly Finding[],
 ): BuiltCandidates {
-  const { candidates: prepared, index } = prepareCandidates(snapshot);
+  const { candidates: prepared, index, view } = prepareCandidates(snapshot);
   let truncated = false;
 
   // Parts, in document order: a child that became a part is not sent again,
   // and a child that is a part of an earlier fragment owns no parts itself.
   const children = childrenByParent(index);
-  const page = pageAreaOf(snapshot);
   const consumed = new Set<string>();
   const pool: PoolEntry[] = [];
   for (const candidate of prepared) {
     if (consumed.has(candidate.elementIds[0])) continue;
     let parts: Part[] = [];
     if (isFragment(candidate)) {
-      const result = partsOf(candidate, index, children, page);
+      const result = partsOf(candidate, index, children, view);
       parts = result.parts;
       if (result.capped) truncated = true;
     }
