@@ -1,0 +1,3700 @@
+{
+  "meta": {
+    "name": "judge-eval-dev",
+    "version": 1,
+    "created": "2026-11-21",
+    "author": "independent Claude agent (not Kiro, not the word-list author)",
+    "caseCount": 120
+  },
+  "cases": [
+    {
+      "id": "cs-en-c-01",
+      "lang": "en",
+      "pattern": "confirmshaming",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Get 10% off your first order Get my code No thanks"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Get 10% off your first order"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Get my code"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "a",
+          "text": "No thanks",
+          "attributes": {}
+        }
+      ],
+      "why": "Neutral decline."
+    },
+    {
+      "id": "cs-en-c-04",
+      "lang": "en",
+      "pattern": "confirmshaming",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Rate your experience Rate now Not now"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Rate your experience"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Rate now"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "button",
+          "text": "Not now"
+        }
+      ],
+      "why": "Neutral decline."
+    },
+    {
+      "id": "cs-en-c-05",
+      "lang": "en",
+      "pattern": "confirmshaming",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Tell us your style Start quiz Skip this step"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Tell us your style"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Start quiz"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "a",
+          "text": "Skip this step",
+          "attributes": {}
+        }
+      ],
+      "why": "Neutral skip."
+    },
+    {
+      "id": "cs-en-c-07",
+      "lang": "en",
+      "pattern": "confirmshaming",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Cover your headphones against drops? Add drop cover Continue without cover"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Cover your headphones against drops?"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Add drop cover"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "a",
+          "text": "Continue without cover",
+          "attributes": {}
+        }
+      ],
+      "why": "Decline states the plain consequence neutrally.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "cs-en-c-09",
+      "lang": "en",
+      "pattern": "confirmshaming",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-4-0",
+          "tag": "h2",
+          "text": "Email preferences"
+        },
+        {
+          "id": "el-0-4-1",
+          "tag": "label",
+          "text": "Unsubscribe from all marketing emails"
+        },
+        {
+          "id": "el-0-4-1-0",
+          "tag": "input",
+          "checked": false,
+          "attributes": {
+            "type": "checkbox"
+          }
+        },
+        {
+          "id": "el-0-4-2",
+          "tag": "button",
+          "text": "Save preferences"
+        }
+      ],
+      "why": "Neutral opt-out control."
+    },
+    {
+      "id": "cs-en-f-02",
+      "lang": "en",
+      "pattern": "confirmshaming",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Free delivery for members Unlock free delivery No, I'd rather pay for delivery"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Free delivery for members"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Unlock free delivery"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "a",
+          "text": "No, I'd rather pay for delivery",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-12-2",
+      "why": "Decline frames refusing as choosing a loss."
+    },
+    {
+      "id": "cs-en-f-04",
+      "lang": "en",
+      "pattern": "confirmshaming",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Add accidental damage cover? Add cover I'll risk breaking it"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Add accidental damage cover?"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Add cover"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "a",
+          "text": "I'll risk breaking it",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-12-2",
+      "why": "Decline frames the user as reckless."
+    },
+    {
+      "id": "cs-en-f-06",
+      "lang": "en",
+      "pattern": "confirmshaming",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Members save on every order Join for free Nah, savings aren't for me"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Members save on every order"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Join for free"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "a",
+          "text": "Nah, savings aren't for me",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-12-2",
+      "why": "Casual guilt-trip; no 'no thanks' template."
+    },
+    {
+      "id": "cs-en-f-07",
+      "lang": "en",
+      "pattern": "confirmshaming",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Exclusive deals in your inbox Sign me up I hate deals, just let me leave"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Exclusive deals in your inbox"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Sign me up"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "button",
+          "text": "I hate deals, just let me leave"
+        }
+      ],
+      "evidenceElementId": "el-0-12-2",
+      "why": "Decline puts words in the user's mouth."
+    },
+    {
+      "id": "cs-en-f-10",
+      "lang": "en",
+      "pattern": "confirmshaming",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-11",
+          "tag": "p",
+          "text": "How would you like updates?"
+        },
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "radiogroup",
+          "text": "How would you like updates? Send me the weekly digest No thanks, I prefer to stay clueless"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "label",
+          "text": "Send me the weekly digest"
+        },
+        {
+          "id": "el-0-12-0-0",
+          "tag": "input",
+          "checked": false,
+          "attributes": {
+            "type": "radio",
+            "name": "updates"
+          }
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "label",
+          "text": "No thanks, I prefer to stay clueless"
+        },
+        {
+          "id": "el-0-12-1-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "radio",
+            "name": "updates"
+          }
+        }
+      ],
+      "evidenceElementId": "el-0-12-1",
+      "relatedElementIds": [
+        "el-0-12-1-0"
+      ],
+      "why": "Shaming decline as a radio label.",
+      "tags": [
+        "checkbox-label"
+      ]
+    },
+    {
+      "id": "cs-tr-c-03",
+      "lang": "tr",
+      "pattern": "confirmshaming",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Siparişlerini takip etmek için hesap oluştur Hesap oluştur Üye olmadan devam et"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Siparişlerini takip etmek için hesap oluştur"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Hesap oluştur"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "a",
+          "text": "Üye olmadan devam et",
+          "attributes": {}
+        }
+      ],
+      "why": "Neutral alternative."
+    },
+    {
+      "id": "cs-tr-c-05",
+      "lang": "tr",
+      "pattern": "confirmshaming",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Tarzını anlat Teste başla Bu adımı atla"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Tarzını anlat"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Teste başla"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "a",
+          "text": "Bu adımı atla",
+          "attributes": {}
+        }
+      ],
+      "why": "Neutral skip."
+    },
+    {
+      "id": "cs-tr-c-06",
+      "lang": "tr",
+      "pattern": "confirmshaming",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-6-0",
+          "tag": "h3",
+          "text": "Dayanamadım"
+        },
+        {
+          "id": "el-0-6-1",
+          "tag": "p",
+          "text": "Fırsatları kaçırmayı hiç sevmem, iki farklı renkte aldım."
+        },
+        {
+          "id": "el-0-6-2",
+          "tag": "span",
+          "text": "Doğrulanmış alıcı · 9 Mayıs 2026"
+        }
+      ],
+      "why": "Shaming-like words in a customer review, not a decline.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "cs-tr-c-07",
+      "lang": "tr",
+      "pattern": "confirmshaming",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Ekran kırılmasına karşı koruma ister misin? Korumayı ekle Koruma olmadan devam et"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Ekran kırılmasına karşı koruma ister misin?"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Korumayı ekle"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "a",
+          "text": "Koruma olmadan devam et",
+          "attributes": {}
+        }
+      ],
+      "why": "Plain consequence, neutral.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "cs-tr-c-09",
+      "lang": "tr",
+      "pattern": "confirmshaming",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-4-0",
+          "tag": "h2",
+          "text": "E-posta tercihleri"
+        },
+        {
+          "id": "el-0-4-1",
+          "tag": "label",
+          "text": "Tüm pazarlama e-postalarından çık"
+        },
+        {
+          "id": "el-0-4-1-0",
+          "tag": "input",
+          "checked": false,
+          "attributes": {
+            "type": "checkbox"
+          }
+        },
+        {
+          "id": "el-0-4-2",
+          "tag": "button",
+          "text": "Tercihleri kaydet"
+        }
+      ],
+      "why": "Neutral opt-out control."
+    },
+    {
+      "id": "cs-tr-f-03",
+      "lang": "tr",
+      "pattern": "confirmshaming",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Özel fırsatlar e-postanda Abone ol İstemiyorum, fırsatları kaçırmaya razıyım"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Özel fırsatlar e-postanda"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Abone ol"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "button",
+          "text": "İstemiyorum, fırsatları kaçırmaya razıyım"
+        }
+      ],
+      "evidenceElementId": "el-0-12-2",
+      "why": "Shaming decline with a gerund-like 'kaçırmaya'.",
+      "tags": [
+        "inflection"
+      ]
+    },
+    {
+      "id": "cs-tr-f-05",
+      "lang": "tr",
+      "pattern": "confirmshaming",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Fidan bağışına katıl 10 TL bağışla Hayır, yardım etmek istemiyorum"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Fidan bağışına katıl"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "10 TL bağışla"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "button",
+          "text": "Hayır, yardım etmek istemiyorum"
+        }
+      ],
+      "evidenceElementId": "el-0-12-2",
+      "why": "Decline casts refusal as unkind."
+    },
+    {
+      "id": "cs-tr-f-06",
+      "lang": "tr",
+      "pattern": "confirmshaming",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Her siparişte üyelere özel indirim Ücretsiz üye ol Hayır, para biriktirmek bana göre değil"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Her siparişte üyelere özel indirim"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Ücretsiz üye ol"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "a",
+          "text": "Hayır, para biriktirmek bana göre değil",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-12-2",
+      "why": "Guilt-trip decline."
+    },
+    {
+      "id": "cs-tr-f-07",
+      "lang": "tr",
+      "pattern": "confirmshaming",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Üyelere özel fiyatlar Fiyatları gör Üyelere özel fiyatları kaçırmak istiyorum"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Üyelere özel fiyatlar"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "Fiyatları gör"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "a",
+          "text": "Üyelere özel fiyatları kaçırmak istiyorum",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-12-2",
+      "why": "Decline with a suffixed object ('fiyatları') and 'kaçırmak'.",
+      "tags": [
+        "inflection"
+      ]
+    },
+    {
+      "id": "cs-tr-f-08",
+      "lang": "tr",
+      "pattern": "confirmshaming",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-12",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Haftalık bitki bakım ipuçları İpuçlarını gönder Yok, bitkilerimin solmasına razıyım"
+        },
+        {
+          "id": "el-0-12-0",
+          "tag": "h2",
+          "text": "Haftalık bitki bakım ipuçları"
+        },
+        {
+          "id": "el-0-12-1",
+          "tag": "button",
+          "text": "İpuçlarını gönder"
+        },
+        {
+          "id": "el-0-12-2",
+          "tag": "button",
+          "text": "Yok, bitkilerimin solmasına razıyım"
+        }
+      ],
+      "evidenceElementId": "el-0-12-2",
+      "why": "Decline implies harm to the user's things."
+    },
+    {
+      "id": "fa-en-c-01",
+      "lang": "en",
+      "pattern": "fake-activity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-2-1",
+          "tag": "span",
+          "text": "4.7 out of 5 (2,318 reviews)"
+        }
+      ],
+      "why": "Cumulative rating count.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fa-en-c-02",
+      "lang": "en",
+      "pattern": "fake-activity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-6-0",
+          "tag": "p",
+          "text": "Bought this for my dad three months ago and he wears it daily."
+        },
+        {
+          "id": "el-0-6-1",
+          "tag": "span",
+          "text": "Verified buyer · 2 March 2026"
+        }
+      ],
+      "why": "Dated customer review in the past tense.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fa-en-c-06",
+      "lang": "en",
+      "pattern": "fake-activity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-2-1",
+          "tag": "span",
+          "text": "Bestseller in Kitchen Storage"
+        }
+      ],
+      "why": "Category ranking badge."
+    },
+    {
+      "id": "fa-en-c-08",
+      "lang": "en",
+      "pattern": "fake-activity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-3-0",
+          "tag": "p",
+          "text": "Store availability — last updated 10 minutes ago"
+        }
+      ],
+      "why": "Data freshness note.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fa-en-c-09",
+      "lang": "en",
+      "pattern": "fake-activity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-8-0",
+          "tag": "p",
+          "text": "Join 25,000 readers of our monthly newsletter"
+        }
+      ],
+      "why": "Static audience size."
+    },
+    {
+      "id": "fa-en-f-01",
+      "lang": "en",
+      "pattern": "fake-activity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-9",
+          "tag": "div",
+          "role": "status",
+          "text": "Someone in Bristol just bought this",
+          "position": "fixed"
+        }
+      ],
+      "evidenceElementId": "el-0-9",
+      "why": "Live purchase toast.",
+      "tags": [
+        "toast"
+      ]
+    },
+    {
+      "id": "fa-en-f-03",
+      "lang": "en",
+      "pattern": "fake-activity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-2",
+          "tag": "p",
+          "text": "31 others are viewing this item at the moment"
+        }
+      ],
+      "evidenceElementId": "el-0-2-2",
+      "why": "Live viewer count with synonyms."
+    },
+    {
+      "id": "fa-en-f-05",
+      "lang": "en",
+      "pattern": "fake-activity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-2",
+          "tag": "span",
+          "text": "Popular! 58 sold in the past 24 hours"
+        }
+      ],
+      "evidenceElementId": "el-0-2-2",
+      "why": "Recent sales count.",
+      "tags": [
+        "badge"
+      ]
+    },
+    {
+      "id": "fa-en-f-09",
+      "lang": "en",
+      "pattern": "fake-activity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-4",
+          "tag": "p",
+          "text": "bought in the last hour"
+        },
+        {
+          "id": "el-0-2-4-0",
+          "tag": "span",
+          "text": "47"
+        }
+      ],
+      "evidenceElementId": "el-0-2-4",
+      "relatedElementIds": [
+        "el-0-2-4-0"
+      ],
+      "why": "Recent purchase count split by a span.",
+      "tags": [
+        "split"
+      ]
+    },
+    {
+      "id": "fa-en-f-10",
+      "lang": "en",
+      "pattern": "fake-activity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-5",
+          "tag": "p",
+          "text": "Trending now: purchased 9 times since you arrived"
+        }
+      ],
+      "evidenceElementId": "el-0-2-5",
+      "why": "Live purchase count relative to the visit."
+    },
+    {
+      "id": "fa-tr-c-01",
+      "lang": "tr",
+      "pattern": "fake-activity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-2-1",
+          "tag": "span",
+          "text": "4,6 / 5 (1.842 değerlendirme)"
+        }
+      ],
+      "why": "Cumulative rating count.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fa-tr-c-02",
+      "lang": "tr",
+      "pattern": "fake-activity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-6-0",
+          "tag": "p",
+          "text": "Annem için üç ay önce aldım, çok memnun kaldı."
+        },
+        {
+          "id": "el-0-6-1",
+          "tag": "span",
+          "text": "Doğrulanmış alıcı · 5 Mart 2026"
+        }
+      ],
+      "why": "Dated customer review in the past tense.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fa-tr-c-05",
+      "lang": "tr",
+      "pattern": "fake-activity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-6-2",
+          "tag": "span",
+          "text": "Bu yorumu 9 kişi faydalı buldu"
+        }
+      ],
+      "why": "Review helpfulness votes."
+    },
+    {
+      "id": "fa-tr-c-06",
+      "lang": "tr",
+      "pattern": "fake-activity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-2-1",
+          "tag": "span",
+          "text": "Mutfak gereçlerinde en çok satanlar"
+        }
+      ],
+      "why": "Category ranking."
+    },
+    {
+      "id": "fa-tr-c-09",
+      "lang": "tr",
+      "pattern": "fake-activity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-8-0",
+          "tag": "p",
+          "text": "Aylık bültenimizi 20.000'den fazla okur takip ediyor"
+        }
+      ],
+      "why": "Static audience size."
+    },
+    {
+      "id": "fa-tr-f-02",
+      "lang": "tr",
+      "pattern": "fake-activity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-3",
+          "tag": "div",
+          "text": "kişi şu anda bu ürünü sepetinde tutuyor"
+        },
+        {
+          "id": "el-0-2-3-0",
+          "tag": "strong",
+          "text": "17"
+        }
+      ],
+      "evidenceElementId": "el-0-2-3",
+      "relatedElementIds": [
+        "el-0-2-3-0"
+      ],
+      "why": "Live basket count split by a <strong>.",
+      "tags": [
+        "split"
+      ]
+    },
+    {
+      "id": "fa-tr-f-04",
+      "lang": "tr",
+      "pattern": "fake-activity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-9",
+          "tag": "div",
+          "text": "Eskişehir'den Deniz 3 dakika önce sipariş verdi",
+          "position": "fixed"
+        }
+      ],
+      "evidenceElementId": "el-0-9",
+      "why": "Recent named order notice.",
+      "tags": [
+        "toast"
+      ]
+    },
+    {
+      "id": "fa-tr-f-05",
+      "lang": "tr",
+      "pattern": "fake-activity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-2",
+          "tag": "span",
+          "text": "Son 24 saatte 64 kez satıldı"
+        }
+      ],
+      "evidenceElementId": "el-0-2-2",
+      "why": "Recent sales count.",
+      "tags": [
+        "badge"
+      ]
+    },
+    {
+      "id": "fa-tr-f-06",
+      "lang": "tr",
+      "pattern": "fake-activity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-2",
+          "tag": "p",
+          "text": "Bugün yirmi iki kişi bu ürünü favorilerine ekledi"
+        }
+      ],
+      "evidenceElementId": "el-0-2-2",
+      "why": "Recent activity with the number as words and a suffix chain.",
+      "tags": [
+        "number-words"
+      ]
+    },
+    {
+      "id": "fa-tr-f-07",
+      "lang": "tr",
+      "pattern": "fake-activity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-9",
+          "tag": "div",
+          "role": "status",
+          "text": "Birisi az önce bu ürünü satın aldı"
+        }
+      ],
+      "evidenceElementId": "el-0-9",
+      "why": "Place-less live purchase toast.",
+      "tags": [
+        "toast"
+      ]
+    },
+    {
+      "id": "fs-en-c-01",
+      "lang": "en",
+      "pattern": "fake-scarcity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-3-1",
+          "tag": "p",
+          "text": "In stock — ships within 24 hours"
+        }
+      ],
+      "why": "Plain availability."
+    },
+    {
+      "id": "fs-en-c-06",
+      "lang": "en",
+      "pattern": "fake-scarcity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-3-1",
+          "tag": "p",
+          "text": "Back in stock on 14 February 2027"
+        }
+      ],
+      "why": "Restock date."
+    },
+    {
+      "id": "fs-en-c-07",
+      "lang": "en",
+      "pattern": "fake-scarcity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-3-1",
+          "tag": "span",
+          "text": "7 in stock"
+        }
+      ],
+      "why": "Bare stock number.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fs-en-c-08",
+      "lang": "en",
+      "pattern": "fake-scarcity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-2-3",
+          "tag": "p",
+          "text": "Available in 5 colours and 6 sizes"
+        }
+      ],
+      "why": "Variant count, not stock."
+    },
+    {
+      "id": "fs-en-c-09",
+      "lang": "en",
+      "pattern": "fake-scarcity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-3-1",
+          "tag": "p",
+          "text": "This size is currently unavailable"
+        }
+      ],
+      "why": "Unavailable variant."
+    },
+    {
+      "id": "fs-en-f-02",
+      "lang": "en",
+      "pattern": "fake-scarcity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-3",
+          "tag": "p",
+          "text": "Only left — order soon"
+        },
+        {
+          "id": "el-0-2-3-0",
+          "tag": "span",
+          "text": "2"
+        }
+      ],
+      "evidenceElementId": "el-0-2-3",
+      "relatedElementIds": [
+        "el-0-2-3-0"
+      ],
+      "why": "Stock claim split by a span around the number, with a pressure phrase.",
+      "tags": [
+        "split"
+      ]
+    },
+    {
+      "id": "fs-en-f-03",
+      "lang": "en",
+      "pattern": "fake-scarcity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-2",
+          "tag": "p",
+          "text": "Low stock: just a handful remaining"
+        }
+      ],
+      "evidenceElementId": "el-0-2-2",
+      "why": "Vague low-stock claim with a synonym."
+    },
+    {
+      "id": "fs-en-f-05",
+      "lang": "en",
+      "pattern": "fake-scarcity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-3-1",
+          "tag": "p",
+          "text": "High demand — only 4 pieces left"
+        }
+      ],
+      "evidenceElementId": "el-0-3-1",
+      "why": "Count with an inserted noun and a demand claim.",
+      "tags": [
+        "inflection"
+      ]
+    },
+    {
+      "id": "fs-en-f-06",
+      "lang": "en",
+      "pattern": "fake-scarcity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-1-1",
+          "tag": "span",
+          "text": "These are flying off the shelves"
+        }
+      ],
+      "evidenceElementId": "el-0-1-1",
+      "why": "Idiomatic 'selling fast' synonym.",
+      "tags": [
+        "badge"
+      ]
+    },
+    {
+      "id": "fs-en-f-09",
+      "lang": "en",
+      "pattern": "fake-scarcity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-0",
+          "tag": "h1",
+          "text": "Waxed canvas tote"
+        },
+        {
+          "id": "el-0-2-1",
+          "tag": "span",
+          "text": "Running low"
+        }
+      ],
+      "evidenceElementId": "el-0-2-1",
+      "why": "Unquantified low-stock badge.",
+      "tags": [
+        "badge"
+      ]
+    },
+    {
+      "id": "fs-tr-c-01",
+      "lang": "tr",
+      "pattern": "fake-scarcity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-3-1",
+          "tag": "p",
+          "text": "Stokta var, 1-2 iş günü içinde kargoda"
+        }
+      ],
+      "why": "Plain availability."
+    },
+    {
+      "id": "fs-tr-c-02",
+      "lang": "tr",
+      "pattern": "fake-scarcity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-3-1",
+          "tag": "p",
+          "text": "Stokta 3 adet kaldı"
+        },
+        {
+          "id": "el-0-3-2",
+          "tag": "p",
+          "text": "Tahmini teslimat: 2-4 iş günü"
+        }
+      ],
+      "tolerateLow": true,
+      "why": "Neutral stock count without a pressure cue.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fs-tr-c-05",
+      "lang": "tr",
+      "pattern": "fake-scarcity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-2-5",
+          "tag": "p",
+          "text": "Bir siparişte en fazla 3 adet alınabilir"
+        }
+      ],
+      "why": "Purchase limit.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fs-tr-c-06",
+      "lang": "tr",
+      "pattern": "fake-scarcity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-3-1",
+          "tag": "p",
+          "text": "Bu ürün 20 Şubat 2027'de yeniden stokta olacak"
+        }
+      ],
+      "why": "Restock date."
+    },
+    {
+      "id": "fs-tr-c-07",
+      "lang": "tr",
+      "pattern": "fake-scarcity",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-3-1",
+          "tag": "span",
+          "text": "Kadıköy mağazasında 6 adet mevcut"
+        }
+      ],
+      "why": "Store stock number.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fs-tr-f-01",
+      "lang": "tr",
+      "pattern": "fake-scarcity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-0",
+          "tag": "h1",
+          "text": "El yapımı seramik kupa"
+        },
+        {
+          "id": "el-0-2-1",
+          "tag": "span",
+          "text": "Neredeyse tükendi!"
+        }
+      ],
+      "evidenceElementId": "el-0-2-1",
+      "why": "Unquantified scarcity badge.",
+      "tags": [
+        "badge"
+      ]
+    },
+    {
+      "id": "fs-tr-f-03",
+      "lang": "tr",
+      "pattern": "fake-scarcity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-2",
+          "tag": "p",
+          "text": "Sınırlı sayıda kaldı, kaçırma"
+        }
+      ],
+      "evidenceElementId": "el-0-2-2",
+      "why": "Vague limited claim with a pressure verb."
+    },
+    {
+      "id": "fs-tr-f-06",
+      "lang": "tr",
+      "pattern": "fake-scarcity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-3-2",
+          "tag": "p",
+          "text": "Acele edin, sadece üç adet kaldı"
+        }
+      ],
+      "evidenceElementId": "el-0-3-2",
+      "why": "Number as a word with a pressure phrase.",
+      "tags": [
+        "number-words"
+      ]
+    },
+    {
+      "id": "fs-tr-f-08",
+      "lang": "tr",
+      "pattern": "fake-scarcity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-4-0",
+          "tag": "p",
+          "text": "Kampanyalı ürünlerimizden yalnızca birkaç tane kaldı!"
+        }
+      ],
+      "evidenceElementId": "el-0-4-0",
+      "why": "Vague remaining stock with a long suffix chain.",
+      "tags": [
+        "inflection"
+      ]
+    },
+    {
+      "id": "fs-tr-f-09",
+      "lang": "tr",
+      "pattern": "fake-scarcity",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-3-4",
+          "tag": "p",
+          "text": "Stokta yalnızca 4 adet var"
+        },
+        {
+          "id": "el-0-3-4-0",
+          "tag": "strong",
+          "text": "Son fırsat!"
+        }
+      ],
+      "evidenceElementId": "el-0-3-4",
+      "relatedElementIds": [
+        "el-0-3-4-0"
+      ],
+      "why": "Pressure in a child <strong>; the stock line alone looks neutral.",
+      "tags": [
+        "split"
+      ]
+    },
+    {
+      "id": "fu-en-c-01",
+      "lang": "en",
+      "pattern": "fake-urgency",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-3-1",
+          "tag": "span",
+          "text": "£32.00"
+        },
+        {
+          "id": "el-0-3-2",
+          "tag": "p",
+          "text": "Order within 3 hrs 12 mins for next-day delivery"
+        }
+      ],
+      "why": "Shipping cut-off: a deadline that is true by nature.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fu-en-c-04",
+      "lang": "en",
+      "pattern": "fake-urgency",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-0-0",
+          "tag": "div",
+          "role": "banner",
+          "text": "Winter sale ends Sunday 3 January 2027 at 23:59 GMT"
+        }
+      ],
+      "why": "Sale with an explicit calendar end date and time.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fu-en-c-05",
+      "lang": "en",
+      "pattern": "fake-urgency",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-7-0",
+          "tag": "p",
+          "text": "Store open today until 8:00 pm"
+        }
+      ],
+      "why": "Opening hours."
+    },
+    {
+      "id": "fu-en-c-08",
+      "lang": "en",
+      "pattern": "fake-urgency",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Sale"
+        },
+        {
+          "id": "el-0-5-1",
+          "tag": "p",
+          "text": "Free returns within 30 days of delivery"
+        }
+      ],
+      "why": "Return window under a sale heading.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fu-en-c-10",
+      "lang": "en",
+      "pattern": "fake-urgency",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-8-0",
+          "tag": "p",
+          "text": "For your security, you'll be signed out after 15 minutes of inactivity."
+        }
+      ],
+      "why": "Session timeout notice, not an offer deadline."
+    },
+    {
+      "id": "fu-en-f-05",
+      "lang": "en",
+      "pattern": "fake-urgency",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-4-0",
+          "tag": "p",
+          "text": "Offer closes in two hours — don't wait"
+        }
+      ],
+      "evidenceElementId": "el-0-4-0",
+      "why": "Countdown with the number written as a word, plus a pressure phrase.",
+      "tags": [
+        "number-words"
+      ]
+    },
+    {
+      "id": "fu-en-f-06",
+      "lang": "en",
+      "pattern": "fake-urgency",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Checkout"
+        },
+        {
+          "id": "el-0-5-1",
+          "tag": "p",
+          "text": "Your discount code expires in 04:59. Complete your order now to keep it."
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "button",
+          "text": "Pay now"
+        }
+      ],
+      "evidenceElementId": "el-0-5-1",
+      "why": "Personal expiry timer on a discount that pushes the user to finish checkout."
+    },
+    {
+      "id": "fu-en-f-07",
+      "lang": "en",
+      "pattern": "fake-urgency",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-9",
+          "tag": "div",
+          "role": "status",
+          "text": "This price is held for you for the next 10 minutes",
+          "position": "fixed"
+        }
+      ],
+      "evidenceElementId": "el-0-9",
+      "why": "Toast claiming a personal price reservation window.",
+      "tags": [
+        "toast"
+      ]
+    },
+    {
+      "id": "fu-en-f-08",
+      "lang": "en",
+      "pattern": "fake-urgency",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-6-0",
+          "tag": "h2",
+          "text": "Last chance! Deal ending any minute now"
+        },
+        {
+          "id": "el-0-6-1",
+          "tag": "a",
+          "text": "See the deals",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-6-0",
+      "why": "Vague imminent deadline with pressure, no date and no timer."
+    },
+    {
+      "id": "fu-en-f-09",
+      "lang": "en",
+      "pattern": "fake-urgency",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-4",
+          "tag": "p",
+          "text": "Prices go up"
+        },
+        {
+          "id": "el-0-2-4-0",
+          "tag": "strong",
+          "text": "at midnight"
+        }
+      ],
+      "evidenceElementId": "el-0-2-4",
+      "relatedElementIds": [
+        "el-0-2-4-0"
+      ],
+      "why": "Deadline split by an inline <strong>; the parent's own text lacks the time phrase.",
+      "tags": [
+        "split"
+      ]
+    },
+    {
+      "id": "fu-tr-c-03",
+      "lang": "tr",
+      "pattern": "fake-urgency",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-1-0",
+          "tag": "p",
+          "text": "Yılbaşına 40 gün kaldı, hediye rehberimize göz atın"
+        }
+      ],
+      "tolerateLow": true,
+      "why": "Countdown to a calendar holiday, no offer deadline.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fu-tr-c-04",
+      "lang": "tr",
+      "pattern": "fake-urgency",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-0-0",
+          "tag": "div",
+          "role": "banner",
+          "text": "Kış indirimi 15 Ocak 2027 Cuma günü saat 23:59'da sona erer"
+        }
+      ],
+      "why": "Sale with an explicit calendar end.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fu-tr-c-06",
+      "lang": "tr",
+      "pattern": "fake-urgency",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-2-0",
+          "tag": "h1",
+          "text": "Mantarlı risotto seti"
+        },
+        {
+          "id": "el-0-2-1",
+          "tag": "span",
+          "text": "%20 indirim"
+        },
+        {
+          "id": "el-0-2-2",
+          "tag": "p",
+          "text": "Pişirme süresi: 25 dakika"
+        }
+      ],
+      "why": "Cooking time next to an offer badge.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "fu-tr-c-08",
+      "lang": "tr",
+      "pattern": "fake-urgency",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-1",
+          "tag": "p",
+          "text": "Teslimattan sonra 14 gün içinde ücretsiz iade"
+        }
+      ],
+      "why": "Return window."
+    },
+    {
+      "id": "fu-tr-c-10",
+      "lang": "tr",
+      "pattern": "fake-urgency",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-8-0",
+          "tag": "p",
+          "text": "Güvenliğiniz için 15 dakika işlem yapılmazsa oturumunuz kapatılır"
+        }
+      ],
+      "why": "Session timeout notice."
+    },
+    {
+      "id": "fu-tr-f-03",
+      "lang": "tr",
+      "pattern": "fake-urgency",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-0-0",
+          "tag": "div",
+          "role": "banner",
+          "text": "Sadece bugüne özel: tüm montlarda %40 indirim"
+        }
+      ],
+      "evidenceElementId": "el-0-0-0",
+      "why": "Rolling 'today only' offer without a date."
+    },
+    {
+      "id": "fu-tr-f-04",
+      "lang": "tr",
+      "pattern": "fake-urgency",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-3-0",
+          "tag": "span",
+          "text": "349,90 TL"
+        },
+        {
+          "id": "el-0-3-1",
+          "tag": "s",
+          "text": "599,90 TL"
+        },
+        {
+          "id": "el-0-3-2",
+          "tag": "span",
+          "text": "Bu gece bitiyor!"
+        }
+      ],
+      "evidenceElementId": "el-0-3-2",
+      "why": "Badge with a rolling deadline next to a discounted price.",
+      "tags": [
+        "badge"
+      ]
+    },
+    {
+      "id": "fu-tr-f-06",
+      "lang": "tr",
+      "pattern": "fake-urgency",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Ödeme"
+        },
+        {
+          "id": "el-0-5-1",
+          "tag": "p",
+          "text": "Sepetindeki indirim kodunun süresi 04:59 içinde doluyor, hemen tamamla"
+        }
+      ],
+      "evidenceElementId": "el-0-5-1",
+      "why": "Personal discount-code timer at checkout."
+    },
+    {
+      "id": "fu-tr-f-09",
+      "lang": "tr",
+      "pattern": "fake-urgency",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-2-4",
+          "tag": "p",
+          "text": "Fiyatlar artıyor"
+        },
+        {
+          "id": "el-0-2-4-0",
+          "tag": "strong",
+          "text": "gece yarısı"
+        }
+      ],
+      "evidenceElementId": "el-0-2-4",
+      "relatedElementIds": [
+        "el-0-2-4-0"
+      ],
+      "why": "Deadline split by an inline <strong>.",
+      "tags": [
+        "split"
+      ]
+    },
+    {
+      "id": "fu-tr-f-10",
+      "lang": "tr",
+      "pattern": "fake-urgency",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-1-2",
+          "tag": "p",
+          "text": "Hafta sonu kampanyalarımızın bitmesine sayılı saatler kaldı!"
+        }
+      ],
+      "evidenceElementId": "el-0-1-2",
+      "why": "Long suffix chain (kampanyalarımızın) and an undated deadline.",
+      "tags": [
+        "inflection"
+      ]
+    },
+    {
+      "id": "ps-en-c-01",
+      "lang": "en",
+      "pattern": "preselection",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Checkout"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "I have read and accept the Terms of Sale"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "why": "Required terms checkbox.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "ps-en-c-02",
+      "lang": "en",
+      "pattern": "preselection",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Checkout"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Email me offers and news"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": false,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "why": "Marketing opt-in left unticked."
+    },
+    {
+      "id": "ps-en-c-04",
+      "lang": "en",
+      "pattern": "preselection",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Checkout"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Billing address is the same as delivery address"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "why": "Neutral convenience default.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "ps-en-c-08",
+      "lang": "en",
+      "pattern": "preselection",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Checkout"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "I confirm I am 18 or over"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "why": "Required age confirmation.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "ps-en-c-09",
+      "lang": "en",
+      "pattern": "preselection",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Checkout"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Email me my receipt"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "why": "Transactional receipt, free."
+    },
+    {
+      "id": "ps-en-f-01",
+      "lang": "en",
+      "pattern": "preselection",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Checkout"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Add 2-year extended warranty (+$24.99)"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "evidenceElementId": "el-0-5-2-0",
+      "relatedElementIds": [
+        "el-0-5-2"
+      ],
+      "why": "Paid add-on ticked by default."
+    },
+    {
+      "id": "ps-en-f-03",
+      "lang": "en",
+      "pattern": "preselection",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Checkout"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Add a £1 donation to our tree-planting fund"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "evidenceElementId": "el-0-5-2-0",
+      "relatedElementIds": [
+        "el-0-5-2"
+      ],
+      "why": "Donation added by default."
+    },
+    {
+      "id": "ps-en-f-04",
+      "lang": "en",
+      "pattern": "preselection",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Checkout"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Protect my parcel against loss and damage – £2.49"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "evidenceElementId": "el-0-5-2-0",
+      "relatedElementIds": [
+        "el-0-5-2"
+      ],
+      "why": "Paid protection ticked by default."
+    },
+    {
+      "id": "ps-en-f-07",
+      "lang": "en",
+      "pattern": "preselection",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Checkout"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Share my purchase history with advertising partners"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "evidenceElementId": "el-0-5-2-0",
+      "relatedElementIds": [
+        "el-0-5-2"
+      ],
+      "why": "Data sharing ticked by default."
+    },
+    {
+      "id": "ps-en-f-08",
+      "lang": "en",
+      "pattern": "preselection",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Checkout"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Include gift wrapping for $5.50"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "evidenceElementId": "el-0-5-2-0",
+      "relatedElementIds": [
+        "el-0-5-2"
+      ],
+      "why": "Paid add-on ticked by default, no 'add' verb."
+    },
+    {
+      "id": "ps-tr-c-01",
+      "lang": "tr",
+      "pattern": "preselection",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Ödeme"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Ön bilgilendirme koşullarını ve mesafeli satış sözleşmesini onaylıyorum"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "why": "Required terms checkbox.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "ps-tr-c-02",
+      "lang": "tr",
+      "pattern": "preselection",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Ödeme"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Kampanya e-postaları almak istiyorum"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": false,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "why": "Marketing left unticked."
+    },
+    {
+      "id": "ps-tr-c-07",
+      "lang": "tr",
+      "pattern": "preselection",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "fieldset",
+          "role": "radiogroup",
+          "text": "Bir kez satın al Abonelikle al, her ay gönderilsin"
+        },
+        {
+          "id": "el-0-5-1",
+          "tag": "label",
+          "text": "Bir kez satın al"
+        },
+        {
+          "id": "el-0-5-1-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "radio",
+            "name": "plan"
+          }
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Abonelikle al, her ay gönderilsin"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": false,
+          "attributes": {
+            "type": "radio",
+            "name": "plan"
+          }
+        }
+      ],
+      "why": "One-off purchase is the default.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "ps-tr-c-09",
+      "lang": "tr",
+      "pattern": "preselection",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Ödeme"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Faturamı e-posta ile gönder"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "why": "Transactional e-invoice, free."
+    },
+    {
+      "id": "ps-tr-c-10",
+      "lang": "tr",
+      "pattern": "preselection",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Ödeme"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Kırılacak ürünler ekstra köpük dolguyla paketlensin (ücretsiz)"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "why": "Free packaging option ticked.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "ps-tr-f-04",
+      "lang": "tr",
+      "pattern": "preselection",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Ödeme"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Kargo sigortası ekle: 24,90 TL"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "evidenceElementId": "el-0-5-2-0",
+      "relatedElementIds": [
+        "el-0-5-2"
+      ],
+      "why": "Paid insurance ticked by default."
+    },
+    {
+      "id": "ps-tr-f-05",
+      "lang": "tr",
+      "pattern": "preselection",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "fieldset",
+          "role": "radiogroup",
+          "text": "Abone ol, her ay otomatik gönderilsin (%10 indirim) Tek seferlik satın al"
+        },
+        {
+          "id": "el-0-5-1",
+          "tag": "label",
+          "text": "Abone ol, her ay otomatik gönderilsin (%10 indirim)"
+        },
+        {
+          "id": "el-0-5-1-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "radio",
+            "name": "plan"
+          }
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Tek seferlik satın al"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": false,
+          "attributes": {
+            "type": "radio",
+            "name": "plan"
+          }
+        }
+      ],
+      "evidenceElementId": "el-0-5-1-0",
+      "relatedElementIds": [
+        "el-0-5-1"
+      ],
+      "why": "Recurring subscription preselected."
+    },
+    {
+      "id": "ps-tr-f-07",
+      "lang": "tr",
+      "pattern": "preselection",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Ödeme"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Kişisel verilerimin iş ortaklarıyla pazarlama amacıyla paylaşılmasını kabul ediyorum"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "evidenceElementId": "el-0-5-2-0",
+      "relatedElementIds": [
+        "el-0-5-2"
+      ],
+      "why": "Marketing data-sharing consent ticked; contains 'kabul ediyorum' like a terms box.",
+      "tags": [
+        "hard-positive"
+      ]
+    },
+    {
+      "id": "ps-tr-f-09",
+      "lang": "tr",
+      "pattern": "preselection",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Ödeme"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "label",
+          "text": "Ticari elektronik ileti almak istiyorum"
+        },
+        {
+          "id": "el-0-5-2-0",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        }
+      ],
+      "evidenceElementId": "el-0-5-2-0",
+      "relatedElementIds": [
+        "el-0-5-2"
+      ],
+      "why": "Commercial messages opt-in ticked."
+    },
+    {
+      "id": "ps-tr-f-10",
+      "lang": "tr",
+      "pattern": "preselection",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-5-0",
+          "tag": "h2",
+          "text": "Ödeme"
+        },
+        {
+          "id": "el-0-5-2",
+          "tag": "input",
+          "checked": true,
+          "attributes": {
+            "type": "checkbox"
+          }
+        },
+        {
+          "id": "el-0-5-3",
+          "tag": "label",
+          "text": "Premium destek paketi ekle (aylık 59 TL)"
+        }
+      ],
+      "evidenceElementId": "el-0-5-2",
+      "relatedElementIds": [
+        "el-0-5-3"
+      ],
+      "why": "Recurring add-on ticked; sibling label.",
+      "tags": [
+        "checkbox-label"
+      ]
+    },
+    {
+      "id": "vi-en-c-01",
+      "lang": "en",
+      "pattern": "visual-interference",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "We use cookies to improve your experience. Accept all Reject all",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "We use cookies to improve your experience.",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Accept all",
+          "boundingBox": {
+            "x": 960,
+            "y": 600,
+            "width": 180,
+            "height": 44
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(22, 101, 52)",
+          "fontSize": "16px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "button",
+          "text": "Reject all",
+          "boundingBox": {
+            "x": 760,
+            "y": 600,
+            "width": 180,
+            "height": 44
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(22, 101, 52)",
+          "fontSize": "16px"
+        }
+      ],
+      "why": "Equal buttons."
+    },
+    {
+      "id": "vi-en-c-03",
+      "lang": "en",
+      "pattern": "visual-interference",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Tell us what you like to see better picks. Continue Skip",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "Tell us what you like to see better picks.",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Continue",
+          "boundingBox": {
+            "x": 500,
+            "y": 620,
+            "width": 240,
+            "height": 48
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(22, 101, 52)",
+          "fontSize": "16px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "a",
+          "text": "Skip",
+          "boundingBox": {
+            "x": 600,
+            "y": 684,
+            "width": 40,
+            "height": 18
+          },
+          "color": "rgb(85, 85, 85)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "14px",
+          "attributes": {}
+        }
+      ],
+      "tolerateLow": true,
+      "why": "Smaller skip link but readable (about 7:1) at 14 px.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "vi-en-c-04",
+      "lang": "en",
+      "pattern": "visual-interference",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-6-0",
+          "tag": "p",
+          "text": "Complete all required fields to continue",
+          "boundingBox": {
+            "x": 480,
+            "y": 560,
+            "width": 400,
+            "height": 20
+          },
+          "color": "rgb(75, 85, 99)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "14px"
+        },
+        {
+          "id": "el-0-6-1",
+          "tag": "button",
+          "text": "Place order",
+          "boundingBox": {
+            "x": 480,
+            "y": 600,
+            "width": 300,
+            "height": 52
+          },
+          "color": "rgb(156, 163, 175)",
+          "backgroundColor": "rgb(229, 231, 235)",
+          "fontSize": "16px",
+          "attributes": {
+            "disabled": ""
+          }
+        }
+      ],
+      "why": "Disabled button greyed until the form is valid; no competing choice.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "vi-en-c-05",
+      "lang": "en",
+      "pattern": "visual-interference",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-20-0",
+          "tag": "p",
+          "text": "© 2026 · All prices include VAT",
+          "boundingBox": {
+            "x": 40,
+            "y": 2400,
+            "width": 300,
+            "height": 14
+          },
+          "color": "rgb(140, 140, 140)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "11px"
+        }
+      ],
+      "why": "Small footer text, not part of a choice.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "vi-en-c-06",
+      "lang": "en",
+      "pattern": "visual-interference",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-4-0",
+          "tag": "p",
+          "text": "Wool socks, 2 pairs",
+          "boundingBox": {
+            "x": 40,
+            "y": 300,
+            "width": 400,
+            "height": 20
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "16px"
+        },
+        {
+          "id": "el-0-4-1",
+          "tag": "input",
+          "boundingBox": {
+            "x": 480,
+            "y": 296,
+            "width": 60,
+            "height": 32
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "16px",
+          "attributes": {
+            "type": "number",
+            "name": "qty"
+          }
+        },
+        {
+          "id": "el-0-4-2",
+          "tag": "button",
+          "text": "Remove",
+          "boundingBox": {
+            "x": 560,
+            "y": 300,
+            "width": 56,
+            "height": 18
+          },
+          "color": "rgb(90, 90, 90)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "13px"
+        }
+      ],
+      "why": "Small but readable remove link in a cart line."
+    },
+    {
+      "id": "vi-en-f-01",
+      "lang": "en",
+      "pattern": "visual-interference",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "We use cookies to improve your experience and show relevant ads. Accept all Reject",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "We use cookies to improve your experience and show relevant ads.",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Accept all",
+          "boundingBox": {
+            "x": 900,
+            "y": 600,
+            "width": 240,
+            "height": 48
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(22, 101, 52)",
+          "fontSize": "16px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "a",
+          "text": "Reject",
+          "boundingBox": {
+            "x": 820,
+            "y": 616,
+            "width": 38,
+            "height": 14
+          },
+          "color": "rgb(200, 200, 200)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "11px",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-14-2",
+      "relatedElementIds": [
+        "el-0-14-1"
+      ],
+      "why": "Reject is a tiny light-grey link (about 1.7:1) beside a large filled accept."
+    },
+    {
+      "id": "vi-en-f-02",
+      "lang": "en",
+      "pattern": "visual-interference",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Add a matching scarf for £12? Yes, add it ×",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "Add a matching scarf for £12?",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Yes, add it",
+          "boundingBox": {
+            "x": 480,
+            "y": 640,
+            "width": 320,
+            "height": 56
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(22, 101, 52)",
+          "fontSize": "18px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "button",
+          "text": "×",
+          "boundingBox": {
+            "x": 1180,
+            "y": 530,
+            "width": 10,
+            "height": 10
+          },
+          "color": "rgb(220, 220, 220)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "10px",
+          "attributes": {
+            "aria-label": "Close"
+          }
+        }
+      ],
+      "evidenceElementId": "el-0-14-2",
+      "relatedElementIds": [
+        "el-0-14-1"
+      ],
+      "why": "Close control is 10×10 px and nearly invisible."
+    },
+    {
+      "id": "vi-en-f-04",
+      "lang": "en",
+      "pattern": "visual-interference",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Protect your new laptop for 3 years Add protection Continue without protection",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "Protect your new laptop for 3 years",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Add protection",
+          "boundingBox": {
+            "x": 450,
+            "y": 620,
+            "width": 300,
+            "height": 56
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(22, 101, 52)",
+          "fontSize": "18px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "a",
+          "text": "Continue without protection",
+          "boundingBox": {
+            "x": 525,
+            "y": 694,
+            "width": 150,
+            "height": 13
+          },
+          "color": "rgb(196, 196, 196)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "11px",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-14-2",
+      "relatedElementIds": [
+        "el-0-14-1"
+      ],
+      "why": "Decline is small and low contrast."
+    },
+    {
+      "id": "vi-en-f-08",
+      "lang": "en",
+      "pattern": "visual-interference",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Before you go: keep your plan and save 30% Keep my plan Cancel anyway",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "Before you go: keep your plan and save 30%",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Keep my plan",
+          "boundingBox": {
+            "x": 450,
+            "y": 620,
+            "width": 300,
+            "height": 56
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(124, 58, 237)",
+          "fontSize": "18px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "a",
+          "text": "Cancel anyway",
+          "boundingBox": {
+            "x": 570,
+            "y": 694,
+            "width": 60,
+            "height": 11
+          },
+          "color": "rgb(205, 205, 205)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "9px",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-14-2",
+      "relatedElementIds": [
+        "el-0-14-1"
+      ],
+      "why": "Cancel link is 9 px light grey."
+    },
+    {
+      "id": "vi-en-f-10",
+      "lang": "en",
+      "pattern": "visual-interference",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "We value your privacy. Accept all Reject all",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(20, 20, 20)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "We value your privacy.",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Accept all",
+          "boundingBox": {
+            "x": 960,
+            "y": 600,
+            "width": 200,
+            "height": 44
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "16px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "a",
+          "text": "Reject all",
+          "boundingBox": {
+            "x": 880,
+            "y": 616,
+            "width": 50,
+            "height": 12
+          },
+          "color": "rgb(60, 60, 60)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "11px",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-14-2",
+      "relatedElementIds": [
+        "el-0-14-1"
+      ],
+      "why": "Dark banner: reject is dark grey on near-black (about 1.6:1) and tiny.",
+      "tags": [
+        "dark-banner"
+      ]
+    },
+    {
+      "id": "vi-tr-c-02",
+      "lang": "tr",
+      "pattern": "visual-interference",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Sitemizde çerezlerden yararlanıyoruz. Kabul et Reddet",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "Sitemizde çerezlerden yararlanıyoruz.",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Kabul et",
+          "boundingBox": {
+            "x": 960,
+            "y": 600,
+            "width": 180,
+            "height": 44
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(22, 101, 52)",
+          "fontSize": "16px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "button",
+          "text": "Reddet",
+          "boundingBox": {
+            "x": 760,
+            "y": 600,
+            "width": 180,
+            "height": 44
+          },
+          "color": "rgb(22, 101, 52)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "16px"
+        }
+      ],
+      "why": "Filled vs outline, same size, both high contrast.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "vi-tr-c-05",
+      "lang": "tr",
+      "pattern": "visual-interference",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-20-0",
+          "tag": "p",
+          "text": "© 2026 · Fiyatlara KDV dahildir",
+          "boundingBox": {
+            "x": 40,
+            "y": 2400,
+            "width": 300,
+            "height": 14
+          },
+          "color": "rgb(140, 140, 140)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "11px"
+        }
+      ],
+      "why": "Small footer text, not a choice.",
+      "tags": [
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "vi-tr-c-06",
+      "lang": "tr",
+      "pattern": "visual-interference",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-4-0",
+          "tag": "p",
+          "text": "Yün çorap, 2 çift",
+          "boundingBox": {
+            "x": 40,
+            "y": 300,
+            "width": 400,
+            "height": 20
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "16px"
+        },
+        {
+          "id": "el-0-4-1",
+          "tag": "input",
+          "boundingBox": {
+            "x": 480,
+            "y": 296,
+            "width": 60,
+            "height": 32
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "16px",
+          "attributes": {
+            "type": "number",
+            "name": "adet"
+          }
+        },
+        {
+          "id": "el-0-4-2",
+          "tag": "button",
+          "text": "Kaldır",
+          "boundingBox": {
+            "x": 560,
+            "y": 300,
+            "width": 48,
+            "height": 18
+          },
+          "color": "rgb(90, 90, 90)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "13px"
+        }
+      ],
+      "why": "Small but readable remove control in a cart line."
+    },
+    {
+      "id": "vi-tr-c-07",
+      "lang": "tr",
+      "pattern": "visual-interference",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Çerez kullanıyoruz. Kabul et Reddet",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(20, 20, 20)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "Çerez kullanıyoruz.",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Kabul et",
+          "boundingBox": {
+            "x": 960,
+            "y": 600,
+            "width": 160,
+            "height": 44
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "16px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "button",
+          "text": "Reddet",
+          "boundingBox": {
+            "x": 780,
+            "y": 600,
+            "width": 160,
+            "height": 44
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "16px"
+        }
+      ],
+      "why": "Honest dark banner with equal buttons.",
+      "tags": [
+        "dark-banner",
+        "hard-negative"
+      ]
+    },
+    {
+      "id": "vi-tr-c-09",
+      "lang": "tr",
+      "pattern": "visual-interference",
+      "expected": "clean",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "E-bültene kaydol, ilk siparişte %10 indirim Abone ol ×",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "E-bültene kaydol, ilk siparişte %10 indirim",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Abone ol",
+          "boundingBox": {
+            "x": 500,
+            "y": 620,
+            "width": 240,
+            "height": 48
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(22, 101, 52)",
+          "fontSize": "16px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "button",
+          "text": "×",
+          "boundingBox": {
+            "x": 1176,
+            "y": 530,
+            "width": 24,
+            "height": 24
+          },
+          "color": "rgb(75, 85, 99)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "20px",
+          "attributes": {
+            "aria-label": "Kapat"
+          }
+        }
+      ],
+      "tolerateLow": true,
+      "why": "Standard-size readable close button."
+    },
+    {
+      "id": "vi-tr-f-03",
+      "lang": "tr",
+      "pattern": "visual-interference",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Bültenimize katıl, %10 indirim kazan İndirimimi al hayır, teşekkürler",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "Bültenimize katıl, %10 indirim kazan",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "İndirimimi al",
+          "boundingBox": {
+            "x": 460,
+            "y": 620,
+            "width": 280,
+            "height": 52
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(190, 18, 60)",
+          "fontSize": "18px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "a",
+          "text": "hayır, teşekkürler",
+          "boundingBox": {
+            "x": 560,
+            "y": 690,
+            "width": 80,
+            "height": 12
+          },
+          "color": "rgb(212, 212, 212)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "10px",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-14-2",
+      "relatedElementIds": [
+        "el-0-14-1"
+      ],
+      "why": "Decline is 10 px light grey."
+    },
+    {
+      "id": "vi-tr-f-04",
+      "lang": "tr",
+      "pattern": "visual-interference",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Yeni dizüstü bilgisayarını 3 yıl koruma altına al Koruma ekle Korumasız devam et",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "Yeni dizüstü bilgisayarını 3 yıl koruma altına al",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Koruma ekle",
+          "boundingBox": {
+            "x": 450,
+            "y": 620,
+            "width": 300,
+            "height": 56
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(22, 101, 52)",
+          "fontSize": "18px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "a",
+          "text": "Korumasız devam et",
+          "boundingBox": {
+            "x": 540,
+            "y": 694,
+            "width": 120,
+            "height": 13
+          },
+          "color": "rgb(196, 196, 196)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "11px",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-14-2",
+      "relatedElementIds": [
+        "el-0-14-1"
+      ],
+      "why": "Decline is small and low contrast."
+    },
+    {
+      "id": "vi-tr-f-05",
+      "lang": "tr",
+      "pattern": "visual-interference",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Uygulamamızda daha hızlı alışveriş yap Uygulamada aç Tarayıcıda devam et",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "Uygulamamızda daha hızlı alışveriş yap",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Uygulamada aç",
+          "boundingBox": {
+            "x": 440,
+            "y": 620,
+            "width": 320,
+            "height": 50
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(37, 99, 235)",
+          "fontSize": "17px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "a",
+          "text": "Tarayıcıda devam et",
+          "boundingBox": {
+            "x": 550,
+            "y": 688,
+            "width": 100,
+            "height": 12
+          },
+          "color": "rgb(190, 190, 190)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "10px",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-14-2",
+      "relatedElementIds": [
+        "el-0-14-1"
+      ],
+      "why": "Browser option is a faint 10 px link."
+    },
+    {
+      "id": "vi-tr-f-08",
+      "lang": "tr",
+      "pattern": "visual-interference",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Gitmeden önce: planını koru, %30 tasarruf et Planımı koru Yine de iptal et",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "Gitmeden önce: planını koru, %30 tasarruf et",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "Planımı koru",
+          "boundingBox": {
+            "x": 450,
+            "y": 620,
+            "width": 300,
+            "height": 56
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(124, 58, 237)",
+          "fontSize": "18px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "a",
+          "text": "Yine de iptal et",
+          "boundingBox": {
+            "x": 565,
+            "y": 694,
+            "width": 70,
+            "height": 11
+          },
+          "color": "rgb(205, 205, 205)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "9px",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-14-2",
+      "relatedElementIds": [
+        "el-0-14-1"
+      ],
+      "why": "Cancel link is 9 px light grey."
+    },
+    {
+      "id": "vi-tr-f-09",
+      "lang": "tr",
+      "pattern": "visual-interference",
+      "expected": "flag",
+      "elements": [
+        {
+          "id": "el-0-14",
+          "tag": "div",
+          "role": "dialog",
+          "text": "Hızlı teslimata geçmek ister misin? 49,90 TL'ye yükselt Standart teslimatla devam et",
+          "boundingBox": {
+            "x": 40,
+            "y": 520,
+            "width": 1200,
+            "height": 220
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgb(255, 255, 255)",
+          "fontSize": "15px",
+          "position": "fixed"
+        },
+        {
+          "id": "el-0-14-0",
+          "tag": "p",
+          "text": "Hızlı teslimata geçmek ister misin?",
+          "boundingBox": {
+            "x": 64,
+            "y": 540,
+            "width": 700,
+            "height": 40
+          },
+          "color": "rgb(17, 17, 17)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "15px"
+        },
+        {
+          "id": "el-0-14-1",
+          "tag": "button",
+          "text": "49,90 TL'ye yükselt",
+          "boundingBox": {
+            "x": 450,
+            "y": 620,
+            "width": 300,
+            "height": 56
+          },
+          "color": "rgb(255, 255, 255)",
+          "backgroundColor": "rgb(22, 101, 52)",
+          "fontSize": "18px"
+        },
+        {
+          "id": "el-0-14-2",
+          "tag": "a",
+          "text": "Standart teslimatla devam et",
+          "boundingBox": {
+            "x": 545,
+            "y": 694,
+            "width": 110,
+            "height": 11
+          },
+          "color": "rgb(200, 200, 200)",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "fontSize": "9px",
+          "attributes": {}
+        }
+      ],
+      "evidenceElementId": "el-0-14-2",
+      "relatedElementIds": [
+        "el-0-14-1"
+      ],
+      "why": "Free option is a faint 9 px link."
+    }
+  ]
+}
