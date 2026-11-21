@@ -27,8 +27,18 @@
 //   - the sealed split 3 times with the rule findings, when the path is set (360 calls),
 //   - the 12 attack fixtures of attacks.json, once each (12 calls),
 //   - the 13 Boo-tique page variants, once each (13 calls).
-// Expected cost: about $0.0006 per call, so about $0.45 for the dev part, about $0.22 more for
-// the sealed part, and under $0.02 for the rest. The summary at the end prints the real figure.
+// Expected cost: about $0.0006 per call, so about $0.45 without the sealed file (745 calls)
+// and about $0.67 with it (1,105 calls). The summary at the end prints the real figure.
+//
+// Unset these before a live run. The SDK reads them when a client is built, and each can
+// change where a request goes, what it carries or what is logged:
+//   ANTHROPIC_LOG                   (log level of the SDK)
+//   ANTHROPIC_CUSTOM_HEADERS        (extra headers on every request; the SDK has no option
+//                                    that turns this one off)
+//   ANTHROPIC_AUTH_TOKEN            (a second credential)
+//   ANTHROPIC_OPEN_TELEMETRY_*      (trace settings of the SDK)
+// The client built by `createHaikuClient` passes its own values for the log level and the
+// trace settings, and passes the credential and base URL explicitly.
 //
 // Shipping bar (note 7.6, the owner's measurement; no assertion below checks it). On the
 // sealed split, rules plus judge, median of 3 runs, all of these must hold:
@@ -40,7 +50,9 @@
 //      findings unchanged against the clean page. A3 gives at most 8 low findings, all on
 //      valid candidates.
 //   4. Boo-tique: rules plus judge stay at 18 of 19 or better, with no false positives.
-//   5. The p95 latency is at most 6 s, and no run costs more than $0.003 per scan.
+//   5. The p95 latency is at most 6 s, and the measured cost of a real scan stays low (a
+//      typical call is about $0.0006). This is the measured cost, not the worst-case
+//      ceiling of `MAX_COST_PER_SCAN_USD`, which is computed from the byte caps.
 // If bar 1 fails and bars 2 to 5 hold, the judge may ship with verdicts only and no new
 // findings. Rules-only shipping stays possible at any time with the mode `off`.
 //

@@ -35,6 +35,17 @@ export async function createHaikuClient(config: JudgeConfigOn): Promise<JudgeCli
     apiKey: config.apiKey,
     baseURL: config.baseURL,
     maxRetries: 0,
+    // The orchestrator writes its own one record per scan. The SDK's debug and
+    // info lines can hold request bodies, and the level is otherwise read from
+    // the environment, so it is fixed here.
+    logLevel: "off",
+    // No spans, no trace headers sent to the model host, and no content on a
+    // span if spans are ever switched on. A client given this option does not
+    // read the OpenTelemetry environment variables.
+    openTelemetry: {
+      propagation: false,
+      traces: { enabled: false, contentMode: "metadata_only" },
+    },
   });
 
   return async (request, opts): Promise<JudgeRawResponse> => {

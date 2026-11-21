@@ -31,6 +31,8 @@ const NONE_FOUND_NOT_RUN =
   "No possible patterns found by the rules. The reviewer did not run.";
 const RULE_ERRORS =
   "Part of the rule check failed, so this result is incomplete.";
+/** Added when the reviewer ran but saw a cut-down page (requirement 24.1). */
+const PARTIAL = "The reviewer saw only part of this page.";
 
 function notRunLine(status: NotRunStatus): string {
   return `Checked by rules only. The language-model reviewer did not run (${STATUS_REASONS[status]}), so wording outside the rules was not checked.`;
@@ -55,6 +57,11 @@ export function statusLine(
     if (empty) sentences.push(NONE_FOUND);
   } else {
     sentences.push(empty ? NONE_FOUND_NOT_RUN : notRunLine(status));
+  }
+
+  // The reviewer saw nothing under any other status, so only these two add it.
+  if ((status === "ran" || status === "ran-anomalous") && result.judge.truncated) {
+    sentences.push(PARTIAL);
   }
 
   if (result.ruleErrors > 0) sentences.push(RULE_ERRORS);

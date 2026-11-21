@@ -16,10 +16,13 @@ const NOT_RUN: readonly JudgeStatus[] = [
   "invalid-output",
 ];
 
+const PARTIAL_SENTENCE = "The reviewer saw only part of this page.";
+
 function resultFor(
   status: JudgeStatus,
   withFinding: boolean,
   ruleErrors: number,
+  truncated = false,
 ): ReviewResult {
   const finding = {
     patternId: "fake-scarcity" as const,
@@ -36,7 +39,7 @@ function resultFor(
   return {
     findings: withFinding ? [{ finding, source: "rules" }] : [],
     setAside: [],
-    judge: { status, candidateCount: 0, truncated: false },
+    judge: { status, candidateCount: 0, truncated },
     ruleErrors,
   };
 }
@@ -128,23 +131,88 @@ describe("statusLine rows", () => {
   });
 });
 
-describe("statusLine enumeration (9 statuses x 2 list states x 2 error states)", () => {
-  const lines: { status: JudgeStatus; empty: boolean; errors: number; line: string }[] = [];
+describe("the partial-review sentence (requirement 24.1 to 24.3)", () => {
+  it("follows the sentence of ran with findings and precedes the disclaimer", () => {
+    expect(statusLine(resultFor("ran", true, 0, true))).toBe(
+      "Checked by rules and a language-model reviewer. The reviewer saw only part of this page. Automated detection — may be wrong.",
+    );
+  });
+
+  it("follows 'No possible patterns found.' for an empty ran list (24.2)", () => {
+    expect(statusLine(resultFor("ran", false, 0, true))).toBe(
+      "No possible patterns found. The reviewer saw only part of this page. Automated detection — may be wrong.",
+    );
+  });
+
+  it("follows the sentences of ran-anomalous, empty and non-empty", () => {
+    expect(statusLine(resultFor("ran-anomalous", true, 0, true))).toBe(
+      "Checked by rules. The reviewer's answer looked unusual, so only its new findings were kept and none of the rule matches were set aside. The reviewer saw only part of this page. Automated detection — may be wrong.",
+    );
+    expect(statusLine(resultFor("ran-anomalous", false, 0, true))).toBe(
+      "Checked by rules. The reviewer's answer looked unusual, so only its new findings were kept and none of the rule matches were set aside. No possible patterns found. The reviewer saw only part of this page. Automated detection — may be wrong.",
+    );
+  });
+
+  it("comes before the rule-error sentence, with the disclaimer last", () => {
+    expect(statusLine(resultFor("ran", true, 1, true))).toBe(
+      `Checked by rules and a language-model reviewer. ${PARTIAL_SENTENCE} ${RULE_ERROR_SENTENCE} Automated detection — may be wrong.`,
+    );
+    expect(statusLine(resultFor("ran", false, 2, true))).toBe(
+      `No possible patterns found. ${PARTIAL_SENTENCE} ${RULE_ERROR_SENTENCE} Automated detection — may be wrong.`,
+    );
+  });
+
+  it.each(NOT_RUN)("is not in the line of %s even when truncated is true", (status) => {
+    for (const withFinding of [true, false]) {
+      expect(statusLine(resultFor(status, withFinding, 0, true))).not.toContain(PARTIAL_SENTENCE);
+    }
+  });
+
+  it("is not in any line when truncated is false", () => {
+    for (const status of JUDGE_STATUSES) {
+      for (const withFinding of [true, false]) {
+        expect(statusLine(resultFor(status, withFinding, 0, false))).not.toContain(PARTIAL_SENTENCE);
+      }
+    }
+  });
+
+  it("does not change a line of a status that did not run", () => {
+    for (const status of NOT_RUN) {
+      for (const withFinding of [true, false]) {
+        expect(statusLine(resultFor(status, withFinding, 1, true))).toBe(
+          statusLine(resultFor(status, withFinding, 1, false)),
+        );
+      }
+    }
+  });
+});
+
+describe("statusLine enumeration (9 statuses x 2 list states x 2 error states x 2 truncated states)", () => {
+  const lines: {
+    status: JudgeStatus;
+    empty: boolean;
+    errors: number;
+    truncated: boolean;
+    line: string;
+  }[] = [];
   for (const status of JUDGE_STATUSES) {
     for (const empty of [true, false]) {
       for (const errors of [0, 2]) {
-        lines.push({
-          status,
-          empty,
-          errors,
-          line: statusLine(resultFor(status, !empty, errors)),
-        });
+        for (const truncated of [false, true]) {
+          lines.push({
+            status,
+            empty,
+            errors,
+            truncated,
+            line: statusLine(resultFor(status, !empty, errors, truncated)),
+          });
+        }
       }
     }
   }
 
-  it("covers 36 combinations", () => {
-    expect(lines).toHaveLength(36);
+  it("covers 72 combinations", () => {
+    expect(lines).toHaveLength(72);
   });
 
   it("never holds 'nothing found' in any letter case", () => {
@@ -179,6 +247,20 @@ describe("statusLine enumeration (9 statuses x 2 list states x 2 error states)",
   it("says 'No possible patterns found' on an empty line only, and never on a non-empty one", () => {
     for (const { empty, line } of lines) {
       expect(line.includes("No possible patterns found")).toBe(empty);
+    }
+  });
+
+  it("holds the partial-review sentence in exactly the lines of ran and ran-anomalous with truncated true (24.4)", () => {
+    for (const { status, truncated, line } of lines) {
+      const expected = truncated && (status === "ran" || status === "ran-anomalous");
+      expect(line.includes(PARTIAL_SENTENCE)).toBe(expected);
+    }
+  });
+
+  it("puts the partial-review sentence before the rule-error sentence (24.1)", () => {
+    for (const { errors, line } of lines) {
+      if (errors === 0 || !line.includes(PARTIAL_SENTENCE)) continue;
+      expect(line.indexOf(PARTIAL_SENTENCE)).toBeLessThan(line.indexOf(RULE_ERROR_SENTENCE));
     }
   });
 });

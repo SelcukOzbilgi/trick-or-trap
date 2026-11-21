@@ -10,6 +10,7 @@ import {
   JUDGE_MODEL_GATEWAY,
   JUDGE_PROMPT_VERSION,
   MAX_COST_PER_SCAN_USD,
+  MAX_DATA_BLOCK_BYTES,
   MAX_OUTPUT_TOKENS,
   PRICE_CACHE_READ_PER_MTOK,
   PRICE_CACHE_WRITE_PER_MTOK,
@@ -19,6 +20,8 @@ import {
   RETRYABLE_STATUSES,
   estimateCostUsd,
 } from "@/lib/judge/constants";
+import { JUDGE_SYSTEM_PROMPT, buildUserMessage } from "@/lib/judge/prompt";
+import { JUDGE_OUTPUT_JSON_SCHEMA } from "@/lib/judge/schema";
 
 describe("limits of design section 9", () => {
   it("pins every numeric limit", () => {
@@ -84,7 +87,9 @@ describe("limits of design section 9", () => {
     expect(PRICE_OUTPUT_PER_MTOK).toBe(0.5);
     expect(PRICE_CACHE_READ_PER_MTOK).toBe(0.01);
     expect(PRICE_CACHE_WRITE_PER_MTOK).toBe(0.125);
-    expect(MAX_COST_PER_SCAN_USD).toBe(0.003);
+    // Requirements 24.5 to 24.7 replace 3.1 and 3.4: the ceiling is the
+    // computed worst case of two attempts, rounded up to the next $0.001.
+    expect(MAX_COST_PER_SCAN_USD).toBe(0.01);
     expect(JUDGE_EFFORT).toBe("low");
   });
 
@@ -119,19 +124,44 @@ describe("limits of design section 9", () => {
   });
 });
 
-describe("spend ceiling (requirement 3.4)", () => {
-  it("keeps two worst-case attempts at or under the per-scan ceiling", () => {
-    const inputPrice = Math.max(
-      PRICE_INPUT_PER_MTOK,
-      PRICE_CACHE_WRITE_PER_MTOK
+describe("spend ceiling (requirements 24.5 to 24.7, design section 24.5)", () => {
+  const utf8Bytes = (text: string): number => new TextEncoder().encode(text).length;
+
+  // Upper bound of the input tokens at one token per byte: the system prompt,
+  // the serialised output schema, the user-message wrapper and the data cap.
+  const promptBytes = utf8Bytes(JUDGE_SYSTEM_PROMPT);
+  const schemaBytes = utf8Bytes(JSON.stringify(JUDGE_OUTPUT_JSON_SCHEMA));
+  const wrapperBytes = utf8Bytes(buildUserMessage(""));
+  const tokens = promptBytes + schemaBytes + wrapperBytes + MAX_DATA_BLOCK_BYTES;
+
+  // Priced at the higher of the input and cache-write prices, plus the output cap.
+  const inputPrice = Math.max(PRICE_INPUT_PER_MTOK, PRICE_CACHE_WRITE_PER_MTOK);
+  const oneAttempt = (tokens * inputPrice + MAX_OUTPUT_TOKENS * PRICE_OUTPUT_PER_MTOK) / 1_000_000;
+  const twoAttempts = 2 * oneAttempt;
+
+  it("prints the byte sizes and both costs", () => {
+    console.info(
+      `[cost ceiling] prompt ${promptBytes} B, schema ${schemaBytes} B, wrapper ${wrapperBytes} B, data cap ${MAX_DATA_BLOCK_BYTES} B, bound ${tokens} tokens; one attempt $${oneAttempt.toFixed(6)}, two attempts $${twoAttempts.toFixed(6)}, ceiling $${MAX_COST_PER_SCAN_USD}`,
     );
-    const oneAttempt =
-      (INPUT_TOKEN_CEILING * inputPrice +
-        MAX_OUTPUT_TOKENS * PRICE_OUTPUT_PER_MTOK) /
-      1_000_000;
-    const twoAttempts = 2 * oneAttempt;
-    expect(twoAttempts).toBeCloseTo(0.002925, 9);
+    expect(tokens).toBeGreaterThan(MAX_DATA_BLOCK_BYTES);
+  });
+
+  it("keeps two worst-case attempts at or under the per-scan ceiling", () => {
     expect(twoAttempts).toBeLessThanOrEqual(MAX_COST_PER_SCAN_USD);
+  });
+
+  it("keeps one worst-case attempt at or under half of the ceiling", () => {
+    expect(oneAttempt).toBeLessThanOrEqual(MAX_COST_PER_SCAN_USD / 2);
+  });
+
+  it("sets the ceiling to the two-attempt figure rounded up to the next $0.001 (24.7)", () => {
+    const roundedUp = Math.ceil(twoAttempts * 1000 - 1e-9) / 1000;
+    expect(MAX_COST_PER_SCAN_USD).toBeCloseTo(roundedUp, 9);
+  });
+
+  it("keeps the typical-page estimate as a pinned estimate, not the bound (24.7)", () => {
+    expect(INPUT_TOKEN_CEILING).toBe(6_100);
+    expect(INPUT_TOKEN_CEILING).toBeLessThan(tokens);
   });
 });
 

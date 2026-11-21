@@ -129,6 +129,22 @@ describe("the real client file (15.1 to 15.6)", () => {
     expect(text).toContain("maxRetries: 0");
   });
 
+  it("turns the SDK's own logging off (24.8, 24.10)", () => {
+    expect(text).toContain('logLevel: "off"');
+  });
+
+  it("switches the SDK's trace propagation and spans off, metadata only (24.9, 24.10)", () => {
+    const start = text.indexOf("openTelemetry: {");
+    expect(start).toBeGreaterThan(-1);
+    const block = text.slice(start);
+    expect(block).toContain("propagation: false");
+    expect(block).toContain("enabled: false");
+    expect(block).toContain('contentMode: "metadata_only"');
+    // The options sit inside the one `openTelemetry` option, before the call.
+    expect(block.indexOf("propagation: false")).toBeLessThan(block.indexOf("messages.create"));
+    expect(block.indexOf("enabled: false")).toBeLessThan(block.indexOf("messages.create"));
+  });
+
   it("builds the body with buildRequestBody and maps errors with toJudgeHttpError", () => {
     expect(text).toContain("buildRequestBody");
     expect(text).toContain("toJudgeHttpError");

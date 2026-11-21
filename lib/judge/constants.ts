@@ -57,6 +57,10 @@ export const ANOMALY_FLAGGED_MIN = 6;
 // -- Tokens and settings ------------------------------------------------------
 
 export const MAX_OUTPUT_TOKENS = 1_400;
+/**
+ * An estimate of the input tokens of one call for a typical page. It is not the
+ * bound: the cost ceiling is derived from the byte caps (requirement 24.5).
+ */
 export const INPUT_TOKEN_CEILING = 6_100;
 export const JUDGE_EFFORT = "low";
 
@@ -81,7 +85,15 @@ export const PRICE_INPUT_PER_MTOK = 0.1;
 export const PRICE_OUTPUT_PER_MTOK = 0.5;
 export const PRICE_CACHE_READ_PER_MTOK = 0.01;
 export const PRICE_CACHE_WRITE_PER_MTOK = 0.125;
-export const MAX_COST_PER_SCAN_USD = 0.003;
+/**
+ * Worst-case cost of one scan with two billed attempts, in US dollars: the
+ * two-attempt figure derived from the byte caps (prompt, output schema,
+ * user-message wrapper and `MAX_DATA_BLOCK_BYTES` at one token per byte, priced
+ * at the higher of the input and cache-write prices, plus `MAX_OUTPUT_TOKENS`),
+ * rounded up to the next $0.001. Requirements 24.5 to 24.7. It is a ceiling,
+ * not a forecast: a typical call costs about $0.0006.
+ */
+export const MAX_COST_PER_SCAN_USD = 0.01;
 
 // -- Model, endpoints and prompt version --------------------------------------
 
