@@ -13,13 +13,13 @@ Rules for every task:
 - Never weaken a test: no deleted case, loosened expectation or new exemption. If a test and the spec contradict each other, stop and say so in the final reply.
 - At the end of the task, the touched tests pass, the named existing tests still pass, and `npx tsc --noEmit` is clean.
 
-- [ ] 1. Types, schemas, the output JSON Schema and constants
+- [x] 1. Types, schemas, the output JSON Schema and constants
   Uses: `lib/types/index.ts`, `lib/detectors/shared/finding.ts` (read-only). Read: requirements 1, 2, 3; design §7, §8, §9, §13 (first paragraph); note 1.5, 3.2.
   Files: `lib/judge/types.ts`, `lib/judge/schema.ts`, `lib/judge/constants.ts`, `tests/judge/schema.test.ts`, `tests/judge/constants.test.ts`.
-  - [ ] 1.1 Create `tests/judge/schema.test.ts` first: the 39 reason codes in their families; `FLAG_CODES_BY_PATTERN` covers the six patterns; the 9 statuses; `ReviewResultSchema` accepts a valid result and rejects a bad `source`, a title without "Possible" and a missing `judge` field; `JudgeOutputSchema` accepts a valid answer and rejects extra keys and wrong enum values; every enum of the JSON Schema equals the zod enum (candidate ids, rule ids, patterns, confidences, decisions, finding reasons, verdict reasons); a walk finds `additionalProperties: false` and a full `required` on every object; the constant is deep-frozen.
-  - [ ] 1.2 Create `tests/judge/constants.test.ts` first: every value of design §9; the cost ceiling of requirement 3.4 is at most `MAX_COST_PER_SCAN_USD`; `estimateCostUsd` on a fixed usage.
-  - [ ] 1.3 Create `types.ts`, `schema.ts` and `constants.ts`.
-  - [ ] 1.4 Run both test files, then `npx tsc --noEmit`.
+  - [x] 1.1 Create `tests/judge/schema.test.ts` first: the 39 reason codes in their families; `FLAG_CODES_BY_PATTERN` covers the six patterns; the 9 statuses; `ReviewResultSchema` accepts a valid result and rejects a bad `source`, a title without "Possible" and a missing `judge` field; `JudgeOutputSchema` accepts a valid answer and rejects extra keys and wrong enum values; every enum of the JSON Schema equals the zod enum (candidate ids, rule ids, patterns, confidences, decisions, finding reasons, verdict reasons); a walk finds `additionalProperties: false` and a full `required` on every object; the constant is deep-frozen.
+  - [x] 1.2 Create `tests/judge/constants.test.ts` first: every value of design §9; the cost ceiling of requirement 3.4 is at most `MAX_COST_PER_SCAN_USD`; `estimateCostUsd` on a fixed usage.
+  - [x] 1.3 Create `types.ts`, `schema.ts` and `constants.ts`.
+  - [x] 1.4 Run both test files, then `npx tsc --noEmit`.
   _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 3.1, 3.2, 3.3, 3.4, 3.5_
 
 - [ ] 2. Redaction
