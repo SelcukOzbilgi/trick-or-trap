@@ -357,3 +357,141 @@ The judge is one language model, Claude Haiku 5.5, reached with `@anthropic-ai/s
 19.3. WHEN `.kiro/steering/structure.md` is read THE SYSTEM SHALL list every file under `lib/judge/` and `tests/judge/`.
 19.4. WHEN `.env.example` is read THE SYSTEM SHALL find `JUDGE_MODE=` and `AI_GATEWAY_API_KEY=` with one comment each, `ANTHROPIC_API_KEY=` with a comment for `JUDGE_MODE=anthropic`, `JUDGE_EVAL_SEALED_PATH=` with a live-test-only comment, and no `GEMINI_API_KEY`.
 19.5. WHEN the steering and `.env.example` change THE SYSTEM SHALL keep `tests/capture/lib-text-rules.test.ts` and `tests/capture/config.test.ts` passing without editing them.
+
+---
+
+# Review fixes
+
+This section adds requirements 20 to 24 for tasks 15 to 19. It comes from `docs/research/model-judge-review.md` (an independent review of the finished implementation, written by a Claude review agent, not by Kiro; "review n" means its section n). The fixes land before the first live run, because they change what the model sees and what its answer can do. The text above is not edited. Where a new criterion replaces an old one, the list below names both, and tests follow the new criterion.
+
+## Amendments
+
+- 1.12 and the rule line "`npm run lint` in task 14 only": lint also runs in task 19, the last task. Tasks 15 to 18 do not run it.
+- 3.1 and 3.4, and the value of `MAX_COST_PER_SCAN_USD` ($0.003) in design §9 and §9's cost paragraph: replaced by 24.5 to 24.7. `INPUT_TOKEN_CEILING` stays at 6,100 as an estimate for a typical page and is no longer the bound.
+- 4.3 (digit run: spaces, dots or dashes between digits): replaced by 23.5 to 23.8.
+- 5.2 (visibility, with a zero-size box allowed for controls): replaced by 21.1 to 21.8. A control other than a checkbox, a radio or a selected option no longer keeps a zero-size box.
+- 5.5 (removed characters): extended by 21.11.
+- 5.6 (cut at 200 characters of the normalised text): replaced by 23.1. The cut now applies to the redacted text.
+- 9.2 (only `max_tokens` and empty text are refused): replaced by 22.1 to 22.7.
+- 9.12 ("more rejects than 11.8 allows"): reads 20.9 and 20.10, and also covers the new anomaly of 20.11.
+- 10.15 (enumeration test): extended by 24.4 with the `truncated` state.
+- 11.2 and 11.3 (downgrade of `reload` and `measured`): replaced by 20.1 to 20.3.
+- 11.4 (downgrade of `structural` and `text`): replaced by 20.4 to 20.6.
+- 11.5 (a reject without high confidence is applied as a downgrade): replaced by 20.7. It is now ignored.
+- 11.8 (reject limit `min(3, floor(n / 2))`, more than half): replaced by 20.9 to 20.13.
+- 14.2 (fields of the log record): the field set is unchanged; the value sets of `stopReason` and `anomalies` widen (20.11, 22.9).
+- 15.3 (client built with base URL, key and `maxRetries: 0`): extended by 24.8 and 24.9.
+- 18.8 and design §20 (live-test cost of about $0.25): replaced by 24.12.
+- 19.1 (the "LLM judge" section of `tech.md`): extended by 20.14 and 24.11. The sentence "never decides about reload or measured findings" is wrong and is replaced.
+- Unchanged on purpose: 16.10 (the rules-only figures 18/60, 3/60, 3/60 and 1 tolerated low), 11.6, 11.7, 11.9 to 11.20, 4.9 (the property stays; its test is extended) and 17.1 to 17.11.
+
+## Left for later
+
+These stay documented in review section 10 and are not built here:
+- The offline fake-`fetch` test of `haiku.ts`.
+- Counting an ancestor id as a duplicate in `related()`.
+- A quote filter for unclosed tags and scheme-less script URLs (a UI rule: finding strings are text nodes only).
+- Route-level rate limits, the daily scan cap and the result cache.
+- Wrapping `createHaikuClient` failures as `off`, and passing `offReason` and `urlHash` from the route.
+- The 25 s against 45 s scan budget.
+- The measurement of the function trace size with the SDK.
+- A second labeller for the evaluation set.
+
+## 20. Downgrade and reject powers
+
+**User story:** As a shopper, I want one model answer to be unable to lower every rule finding, so that a hostile page cannot make a result look cleaner than the rules found (review 3.2 items 1 and 4).
+
+**Acceptance criteria:**
+
+20.1. WHEN a `downgrade` names a `reload` or a `measured` finding and the judge's confidence is not `high` THE SYSTEM SHALL ignore the verdict and return the finding unchanged with source `rules`.
+20.2. WHEN a `downgrade` names a `reload` finding with judge confidence `high` THE SYSTEM SHALL lower it one level and never below medium.
+20.3. WHEN a `downgrade` names a `measured` finding with judge confidence `high` THE SYSTEM SHALL set it to low and never below low.
+20.4. WHEN a `downgrade` names a `structural` or `text` finding with a look-alike reason code and the judge's confidence is not `high` THE SYSTEM SHALL ignore the verdict and return the finding unchanged with source `rules`.
+20.5. WHEN a `downgrade` names a `structural` or `text` finding with a look-alike reason code and judge confidence `high` THE SYSTEM SHALL set it to low.
+20.6. WHEN a `downgrade` names a `structural` or `text` finding with a flag code of its pattern or `insufficient-context` THE SYSTEM SHALL lower it one level, whatever the judge's confidence.
+20.7. WHEN a `reject` names a `structural` or `text` finding and the judge's confidence is not `high` THE SYSTEM SHALL ignore the verdict and return the finding unchanged with source `rules`.
+20.8. WHEN a `reject` with judge confidence `high` and a look-alike code names a `structural` or `text` finding THE SYSTEM SHALL move the finding unchanged to `setAside`, as in 11.7.
+20.9. WHEN `n` is the number of sent `structural` and `text` findings, with `n` at least 1, THE SYSTEM SHALL allow at most `min(3, max(1, floor(n / 2)))` applicable rejects, where an applicable reject is a validated reject that names a sent `structural` or `text` finding, whatever its confidence.
+20.10. WHEN the applicable rejects exceed the allowance of 20.9 THE SYSTEM SHALL ignore every verdict of the scan, including a confirm that a duplicate finding would give, and set `ran-anomalous` with the anomaly `too-many-rejects`.
+20.11. WHEN three or more rule findings were sent and the number of distinct sent rule findings named by a lowering verdict is more than half of the rule findings sent THE SYSTEM SHALL ignore every verdict of the scan, including a confirm that a duplicate finding would give, and set `ran-anomalous` with the anomaly `too-many-lowered`.
+20.12. WHEN 20.11 counts lowering verdicts THE SYSTEM SHALL count each validated `downgrade` and each applicable reject, including verdicts that 20.1, 20.4 or 20.7 ignore, and SHALL not count a reject of a `reload` or `measured` finding.
+20.13. WHEN fewer than three rule findings were sent THE SYSTEM SHALL not apply 20.11; WHEN 20.10 and 20.11 both apply THE SYSTEM SHALL report each code once.
+20.14. WHEN `.kiro/steering/tech.md` is read THE SYSTEM SHALL say that the judge may lower a `reload` finding (never below medium) and a `measured` finding (to low) only with its own confidence `high`, and that it never rejects, sets aside or raises either.
+20.15. WHEN the fake judge `downgradeAllJudge` runs THE SYSTEM SHALL still answer with a downgrade of every rule finding, and the merge SHALL ignore or void that answer under 20.1 to 20.13.
+20.16. WHEN `downgradeAllJudge` answers over a page with three or more sent rule findings THE SYSTEM SHALL return those findings unchanged with status `ran-anomalous`.
+20.17. WHEN the rules-only run over dev ends THE SYSTEM SHALL find the figures of 16.10 exactly as before.
+
+## 21. Text the shopper cannot see
+
+**User story:** As a shopper, I want the model to read only what I could see on the page, so that a shop cannot hide an instruction in text I never see (review 3.2 item 2).
+
+**Acceptance criteria:**
+
+21.1. WHEN an element's box lies entirely outside the page area given by the snapshot's own width and height fields THE SYSTEM SHALL not make it a candidate.
+21.2. WHEN an element's box is under 4 px wide or under 4 px high THE SYSTEM SHALL not make it a candidate, except under 21.8.
+21.3. WHEN an element's font size is known and under 6 px THE SYSTEM SHALL not make it a candidate.
+21.4. WHEN an element's opacity multiplied by the opacities of its captured ancestors is under 0.1 THE SYSTEM SHALL not make it a candidate.
+21.5. WHEN the text contrast of an element against its effective background is under 1.2:1 and that background is known THE SYSTEM SHALL not make it a candidate.
+21.6. WHEN the effective background is assumed, or the text colour cannot be read, or the font size cannot be read THE SYSTEM SHALL not apply the test that needs it.
+21.7. WHEN these tests run THE SYSTEM SHALL use only fields the snapshot already holds and run them in the order of design §24.2.
+21.8. WHEN an element is a checkbox or radio input, or a selected option, THE SYSTEM SHALL not apply 21.1 and 21.2 to that element itself, SHALL apply 21.3 to 21.5 to the element that carries its text (the merged label, or the option itself), and SHALL apply 21.1 and 21.2 to a merged label; a checkbox or radio without a label has no text to test.
+21.9. WHEN an element is dropped by 21.1 to 21.5 THE SYSTEM SHALL not send it as a candidate, as a part or as a covering descendant in 6.1.
+21.10. WHEN an element is dropped by 21.1 to 21.5 THE SYSTEM SHALL leave no placeholder, label or count for it in the data block, and SHALL not set `truncated` because of it.
+21.11. WHEN text is normalised THE SYSTEM SHALL also remove U+E0000 to U+E007F, U+00AD, U+061C, U+180E, U+2800, U+3164, U+115F, U+1160 and U+FFA0, in addition to the ranges of 5.5.
+21.12. WHEN a claim such as "Only 2 left" holds any one of those characters inside a word THE SYSTEM SHALL send the same text as the claim without it.
+21.13. WHEN an element is small print that a shopper can read (font size at least 6 px, contrast at least 1.2:1, box at least 4 px each way, on the page) THE SYSTEM SHALL send it.
+21.14. WHEN the build-case test runs over the dev cases THE SYSTEM SHALL print the number of flag cases whose evidence element maps to no candidate, so that a case that became unsendable is reported and not hidden.
+
+## 22. Stop reasons
+
+**User story:** As the owner, I want an answer used only when the model finished normally, so that a refusal or a cut-off answer never becomes a result (review 3.2 item 3).
+
+**Acceptance criteria:**
+
+22.1. WHEN the stop reason is `end_turn` or `stop_sequence` THE SYSTEM SHALL go on to parse and validate the text.
+22.2. WHEN the stop reason is `refusal` THE SYSTEM SHALL give `invalid-output` with the code `stop-refusal`.
+22.3. WHEN the stop reason is `pause_turn` THE SYSTEM SHALL give `invalid-output` with the code `stop-pause-turn`.
+22.4. WHEN the stop reason is `max_tokens` THE SYSTEM SHALL give `invalid-output` with the code `stop-max-tokens`.
+22.5. WHEN the stop reason is `tool_use` THE SYSTEM SHALL give `invalid-output` with the code `stop-tool-use`.
+22.6. WHEN the stop reason is empty or any other value THE SYSTEM SHALL give `invalid-output` with the code `stop-unknown`.
+22.7. WHEN a stop reason of 22.2 to 22.6 comes with a text that parses and would pass validation THE SYSTEM SHALL still give `invalid-output`, with no findings and no verdicts.
+22.8. WHEN the status is `invalid-output` for a stop reason THE SYSTEM SHALL make no retry and SHALL return every rule finding unchanged with source `rules`.
+22.9. WHEN the log record is built THE SYSTEM SHALL hold the code of 22.2 to 22.6 in `anomalies` and a `stopReason` from the fixed set `end_turn`, `stop_sequence`, `max_tokens`, `refusal`, `pause_turn`, `tool_use` or `other`, and no other value.
+22.10. WHEN `statusLine` is called for such a result THE SYSTEM SHALL return the rules-only line with the reason "its answer could not be used".
+
+## 23. Redaction
+
+**User story:** As a shopper whose details appear on a page, I want redaction to hold across the cut and across common separators, and dates to stay readable, so that personal data does not leak and evidence is not erased (review 4).
+
+**Acceptance criteria:**
+
+23.1. WHEN candidate text is prepared THE SYSTEM SHALL normalise it, redact the whole normalised text, and only then cut it at 200 characters, setting `cut: true` when the redacted text is longer than 200.
+23.2. WHEN the normalised text is longer than 2,000 characters THE SYSTEM SHALL cut it at 2,000 and drop the trailing partial word before redaction.
+23.3. WHEN a part is prepared THE SYSTEM SHALL normalise, redact and then cut it at 24 characters.
+23.4. WHEN the quote check and the parts are built THE SYSTEM SHALL use the sent, redacted text, as in 9.4.
+23.5. WHEN text holds a date or a time of day of design §24.4 THE SYSTEM SHALL keep it readable, alone, with a time ("31.12.2025 23:59", "2025-12-31 23:59"), in a range ("01.11.2026 - 30.11.2026") or in the form "12/31/2025".
+23.6. WHEN text holds a run of digits THE SYSTEM SHALL count its digits after removing the dates and times of 23.5 from the run, and replace each remaining part with 9 or more digits with `[number]`; the run and the separators are defined in design §24.4.
+23.7. WHEN text holds a phone number with parentheses ("Call 0 (532) 123 45 67", "(0532) 123-45-67") THE SYSTEM SHALL replace it with `[number]`, including a parenthesis directly before its first digit or after its last.
+23.8. WHEN text holds a card-like number split by spaces, " - " or "/" ("4111 - 1111 - 1111 - 1111", "4111/1111/1111/1111") THE SYSTEM SHALL replace it with `[number]`.
+23.9. WHEN text holds a price, a short count, a clock time or a name THE SYSTEM SHALL keep it, as in 4.8; "Priya from Cardiff", "Only 3 left", "12:45" and "2.450,00 TL" stay.
+23.10. WHEN the property test runs over seeded random strings THE SYSTEM SHALL generate the separator shapes of 23.6 to 23.8, dates, times, and strings whose personal data crosses the 200-character cut, and SHALL find no sent text that holds `://`, an `@`, or 9 or more consecutive digits.
+23.11. WHEN a date or time is next to digits that make a run of 9 or more digits THE SYSTEM SHALL still replace those digits, as in "1234567890 12:30".
+
+## 24. Status line, cost ceiling, SDK environment and live-test header
+
+**User story:** As the owner, I want a partial review to be visible, a cost ceiling that is true, and an SDK that cannot print page text, so that the first live run measures what it should (review 3.2 item 5, 4, 5 and 11).
+
+**Acceptance criteria:**
+
+24.1. WHEN the status is `ran` or `ran-anomalous` and `judge.truncated` is true THE SYSTEM SHALL add the fixed sentence "The reviewer saw only part of this page." after the sentences of the status and before the rule-error sentence.
+24.2. WHEN the findings list is empty, the status is `ran` and `judge.truncated` is true THE SYSTEM SHALL return "No possible patterns found. The reviewer saw only part of this page." followed by the disclaimer.
+24.3. WHEN the status is another one, or `judge.truncated` is false, THE SYSTEM SHALL not add that sentence.
+24.4. WHEN the enumeration test runs THE SYSTEM SHALL cover every status, both list states, both `ruleErrors` states and `truncated` true and false, find no "nothing found" in any line, and find the sentence of 24.1 in exactly the lines that 24.1 names.
+24.5. WHEN the cost-ceiling test runs THE SYSTEM SHALL derive an input-token bound from the byte caps: the UTF-8 bytes of `JUDGE_SYSTEM_PROMPT`, of the serialised `JUDGE_OUTPUT_JSON_SCHEMA`, of the user-message wrapper and `MAX_DATA_BLOCK_BYTES`, at one token per byte.
+24.6. WHEN the cost-ceiling test runs THE SYSTEM SHALL price that bound at the higher of the input and cache-write prices, add `MAX_OUTPUT_TOKENS` at the output price, and find the cost of one attempt, and of two attempts, at most `MAX_COST_PER_SCAN_USD` for the two attempts and at most half of it for one.
+24.7. WHEN `MAX_COST_PER_SCAN_USD` is read THE SYSTEM SHALL find the computed worst case of two attempts rounded up to the next $0.001 (expected $0.010), and the spec text SHALL state the typical cost of about $0.0006 per call separately and as no bound.
+24.8. WHEN the client is built THE SYSTEM SHALL pass `logLevel: "off"`.
+24.9. WHEN the client is built THE SYSTEM SHALL pass `openTelemetry` with `propagation: false` and `traces` with `enabled: false` and `contentMode: "metadata_only"`.
+24.10. WHEN the source-rule test runs THE SYSTEM SHALL find the options of 24.8 and 24.9 in the text of `lib/judge/haiku.ts`.
+24.11. WHEN the header of `tests/judge/live/judge-live.test.ts` and `.kiro/steering/tech.md` are read THE SYSTEM SHALL list `ANTHROPIC_LOG`, `ANTHROPIC_CUSTOM_HEADERS`, `ANTHROPIC_AUTH_TOKEN` and the `ANTHROPIC_OPEN_TELEMETRY_*` variables as to be unset for a live run, and `tech.md` SHALL also say that hidden candidates are not sent and that only the stop reasons of 22.1 are used.
+24.12. WHEN the live-test header and design §20 state the cost of a live run THE SYSTEM SHALL state about $0.45 without the sealed file and about $0.67 with it.

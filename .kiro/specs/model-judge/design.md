@@ -346,3 +346,159 @@ End to end through `reviewFindings` with the mock, one `describe` per attack A1�
 | 16.3 to 16.15 | 12 |
 | 15 | 13 |
 | 18, 19 | 14 |
+
+---
+
+# Review fixes
+
+## 24. Review fixes
+
+Source: `docs/research/model-judge-review.md` ("review n" below). Requirements 20 to 24 and tasks 15 to 19 belong to this section. The sections above are not edited; where this section differs from them, this section wins, and the list "Amendments" in `requirements.md` names each case. Requirement numbers are in brackets.
+
+New constants (all in `lib/judge/constants.ts`, each pinned in `tests/judge/constants.test.ts`; existing pins stay):
+
+| Name | Value | Used by |
+|---|---|---|
+| `MIN_REJECTS_ALLOWED` | 1 | reject allowance (task 15) |
+| `LOWERED_MIN_RULE_FINDINGS` | 3 | lowering limit (task 15) |
+| `MIN_VISIBLE_BOX_PX` | 4 | candidate box test (task 16) |
+| `MIN_FONT_PX` | 6 | candidate font test (task 16) |
+| `MIN_EFFECTIVE_OPACITY` | 0.1 | candidate opacity test (task 16) |
+| `MIN_TEXT_CONTRAST` | 1.2 | candidate contrast test (task 16) |
+| `REDACT_INPUT_MAX_CHARS` | 2,000 | redaction input bound (task 18) |
+| `MAX_COST_PER_SCAN_USD` | 0.010 (was 0.003) | cost-ceiling test (task 19) |
+
+`MAX_REJECTS` (3) and `INPUT_TOKEN_CEILING` (6,100) keep their values.
+
+### 24.1 Merge powers (task 15; requirement 20)
+
+Replaces the power table of section 15. A "verdict" is the first validated verdict of a rule id.
+
+| Kind | Confirm | Downgrade | Reject |
+|---|---|---|---|
+| `reload` | level kept | judge `high` only: one level, floor medium; otherwise ignored | ignored, not counted |
+| `measured` | level kept | judge `high` only: set to low (never below low); otherwise ignored | ignored, not counted |
+| `structural`, `text` | level kept | flag code of the pattern or `insufficient-context`: one level, any confidence. Look-alike code: judge `high` only, set to low; otherwise ignored | judge `high` and look-alike code: set aside. Otherwise ignored |
+
+An ignored verdict leaves the finding as it is: source `rules`, no `ruleConfidence`, no `judgeReason`. A reject without `high` is a downgrade to low by a look-alike code, so it falls under the same gate and is ignored (it was applied as a downgrade before; amendment of 11.5). `applyVerdict(kind, verdict)` returns `null` for every ignored case.
+
+Order of work in `mergeReview` (replaces the order of section 15):
+1. If validation reported an anomaly, skip to step 6 with no verdict.
+2. Remove rejects of `reload` and `measured` findings (not counted).
+3. Reject allowance: `n` = sent findings of kind `structural` or `text`. For `n >= 1` the allowance is `min(MAX_REJECTS, max(MIN_REJECTS_ALLOWED, floor(n / 2)))`; for `n = 0` no reject is applicable. Applicable rejects are counted whatever their confidence (as before). Above the allowance: anomaly `too-many-rejects`.
+4. Lowering limit: `m` = number of sent rule findings (`built.map.rules.size`, at most 20). If `m >= LOWERED_MIN_RULE_FINDINGS`, `L` = number of distinct sent rule findings named by a validated `downgrade` or an applicable reject, counted before the confidence gates of the table, so ignored verdicts count. If `2 * L > m`: anomaly `too-many-lowered`.
+5. If step 3 or 4 added an anomaly, clear every verdict (both codes are reported when both apply).
+6. Duplicates become confirms for rules without a verdict (skipped when verdicts were cleared); apply verdicts through the table; judge-only findings; ordering. Unchanged from section 15.
+
+`AnomalyCode` gains `too-many-lowered`. The status is `ran-anomalous` through the existing rule (any anomaly), with the existing status line.
+
+Decisions:
+- **Confidence gate (review 3.2.1 a and b).** The review's probe lowered every rule finding of nine Boo-tique variants with judge confidence `low` and `insufficient-context`, and the status stayed `ran`. After the gate, a downgrade of a `reload` or `measured` finding, and any lowering to low by a look-alike code, needs the model's own `high`. This narrows the path; it does not close it, because a hostile page can also try to make the model say `high`. The closing bounds are the floors, the half rule below, and the fact that every lowered finding stays in the list, with `ruleConfidence` and a visible reason.
+- **A one-level downgrade with a flag code or `insufficient-context` stays open at any confidence.** The review asked for no gate there, and it moves a finding by one level at most. The half rule covers the mass case.
+- **Half rule, counted over lowering verdicts of both kinds.** The review asked for "more than half downgraded". Rejects and downgrades are counted together, because each stays within its own limit in a bad answer (page with 5 findings: 2 rejects and 2 downgrades lower 4 of 5 and break neither limit alone). Counting verdicts and not effects also catches the original probe, where the gate would otherwise make every verdict a silent no-op and hide that the answer tried it.
+- **Minimum of 3 rule findings.** With 1 or 2 findings, "more than half" would mark a normal answer as unusual (one of two findings lowered is half of a page that has nothing else to say). With 3 rule findings, 2 lowering verdicts are already more than the reject allowance of 1 when both are rejects, so the new rule fits the existing one. At 3 or fewer findings the only bounds are the gates, the floors and the visible labels; the damage is at most 3 findings, each still listed.
+- **Clear the whole answer, not only the excess.** For both limits the answer is anomalous and all verdicts are cleared. Clearing only the excess needs a rule for which verdicts survive. Any such rule depends on the order or ids the model chose, and the model's choice is what the shop's text may have steered. A mass downgrade shows that the answer as a whole cannot be trusted, so its honest-looking verdicts are not trusted either. This is the rule already used for too many rejects, so the status line and the tests stay uniform. The cost is that a rare honest answer with several look-alikes is also cleared; the shopper then reads "Checked by rules. The reviewer's answer looked unusual…" and gets rules-only levels, which is the safe default. A safer alternative was considered: also dropping the judge's new findings from an anomalous answer. It was not taken, because the status line (section 14) and 9.13 already promise "only its new findings were kept", and those findings are low and capped at 8.
+- **One reject on a single rejectable finding (review 3.2.4).** `floor(1 / 2) = 0` made one reject on the commonest checkout shape (one structural finding) an anomaly that voided the answer. The allowance becomes `min(3, max(1, floor(n / 2)))` for `n >= 1`. This is acceptable because the reject still needs `high` and a look-alike code, the finding is moved to the visible set-aside list and not deleted, `reload` and `measured` findings cannot be rejected, and no other finding of the page is affected. The risk, stated: a hostile page that gets one `high` look-alike answer can set aside its only text or structural finding. With `n` of 2 or 3 the allowance stays 1, with 4 it is 2, with 6 or more it is 3.
+- **Not changed:** a reject with low confidence still counts toward the allowance (review 2: safer).
+
+The by-construction test of section 15 stays and runs over the new table. `fake-judges.ts`: `downgradeAllJudge` stays a fake that downgrades every rule finding with confidence `high` and `insufficient-context`; only its comment gains a line that the merge ignores or voids it. `tech.md` replaces the sentence "never decides about reload or measured findings" with: the judge may lower a `reload` finding by one level (never below medium) and set a `measured` finding to low, only with its own confidence `high`; it never rejects, sets aside or raises either.
+
+### 24.2 Text the shopper cannot see (task 16; requirement 21)
+
+A candidate is dropped, not labelled. Dropping is simpler and safer than a "hidden" label: no extra field or sentence reaches the model, the model can never quote what it never received, and the quote check of 9.4 needs no change. A dropped element leaves no placeholder, is not counted, and does not set `truncated`, because it is not a cap.
+
+The tests use only fields the snapshot already has: `boundingBox`, `fontSize`, `opacity`, `color`, `backgroundColor`, and `fullWidth`, `fullHeight`, `viewportWidth`, `viewportHeight`. They run in this order in `prepareCandidates` (the order does not change the result, since any hit drops the element; it is fixed so code and tests agree), on the element that carries the text (the "carrier"):
+1. Style: `display: none`, `visibility` hidden or collapse, opacity 0, on the element or an ancestor (existing 5.2).
+2. Off-screen: the page area is `W = max(fullWidth, viewportWidth)` by `H = max(fullHeight, viewportHeight)`; an edge whose value is not a finite positive number is not tested. The box `(x, y, w, h)` is off-screen when `x + w <= 0`, `y + h <= 0`, `x >= W` or `y >= H`. A box at (-9999, -9999) is off-screen; a box partly on the page is not.
+3. Tiny box: `w < MIN_VISIBLE_BOX_PX` or `h < MIN_VISIBLE_BOX_PX`. This replaces the old zero-box rule for non-controls and ends the zero-box allowance for controls that carry text (links, buttons, selects).
+4. Font: `fontSizePx` known and `< MIN_FONT_PX`.
+5. Effective opacity: own opacity times the opacities of captured ancestors `< MIN_EFFECTIVE_OPACITY`.
+6. Contrast: `textContrast(index, carrier)` is not null, its background is not `assumed`, and `ratio < MIN_TEXT_CONTRAST`.
+
+Carriers and exemptions: for a checkbox or radio input with a merged label, the carrier is the label, and tests 2 to 6 run on it. A label that fails them is not merged, as a label hidden by style is not today: the input is then sent with its checked state and no text. The input itself is exempt from tests 2 and 3, because custom checkboxes are routinely 1 px or moved off-screen with the label showing their state; its checked state is what is sent. A checkbox or radio without a label sends no text, so no hidden text can come from it, and it keeps the style test only. A selected `option` is exempt from tests 2 and 3 (a closed select reports a zero box) and takes tests 4 to 6 on itself. Every other element is its own carrier.
+
+Parts and coverage: a child whose own tests drop it is not attached as a part (`partsOf` applies the same function), and the 80 % coverage count of 6.1 counts only descendants that pass. One function `isShopperVisible(el, index, page)` holds tests 2 to 6 so that the three call sites cannot differ.
+
+Normalisation: `isRemovedCharacter` also removes U+E0000 to U+E007F, U+00AD, U+061C, U+180E, U+2800, U+3164, U+115F, U+1160 and U+FFA0. NFKC runs first and turns U+3164 and U+FFA0 into U+1160, which is then removed; the three are still listed so a change of order cannot reopen them. A removed character is dropped, not turned into a space, as in 5.5.
+
+Residual risks, stated: text hidden by a clipping ancestor (`overflow: hidden` with a tiny box), `text-indent`, `clip-path`, text covered by another element, text in the page's own background colour when no ancestor background was captured (contrast is skipped for an assumed background, because a dark page whose background sits on an element outside the sample would otherwise lose all its light text), and other invisible code points not listed (for example U+034F, U+17B4, U+17B5, variation selectors). A claim on a carousel slide beyond the page width is not sent; the rules still see it. The verdict powers, validation and merge do not depend on these tests.
+
+Tests that must keep passing: the helper `makeSnapshot` in `tests/judge/helpers/snapshot.ts` gives element `i` the default box `y = 100 + 40 * i` and a fixed `fullHeight` of 2,000, so a page of 48 or more default elements lies below the page area. The task makes `makeSnapshot` set `fullHeight` to at least the bottom of the last default box (an explicit `extra.fullHeight` still wins). This keeps the 1,500-element tests (A6, request body size, caps) meaningful and is not a loosened expectation. `tests/judge/eval/build-case.ts` is not changed; the dev set has far fewer than 72 elements per case.
+
+### 24.3 Stop reasons (task 17; requirement 22)
+
+`validateOutput` checks the stop reason first, before the empty-text check and before parsing (it replaces step 1 of section 13).
+
+| Stop reason | Result | Code | Logged `stopReason` |
+|---|---|---|---|
+| `end_turn` | go on | none | `end_turn` |
+| `stop_sequence` | go on | none | `stop_sequence` |
+| `refusal` | `invalid-output` | `stop-refusal` | `refusal` |
+| `pause_turn` | `invalid-output` | `stop-pause-turn` | `pause_turn` |
+| `max_tokens` | `invalid-output` | `stop-max-tokens` | `max_tokens` |
+| `tool_use` | `invalid-output` | `stop-tool-use` | `tool_use` |
+| empty or any other value | `invalid-output` | `stop-unknown` | `other` |
+
+`ValidationResult` becomes `{ kind: "invalid"; code?: StopAnomalyCode }`: `code` is set for the five stop cases and absent for empty text, bad JSON and a schema failure (an existing test that compares the whole invalid object is updated to the new shape with the requirement named, and not loosened). `AnomalyCode` gains the five `stop-*` codes, `LoggedStopReason` gains `pause_turn` and `tool_use`, and `review.ts` puts `code` into `trace.anomalies` before it returns `invalid-output`. `STATUS_REASONS["invalid-output"]` ("its answer could not be used") is reused, so the shopper sees the existing rules-only line. The log record keeps its field set; only the value sets widen. No new retry rule: an invalid answer is never retried (9.1).
+
+`stop_sequence` is accepted because the request sends no stop sequence, so it cannot occur in a valid answer, and accepting it harms nothing. Unverified: the AI Gateway's stop-reason strings. If it renames `end_turn`, every call gives `invalid-output` with `stop-unknown` and the live test shows no `ran` status, which is visible and falls back to rules-only.
+
+### 24.4 Redaction (task 18; requirement 23)
+
+New exported function in `candidates.ts`: `sentCandidateText(raw)` returns `{ text, cut }`: `normaliseFull(raw)`, bound to `REDACT_INPUT_MAX_CHARS` (longer input is cut there and the trailing partial word, everything after the last whitespace, is dropped before redaction), `redactText`, then `cutAtBoundary(…, MAX_CANDIDATE_CHARS)`. `prepareCandidates` and `partsOf` use it (a part uses the same chain with a cut at 24). `normaliseCandidateText` stays exported with its current behaviour for its existing tests. `isMostlyRedacted` is applied to the sent text. The quote check reads `candidate.text`, which is the sent text, so it stays consistent. The element text is at most 1,000 characters by the snapshot schema, so the 2,000-character bound only protects callers that bypass the schema.
+
+Digit rule in `redactText` (replaces the 9-digit rule of section 10; the order email, URL, digits, IBAN, handle stays):
+- Separator set: space, `.`, `-`, `/`, `(`, `)`. A gap between two digits is 0 to 3 characters from that set.
+- Digit run: a digit, then any number of (gap, digit) pairs; an opening `(` directly before the first digit and a closing `)` directly after the last digit belong to the run.
+- Protected spans, found first, each not preceded or followed by a digit:
+  - date, day or month first: `D{1,2}` separator `D{1,2}` separator `1900`–`2199`, with the first two numbers a plausible day (1–31) and month (1–12) in either order; separators from `.`, `-`, `/`, the same character twice;
+  - date, year first: a year of 1900–2199, separator, a month 1–12, separator, a day 1–31, same separator twice;
+  - time: hours 0–24, `:`, minutes 00–59, optionally `:` and seconds 00–59.
+- Counting: the protected spans are cut out of the run; each remaining part is counted by its digits (any `\p{Nd}`); a part with 9 or more digits is replaced as a whole by `[number]`.
+
+| Input | Sent as |
+|---|---|
+| `31.12.2025 23:59`, `2025-12-31 23:59`, `01.11.2026 - 30.11.2026`, `12/31/2025` | unchanged |
+| `Call 0 (532) 123 45 67` | `Call [number]` |
+| `(0532) 123-45-67` | `[number]` |
+| `4111 - 1111 - 1111 - 1111`, `4111/1111/1111/1111` | `[number]` |
+| `0532 123 45 67 until 31.12.2025` | `[number] until 31.12.2025` |
+| `1234567890 12:30` | `[number] 12:30` |
+| `Order 12345678 sent` (8 digits), `2.450,00 TL`, `Only 3 left`, `12:45` | unchanged |
+
+Existing behaviour that stays: email, URL, IBAN and handle rules, `[number]` for runs of single spaces, dots or dashes, and the prices, counts, clock times and names of 4.8. A longer gap set means a shoe-size list such as "36 - 37 - 38 - 39 - 40" (10 digits) is now redacted as the same list with single spaces already was; this is accepted. Plausible calendar values are required for a protected date so that a number of digits that is not a date is never protected.
+
+Property test (extends 4.9): the seeded generator (no `Math.random`) adds the separator shapes above, dates and times, and strings with an email, a handle or a number that starts between characters 185 and 199 of a long normalised text, so that the old cut position would have left part of it. It runs the strings through `sentCandidateText` and asserts: no `://`, no `@`, no 9 consecutive digits, and for strings built from a number shape and no date, no run with 9 or more digits after the dates and times are cut out.
+
+### 24.5 Status line, cost ceiling, SDK options and live-test header (task 19; requirement 24)
+
+**Status line.** One fixed sentence is added to `summary.ts`: `PARTIAL = "The reviewer saw only part of this page."`. For status `ran` or `ran-anomalous` with `judge.truncated` true it follows the main sentence or sentences (for an empty `ran` list: "No possible patterns found." then `PARTIAL`) and comes before the rule-error sentence; the disclaimer is last. For a status in which the reviewer did not run it is not used, because the reviewer saw nothing and the existing line says so; `truncated` may be true there only because the builder had run. Line for `ran`, non-empty, truncated: "Checked by rules and a language-model reviewer. The reviewer saw only part of this page. Automated detection — may be wrong."
+
+**Cost ceiling.** The test derives the bound from the byte caps, not from `INPUT_TOKEN_CEILING`:
+- `tokens = bytes(JUDGE_SYSTEM_PROMPT) + bytes(JSON.stringify(JUDGE_OUTPUT_JSON_SCHEMA)) + bytes(buildUserMessage("")) + MAX_DATA_BLOCK_BYTES`, at one token per byte. A token is never shorter than one byte, so this is an upper bound.
+- One attempt: `(tokens × max(PRICE_INPUT, PRICE_CACHE_WRITE) + MAX_OUTPUT_TOKENS × PRICE_OUTPUT) / 10⁶`. Two attempts: twice that.
+- With the review's sizes (6,653 + 2,419 + 24,000 bytes and a wrapper of about 90 bytes, about 33,200 tokens): one attempt about $0.0048, two about $0.0097. The review's figures (about $0.0033 and $0.0067) assume about 25,000 tokens and the input price; this design prices all of the request at the higher cache-write price, so its bound is higher and still safe.
+- Decision: raise the stated ceiling, not the limits. `MAX_COST_PER_SCAN_USD` = the two-attempt figure rounded up to the next $0.001, expected $0.010. The task computes it from the real sizes and sets the constant to that value; the test then holds with the constant, and any later growth of the prompt, schema or data cap fails it. Lowering `MAX_DATA_BLOCK_BYTES` instead would cut the evidence a legitimate page can send, to protect against a page that needs one token per byte, which no real page does. The honest statement is that the worst case is about one cent per scan with a billed retry, which is still about 100 worst-case scans per $1 daily budget.
+- Typical cost is stated apart: about $0.0006 per call (note 5, review 5), about 1,600 scans per $1. It is a measured figure for the live run, not a bound, and no constant or assertion holds it.
+- The tests that quote the old figure change: `constants.test.ts` (`toBeCloseTo(0.002925, 9)` and `toBe(0.003)`), the shipping bar line 5 in the live-test header ("no run costs more than $0.003 per scan") gets the words "measured cost of a real scan, not the worst-case ceiling", and design §9 and 3.4 are covered by the Amendments list.
+
+**SDK options.** Checked in `node_modules/@anthropic-ai/sdk/client.d.ts` and `internal/tracing.d.ts` (SDK 1.12.0, read-only): `ClientOptions.logLevel` takes `'off' | 'error' | 'warn' | 'info' | 'debug'` and otherwise reads `ANTHROPIC_LOG`; `ClientOptions.openTelemetry` takes `false` or `{ tracerProvider?, propagation?, traces? }` with `traces` as a boolean or `{ enabled?, contentMode?: 'metadata_only' | 'content', maxContentBytes? }`; a client given the option does not read the `ANTHROPIC_OPEN_TELEMETRY_*` variables. `createHaikuClient` passes `logLevel: "off"` (the orchestrator writes its own one record, and the SDK's debug and info lines can hold request bodies) and `openTelemetry: { propagation: false, traces: { enabled: false, contentMode: "metadata_only" } }` (no spans, no trace headers, and metadata-only content if spans are ever switched on). The explicit `apiKey` and `baseURL` already stop `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN` and `ANTHROPIC_BASE_URL` from being read (review 4). The SDK 1.12.0 types show no option that removes `ANTHROPIC_CUSTOM_HEADERS`, so that variable is documented only: it must be unset for a live run, with `ANTHROPIC_LOG`, `ANTHROPIC_AUTH_TOKEN` and the `ANTHROPIC_OPEN_TELEMETRY_*` variables, in the live-test header and in `tech.md`. `source-rules.test.ts` checks the text of `haiku.ts` for `logLevel: "off"`, `propagation: false`, `enabled: false` and `contentMode: "metadata_only"`; `npx tsc --noEmit` checks the option names against the installed types.
+
+**Live-test header and §20.** The cost line reads: about $0.45 without the sealed file and about $0.67 with it (about 745 calls for dev, attacks and the Boo-tique plus 360 for sealed, at about $0.0006 each, review 11). Design §20's "(about $0.25)" is replaced the same way. The note's own figure (note 7.5) lives in `docs/research` and is not edited.
+
+### 24.6 Errors, test strategy and out of scope
+
+- Errors: nothing here throws or catches new errors. A stop-reason failure and a hidden or unreadable element are not exceptions; they become `invalid-output` with a code and a dropped candidate. The orchestrator's single `try` still turns any unexpected throw into `error`.
+- Unit-tested: the merge table and both limits with a seeded by-construction run, the candidate tests with one case per rule and per removed character, each stop reason through `validateOutput` and `reviewFindings`, each redaction example and the extended property test, the status-line enumeration, the cost ceiling from the byte caps, and the source text of `haiku.ts`. The dev evaluation with both fake judges shows the merge ignores or voids `downgradeAllJudge`.
+- Not automated: the real model's behaviour, gateway stop-reason strings, real pages with hidden text, and the live cost. The live test stays opt-in and is never run by an agent.
+- Out of scope: the items of "Left for later" in `requirements.md`.
+
+### 24.7 Requirements to tasks
+
+| Requirements | Task |
+|---|---|
+| 20 | 15 |
+| 21 | 16 |
+| 22 | 17 |
+| 23 | 18 |
+| 24 | 19 |
