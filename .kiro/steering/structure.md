@@ -83,10 +83,22 @@ trick-or-trap/
 │   │   ├── visual-interference.ts # detectVisualInterference
 │   │   ├── shared/                # text, patterns, elements, samples, labels, parsers, colour, finding builder
 │   │   └── data/                  # English and Turkish word lists, one file per detector family
-│   ├── judge/
-│   │   ├── interface.ts           # Judge interface
-│   │   ├── haiku.ts               # Claude Haiku 5.5 implementation
-│   │   └── mock.ts                # deterministic mock for tests
+│   ├── judge/                     # model judge (spec model-judge); pure except haiku.ts and config.ts
+│   │   ├── types.ts               # reason codes, statuses, ReviewResult and its zod schemas, JudgeLogRecord
+│   │   ├── schema.ts              # JudgeOutputSchema (zod) and the frozen JUDGE_OUTPUT_JSON_SCHEMA
+│   │   ├── constants.ts           # every limit, price, id, timing and score; estimateCostUsd
+│   │   ├── redact.ts              # redactText, isMostlyRedacted
+│   │   ├── candidates.ts          # normaliseCandidateText, prepareCandidates, ruleKind, buildCandidates
+│   │   ├── prompt.ts              # JUDGE_SYSTEM_PROMPT, encodePageData, buildUserMessage, buildJudgeRequest, buildRequestBody
+│   │   ├── validate.ts            # validateOutput: ids, quote check, structure checks, reason families, anomalies
+│   │   ├── templates.ts           # titles, reason sentences, description builders, set-aside heading
+│   │   ├── summary.ts             # statusLine and its fixed sentences
+│   │   ├── merge.ts               # mergeReview, assembleJudgeFinding: verdict powers, dedup, set-aside, ordering
+│   │   ├── interface.ts           # JudgeClient seam, JudgeHttpError, toJudgeHttpError
+│   │   ├── mock.ts                # createMockJudge, readPageData: deterministic client for tests
+│   │   ├── config.ts              # readJudgeConfig(env), server-only
+│   │   ├── review.ts              # reviewFindings, createCooldown, defaultCooldown, the log record
+│   │   └── haiku.ts               # createHaikuClient: the only network and SDK code, server-only
 │   ├── walker/
 │   │   ├── walker.ts              # flow walker orchestrator
 │   │   ├── decider.ts             # Decider interface
@@ -137,11 +149,34 @@ trick-or-trap/
 │   ├── types/
 │   │   ├── schemas.test.ts        # lib/types schemas
 │   │   └── capture-meta.test.ts   # CaptureMeta, including httpStatus
+│   ├── judge/
+│   │   ├── schema.test.ts         # reason codes, statuses, result and output schemas, JSON Schema agreement
+│   │   ├── constants.test.ts      # every constant, the cost ceiling, estimateCostUsd
+│   │   ├── redact.test.ts         # redaction rules and the seeded property test
+│   │   ├── candidates.test.ts     # eligibility, normalisation, labels, groups, places, facts
+│   │   ├── candidates-rank.test.ts # parts, rule links, ranking, caps, ids
+│   │   ├── prompt.test.ts         # encoding, prompt parts, user message, request body and its size
+│   │   ├── validate.test.ts       # output validation, quote check, anomalies
+│   │   ├── wording.test.ts        # titles start with "Possible", no forbidden word in any judge text
+│   │   ├── summary.test.ts        # status lines for every status and list state
+│   │   ├── merge.test.ts          # verdict powers, dedup, set-aside, by-construction test
+│   │   ├── interface.test.ts      # toJudgeHttpError
+│   │   ├── mock.test.ts           # the mock's scripts and readPageData
+│   │   ├── config.test.ts         # readJudgeConfig
+│   │   ├── review.test.ts         # orchestrator with a manual clock and timer
+│   │   ├── review-log.test.ts     # one log record per scan, nothing sensitive in it
+│   │   ├── injection.test.ts      # code-layer attacks A1 to A11 through reviewFindings and the mock
+│   │   ├── source-rules.test.ts   # SDK only in haiku.ts, hook word absent, no clock or random, pinned dependency
+│   │   ├── helpers/               # snapshot.ts (snapshot builders), harness.ts (manual clock and timer)
+│   │   ├── eval/                  # build-case.ts, score.ts, fake-judges.ts and their tests, dev-eval.test.ts (rules-only regression, fake judges), replay.test.ts (recorded responses)
+│   │   └── live/                  # judge-live.test.ts (opt-in, owner only, RUN_LIVE_JUDGE=1) and attacks.json (model-layer attack fixtures)
 │   ├── walker/
 │   │   └── walker.test.ts
 │   └── fixtures/
 │       ├── boo-tique-ground-truth.json  # copy of docs/research file, canonical pattern ids
 │       ├── real-world-phrases.json      # corpus of real-world wording; every word-list entry must occur in it
+│       ├── judge-eval/                  # dev split of the judge evaluation, its README and rules-only baseline (the sealed split is not in the repository)
+│       ├── judge-dev-responses.json     # raw dev answers recorded by the owner's live run (RECORD_JUDGE_DEV=1); the replay test is skipped while it is absent
 │       └── snapshots/                   # PageSnapshot fixtures per Boo-tique page
 ├── .kiro/
 │   ├── steering/                  # these files
