@@ -541,7 +541,7 @@ Turkish law is not cited anywhere in this feature. If a later string refers to l
 Independent, written before reading the detectors' word lists, the phrase corpus or the hold-out:
 - 240 cases: 6 patterns × (20 flag + 20 honest), half English and half Turkish.
 - Split by a seeded, stratified shuffle into **dev** (120) and **sealed** (120).
-- The dev split ships as `tests/fixtures/judge-eval-dev.json`, sha256 `68173dd346198c43e3d325c645f50c14e375c8236a66eb123e2689eb444f9cff`. The schema and the scoring rules are in the README that ships beside it.
+- The dev split ships as `tests/fixtures/judge-eval/dev.json`, sha256 `68173dd346198c43e3d325c645f50c14e375c8236a66eb123e2689eb444f9cff`. The schema and the scoring rules are in the README that ships beside it.
 - The **sealed** split stays outside the repository with the owner and is never shown to Kiro. Only aggregate numbers from it may be published.
 
 Overlap check, done after freezing and without editing any case. About 500 element texts longer than 6 characters were compared with the phrase corpus and the hold-out strings:
@@ -648,7 +648,7 @@ Tests first in every task. Each test runs its own file only (`vitest run <file> 
 | 10 | Seam and mock: `JudgeClient`, `JudgeHttpError`, deterministic mock | `lib/judge/interface.ts`, `lib/judge/mock.ts`, `tests/judge/mock.test.ts` |
 | 11 | Orchestrator: `reviewFindings` with deadline, skip, one retry, timeout, 402 cooldown, `off` mode, the log record (no page text) | `lib/judge/review.ts`, `tests/judge/review.test.ts` |
 | 12 | Real client: `server-only`, dynamic SDK import, gateway or direct base URL by mode, `maxRetries: 0`, error mapping; source-rule test (SDK only here, never imported by unit tests) | `lib/judge/haiku.ts`, `tests/judge/source-rules.test.ts` |
-| 13 | Eval harness: scoring per the README, the dev fixture copy, the rules-only regression pinned to 18/60 and 3/60, the replay test (skipped until the recorded-responses fixture exists) | `tests/judge/eval/score.ts`, `tests/judge/eval/dev-eval.test.ts`, `tests/fixtures/judge-eval-dev.json`, `tests/fixtures/judge-eval-dev-baseline.json` |
+| 13 | Eval harness: scoring per the README, the dev fixture copy, the rules-only regression pinned to 18/60 and 3/60, the replay test (skipped until the recorded-responses fixture exists) | `tests/judge/eval/score.ts`, `tests/judge/eval/dev-eval.test.ts`, `tests/fixtures/judge-eval/dev.json`, `tests/fixtures/judge-eval/judge-eval-dev-baseline.json` |
 | 14 | Docs and steering: `tech.md` "LLM judge" section (no Gemini fallback, the seam, modes, the never-"nothing found" rule); `structure.md` judge files; `.env.example` (`JUDGE_MODE`, `AI_GATEWAY_API_KEY`, remove `GEMINI_API_KEY`); copy this note to `docs/research/` | steering, `.env.example`, `docs/research/model-judge-design.md` |
 | 15 | Opt-in live test (written, never run by Kiro): dev, sealed by path, attacks, Boo-tique, 3 repetitions, metrics and cost print, records dev responses when `RECORD_JUDGE_DEV=1` | `tests/judge/live/judge-live.test.ts`, `tests/judge/live/attacks.json` |
 

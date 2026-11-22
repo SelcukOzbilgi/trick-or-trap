@@ -54,7 +54,7 @@ Same image model as above (`openai/gpt-image-2-6-flare` through the Wiro API), r
 
 ### What was added or replaced
 
-- Added `docs/images/banner.webp`, `how-it-works.webp`, `monsters.webp`, `built-with-kiro.webp` (README images, WebP web copies) and `social-preview.jpg` (1280x640, kept for the repository's social preview setting). Not yet used by the README.
+- Added `docs/images/banner.webp`, `how-it-works.webp`, `monsters.webp`, `built-with-kiro.webp` (README images, WebP web copies) and `social-preview.jpg` (1280x640, kept for the repository's social preview setting). The four WebP images are used by `README.md`; the JPEG is for the repository's social preview.
 - Replaced the plates (`-512.webp`, `-1024.webp`) of werewolf, vampire, zombie, spider and mummy, and the stamps (`-88.png`, `-256.png`) of werewolf, vampire, spider and mummy. Same file names, pixel sizes and formats; no code change needed.
 - Werewolf stamp: redrawn as a simplified bust of the new werewolf plate, so that stamp and plate show the same character. The owner approved it after a visual comparison.
 - Not replaced: the zombie stamp. It intentionally stays as the earlier drawing (a bust with an iron ball and chain) by the owner's choice, while its plate shows the newer drawing (a zombie chained to a turnstile); only the zombie plate changed.

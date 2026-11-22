@@ -4,6 +4,18 @@ All notable changes to this project are recorded here. The format is based on Ke
 
 ## [Unreleased]
 
+### Added
+
+- Add the model judge in `lib/judge`: a small language model (Claude Haiku 5.5) reviews the page elements and the rule findings of a scan. It is behind the switch `JUDGE_MODE` (`off`, `gateway` or `anthropic`), off by default, and no route calls it yet. Spec `model-judge`.
+- Add a mock judge client, fake judges and an evaluation harness over the independent dev set (`tests/fixtures/judge-eval/dev.json`). The judge has not been run against a real model.
+
+### Security
+
+- Do not send candidates a shopper cannot see (off-screen, tiny, faint or hidden by an ancestor), and keep hidden text out of the text of visible elements.
+- Cap the judge's downgrades of rule findings.
+- Accept only the stop reasons `end_turn` and `stop_sequence`. Any other stop reason gives an unusable answer and the rule findings stand.
+- Redact candidate text (emails, links, long numbers and handles) before it is cut to length, so that a cut cannot leave part of a redacted item.
+
 ## [0.1.0] - 2026-11-21
 
 Work before pull request #11 was committed directly to `main`. Pull request #13 holds two specs (`page-capture` and `page-capture-fixes`); #12 was closed unmerged in its favour.

@@ -31,7 +31,9 @@ Nothing is deployed yet. This is what is on `main` today.
 - Page capture through a remote browser (Browser Use Cloud, driven by `playwright-core`) with a browser-level request guard (`lib/capture`).
 - Six rule-based detectors (`lib/detectors`).
 
-Not built yet: the interface ([#5](https://github.com/SelcukOzbilgi/trick-or-trap/issues/5)), the scan route ([#4](https://github.com/SelcukOzbilgi/trick-or-trap/issues/4)), the model reviewer ([#6](https://github.com/SelcukOzbilgi/trick-or-trap/issues/6)), the flow walker ([#7](https://github.com/SelcukOzbilgi/trick-or-trap/issues/7)), abuse guards ([#8](https://github.com/SelcukOzbilgi/trick-or-trap/issues/8)); capture and detector follow-ups in [#3](https://github.com/SelcukOzbilgi/trick-or-trap/issues/3), [#15](https://github.com/SelcukOzbilgi/trick-or-trap/issues/15) and [#17](https://github.com/SelcukOzbilgi/trick-or-trap/issues/17). The first release is tracked in [#9](https://github.com/SelcukOzbilgi/trick-or-trap/issues/9). Nothing is deployed, and no public route calls the capture module or the detectors yet; the landing page (`app/page.tsx`) is a placeholder.
+The model reviewer ([#6](https://github.com/SelcukOzbilgi/trick-or-trap/issues/6)) is implemented in `lib/judge` behind the switch `JUDGE_MODE`. It is off by default, no route calls it, and it has never been run against a real model.
+
+Not built yet: the interface ([#5](https://github.com/SelcukOzbilgi/trick-or-trap/issues/5)), the scan route ([#4](https://github.com/SelcukOzbilgi/trick-or-trap/issues/4)), the flow walker ([#7](https://github.com/SelcukOzbilgi/trick-or-trap/issues/7)), abuse guards ([#8](https://github.com/SelcukOzbilgi/trick-or-trap/issues/8)); capture and detector follow-ups in [#3](https://github.com/SelcukOzbilgi/trick-or-trap/issues/3), [#15](https://github.com/SelcukOzbilgi/trick-or-trap/issues/15) and [#17](https://github.com/SelcukOzbilgi/trick-or-trap/issues/17). The first release is tracked in [#9](https://github.com/SelcukOzbilgi/trick-or-trap/issues/9). Nothing is deployed, and no public route calls the capture module or the detectors yet; the landing page (`app/page.tsx`) is a placeholder.
 
 ## The monsters
 
@@ -124,7 +126,7 @@ The hook was written against Kiro's hook documentation and loader (pull request 
 
 Figures from the run recorded in `.kiro/specs/detectors-static-fixes/design.md` (2026-11-19) and in pull request [#16](https://github.com/SelcukOzbilgi/trick-or-trap/pull/16). The tests enforce floors, not these exact counts. The 50-case stress probe is described in the spec and steering text (`.kiro/specs/detectors-static-fixes/design.md`, `.kiro/steering/tech.md`); its cases are not in the repository.
 
-The demo shop has 22 planted entries in total: 19 for the six detectors and 3 flow patterns that the detectors do not cover. The demo-shop figures are scored on snapshots built by a test harness (`tests/detectors/eval/`), not on live captures. Matching by listed phrases does not generalise well yet, which is why a model reviewer ([#6](https://github.com/SelcukOzbilgi/trick-or-trap/issues/6)) and a generalisation round with a frozen independent evaluation set ([#17](https://github.com/SelcukOzbilgi/trick-or-trap/issues/17)) are next.
+The demo shop has 22 planted entries in total: 19 for the six detectors and 3 flow patterns that the detectors do not cover. The demo-shop figures are scored on snapshots built by a test harness (`tests/detectors/eval/`), not on live captures. Matching by listed phrases does not generalise well yet. A model reviewer ([#6](https://github.com/SelcukOzbilgi/trick-or-trap/issues/6)) is implemented behind `JUDGE_MODE`, off by default, not called by any route and never yet run against a real model, so there is no quality figure for it. A generalisation round with a frozen independent evaluation set ([#17](https://github.com/SelcukOzbilgi/trick-or-trap/issues/17)) is next.
 
 CI at the merge of pull request #16 passed 4,220 tests (8 skipped) in 92 files (1 skipped). This is the figure from that pull request's description, not a promise for today.
 
@@ -150,7 +152,7 @@ From the pull requests [#13](https://github.com/SelcukOzbilgi/trick-or-trap/pull
  3. Remote browser capture           built  lib/capture
       under a browser-level request guard
  4. Detectors over the snapshot      built  lib/detectors
- 5. Model reviewer                   (planned: #6)
+ 5. Model reviewer                   built  lib/judge (#6); off by default, no route calls it
  6. Results page with monsters       (planned: #5, #8)
 ```
 
@@ -161,7 +163,7 @@ What is built, as `lib/capture` does it:
 - If the guard is lost, the capture fails closed: the session is stopped and no snapshot or image is returned. The public outcome for a failed scan is "could not scan", never clean (an outcome type in `lib/capture`; no page shows it yet).
 - A successful capture returns an element snapshot with boxes and styles, screenshots, and a second sample taken after a reload. The overall capture deadline is 45 seconds.
 - Detectors are pure functions over that snapshot. Each returns findings. A detector that throws is reported as an error and never turns into "no finding".
-- Page text in a snapshot is untrusted data for every consumer, including the planned model reviewer.
+- Page text in a snapshot is untrusted data for every consumer, including the model reviewer (implemented behind `JUDGE_MODE`, off by default, not called by any route and never yet run against a real model, [#6](https://github.com/SelcukOzbilgi/trick-or-trap/issues/6)).
 
 `docs/research/architecture.md` holds the pre-implementation research. It was not written by Kiro.
 
@@ -213,16 +215,25 @@ Read by page capture today (`lib/capture/config.ts`):
 | `CAPTURE_BROWSER_MODE` | Default `remote`. Only `remote` is implemented. |
 | `CAPTURE_WEBSOCKET_HARDENING` | `on` or `off`. Default `on`. |
 
+Read by the model judge (`lib/judge`, no route calls it yet):
+
+| Name | Meaning |
+|---|---|
+| `JUDGE_MODE` | `off`, `gateway` or `anthropic`. Default `off`. When the key of the chosen mode is missing, the judge does not run. |
+| `AI_GATEWAY_API_KEY` | Vercel AI Gateway key. Used when `JUDGE_MODE` is `gateway`. |
+| `ANTHROPIC_API_KEY` | Anthropic key. Used when `JUDGE_MODE` is `anthropic`. |
+
 Test-only fixture switches:
 
 | Name | Meaning |
 |---|---|
+| `JUDGE_EVAL_SEALED_PATH` | Opt-in live judge test only: path of a sealed evaluation file kept outside the repository. |
 | `CAPTURE_FIXTURE_ROUTES` | The routes under `/capture-fixture` answer only when this is exactly `on`. Keep it off in production. |
 | `CAPTURE_FIXTURE_ALT_ORIGIN` | An `https` origin that the fixture page embeds as its cross-site frame. Optional. |
 | `LIVE_FIXTURE_BASE_URL` | Remote-browser test only: origin of a deployment that serves the fixture routes. |
 | `LIVE_FIXTURE_ALT_BASE_URL` | Remote-browser test only: the same deployment on another site. |
 
-Listed for later features (no code reads them yet): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`.
+Listed for later features (no code reads them yet): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
 
 `NEXT_PUBLIC_APP_URL` is parsed by `lib/capture/config.ts` but not used yet. It is meant for the app's public origin (absolute links, `og:` tags) and it bypasses no capture check. The opt-in remote-browser test reads it to find a running Boo-tique.
 
