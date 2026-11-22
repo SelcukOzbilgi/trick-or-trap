@@ -274,3 +274,335 @@ describe("bounded work", () => {
     }
   });
 });
+
+// Requirement 23 and design 24.4 (task 18.1): separators, parentheses, and
+// protected dates and times in a digit run.
+
+describe("23.5 dates and times stay readable", () => {
+  it.each([
+    "31.12.2025 23:59",
+    "2025-12-31 23:59",
+    "01.11.2026 - 30.11.2026",
+    "12/31/2025",
+  ])("keeps %j unchanged", (text) => {
+    expect(redactText(text)).toBe(text);
+  });
+
+  it("keeps a date and a time inside a sentence", () => {
+    expect(redactText("Offer ends 31.12.2025 at 23:59:30 sharp")).toBe(
+      "Offer ends 31.12.2025 at 23:59:30 sharp",
+    );
+    expect(redactText("Valid 1/2/1999 and 2199.01.31")).toBe(
+      "Valid 1/2/1999 and 2199.01.31",
+    );
+  });
+});
+
+describe("23.7 phone numbers with parentheses", () => {
+  it("replaces a phone number with a parenthesised group", () => {
+    expect(redactText("Call 0 (532) 123 45 67")).toBe("Call [number]");
+  });
+
+  it("puts the opening and closing parenthesis inside the replacement", () => {
+    expect(redactText("(0532) 123-45-67")).toBe("[number]");
+    expect(redactText("Call (0532 123 45 67) now")).toBe("Call [number] now");
+    expect(redactText("see (123456789) ok")).toBe("see [number] ok");
+  });
+
+  it("keeps parentheses around a number that is too short", () => {
+    expect(redactText("Size (12345678) fits")).toBe("Size (12345678) fits");
+    expect(redactText("(532) 123")).toBe("(532) 123");
+  });
+
+  it("keeps a parenthesis that is not directly next to a digit", () => {
+    expect(redactText("Call ( 0532 123 45 67 ) now")).toBe("Call ( [number] ) now");
+  });
+});
+
+describe("23.8 card-like numbers with longer separators", () => {
+  it("replaces a number split by a spaced dash", () => {
+    expect(redactText("4111 - 1111 - 1111 - 1111")).toBe("[number]");
+  });
+
+  it("replaces a number split by slashes", () => {
+    expect(redactText("4111/1111/1111/1111")).toBe("[number]");
+    expect(redactText("Card 4111 / 1111 / 1111 / 1111 ok")).toBe("Card [number] ok");
+  });
+
+  it("does not join digits across a gap of four characters", () => {
+    expect(redactText("1234 -.- 5678 -.- 9012")).toBe("1234 -.- 5678 -.- 9012");
+  });
+});
+
+describe("23.6 and 23.11 digits next to dates and times", () => {
+  it("replaces a phone number and keeps the date after it", () => {
+    expect(redactText("0532 123 45 67 until 31.12.2025")).toBe(
+      "[number] until 31.12.2025",
+    );
+  });
+
+  it("replaces digits that come before a time", () => {
+    expect(redactText("1234567890 12:30")).toBe("[number] 12:30");
+  });
+
+  it("replaces digits that come after a time", () => {
+    expect(redactText("12:30 1234567890")).toBe("12:30 [number]");
+  });
+
+  it("replaces digits on both sides of a date and keeps the date", () => {
+    expect(redactText("1234567890 31.12.2025 0987654321")).toBe(
+      "[number] 31.12.2025 [number]",
+    );
+    expect(redactText("12345678901 31.12.2025")).toBe("[number] 31.12.2025");
+  });
+
+  it("counts each part left after a date is cut out", () => {
+    // 6 digits on each side of the date: neither part reaches 9.
+    expect(redactText("123456 31.12.2025 654321")).toBe("123456 31.12.2025 654321");
+    expect(redactText("123456 2025-12-31")).toBe("123456 2025-12-31");
+  });
+
+  it("redacts a digit run in which a time stands without the digits of its hour", () => {
+    expect(redactText("123456789012:30")).toBe("[number]:30");
+  });
+
+  it("still redacts an IBAN and an 11-digit number next to a date", () => {
+    expect(redactText("GB29 NWBK 6016 1331 9268 19 on 31.12.2025")).toBe(
+      "[number] on 31.12.2025",
+    );
+    expect(redactText("TC 12345678901 girin")).toBe("TC [number] girin");
+  });
+});
+
+describe("23.9 text that stays, with the new separators", () => {
+  it.each([
+    "Order 12345678 sent",
+    "2.450,00 TL",
+    "$24.99",
+    "Only 3 left",
+    "12:45",
+    "Priya from Cardiff",
+    "Sizes 36 - 37 - 38 - 39",
+    "Open 9:00-17:30 (Mon-Fri)",
+  ])("keeps %j", (text) => {
+    expect(redactText(text)).toBe(text);
+  });
+});
+
+describe("a value that only looks like a date is not protected", () => {
+  it("does not protect a date with an impossible day or month", () => {
+    expect(redactText("123456 45.13.2025")).toBe("[number]");
+    expect(redactText("123456 13.45.2025")).toBe("[number]");
+    expect(redactText("123456 2025-13-45")).toBe("[number]");
+    expect(redactText("123456 00.12.2025")).toBe("[number]");
+  });
+
+  it("protects the same shape with plausible values", () => {
+    expect(redactText("123456 31.12.2025")).toBe("123456 31.12.2025");
+    expect(redactText("123456 12.31.2025")).toBe("123456 12.31.2025");
+  });
+
+  it("does not protect a date with a year outside 1900 to 2199", () => {
+    expect(redactText("123456 31.12.1850")).toBe("[number]");
+    expect(redactText("123456 31.12.2200")).toBe("[number]");
+  });
+
+  it("does not protect a date with two different separators", () => {
+    expect(redactText("123456 31.12-2025")).toBe("[number]");
+  });
+
+  it("does not protect a date next to another digit", () => {
+    expect(redactText("31.12.20251")).toBe("[number]");
+    expect(redactText("131.12.2025")).toBe("[number]");
+  });
+
+  it("does not protect a time with an impossible hour or minute", () => {
+    expect(redactText("1234567 25:30")).toBe("[number]:30");
+    expect(redactText("1234567 12:60")).toBe("[number]:60");
+    expect(redactText("1234567 12:5")).toBe("[number]:5");
+  });
+
+  it("protects a time with a plausible hour and minute", () => {
+    expect(redactText("1234567 24:30")).toBe("1234567 24:30");
+    expect(redactText("1234567 0:00")).toBe("1234567 0:00");
+    expect(redactText("1234567 12:30:45")).toBe("1234567 12:30:45");
+  });
+});
+
+describe("23.10 property test: separator shapes, dates and times", () => {
+  // Fixed-seed generator (mulberry32); no Math.random.
+  function createRandom(seed: number): () => number {
+    let state = seed >>> 0;
+    return () => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  // Gaps of 0 to 3 characters from the separator set, none with two spaces.
+  const GAPS = ["", " ", ".", "-", "/", " - ", " / ", " (", ") ", "-/", ".-"];
+  const WORDS = ["Call", "Card", "Phone", "ok", "now", "until", "Order", "Sent"];
+
+  function pick<T>(random: () => number, list: readonly T[]): T {
+    return list[Math.floor(random() * list.length)] as T;
+  }
+
+  /** A number shape with exactly `digitCount` digits, placeholder-style digits. */
+  function numberShape(random: () => number, digitCount: number): string {
+    const cycle = "1234567890";
+    let out = random() < 0.2 ? "(" : "";
+    let used = 0;
+    let offset = Math.floor(random() * 10);
+    while (used < digitCount) {
+      const group = Math.min(digitCount - used, 1 + Math.floor(random() * 4));
+      for (let i = 0; i < group; i += 1) {
+        out += cycle.charAt((offset + i) % 10);
+      }
+      offset += group;
+      used += group;
+      if (used < digitCount) out += pick(random, GAPS);
+    }
+    if (random() < 0.2) out += ")";
+    return out;
+  }
+
+  const DATE_SEPARATORS = [".", "-", "/"];
+
+  function dateShape(random: () => number): string {
+    const separator = pick(random, DATE_SEPARATORS);
+    const year = 1900 + Math.floor(random() * 300);
+    const month = 1 + Math.floor(random() * 12);
+    const day = 1 + Math.floor(random() * 12);
+    const dayFirst = random() < 0.5;
+    if (random() < 0.5) return [year, month, day].join(separator);
+    return dayFirst
+      ? [day, month, year].join(separator)
+      : [month, day, year].join(separator);
+  }
+
+  function timeShape(random: () => number): string {
+    const hours = Math.floor(random() * 25);
+    const minutes = String(Math.floor(random() * 60)).padStart(2, "0");
+    const seconds = String(Math.floor(random() * 60)).padStart(2, "0");
+    return random() < 0.5
+      ? `${hours}:${minutes}`
+      : `${hours}:${minutes}:${seconds}`;
+  }
+
+  /** The longest digit count of a run (gaps of the separator set) in `text`. */
+  function longestRunDigits(text: string): number {
+    const runs = text.match(
+      /\p{Nd}(?:(?:[.\-/()]| (?! )){0,3}\p{Nd})*/gu,
+    );
+    let best = 0;
+    for (const run of runs ?? []) {
+      best = Math.max(best, run.replace(/\P{Nd}/gu, "").length);
+    }
+    return best;
+  }
+
+  it("redacts every number shape of 9 to 16 digits", () => {
+    const random = createRandom(24041);
+    for (let i = 0; i < 600; i += 1) {
+      const digits = 9 + Math.floor(random() * 8);
+      const shape = numberShape(random, digits);
+      const input = `${pick(random, WORDS)} ${shape} ${pick(random, WORDS)}`;
+      const output = redactText(input);
+      expect(output, input).toContain("[number]");
+      expect(longestRunDigits(output), input).toBeLessThan(9);
+      expect(output, input).not.toMatch(/\d{5}/);
+    }
+  });
+
+  it("keeps every number shape of 8 digits or fewer", () => {
+    const random = createRandom(24042);
+    for (let i = 0; i < 600; i += 1) {
+      const digits = 1 + Math.floor(random() * 8);
+      const shape = numberShape(random, digits);
+      const input = `${pick(random, WORDS)} ${shape} ${pick(random, WORDS)}`;
+      expect(redactText(input), input).toBe(input);
+    }
+  });
+
+  it("keeps every plausible date and time between words", () => {
+    const random = createRandom(24043);
+    for (let i = 0; i < 600; i += 1) {
+      const date = dateShape(random);
+      const time = timeShape(random);
+      const input = `${pick(random, WORDS)} ${date} ${time} ${pick(random, WORDS)}`;
+      expect(redactText(input), input).toBe(input);
+    }
+  });
+
+  it("redacts a number shape next to a date or a time and keeps the date or time", () => {
+    const random = createRandom(24044);
+    for (let i = 0; i < 600; i += 1) {
+      const digits = 9 + Math.floor(random() * 6);
+      const shape = numberShape(random, digits);
+      const stamp = random() < 0.5 ? dateShape(random) : timeShape(random);
+      const input =
+        random() < 0.5
+          ? `${shape} ${stamp} ${pick(random, WORDS)}`
+          : `${pick(random, WORDS)} ${stamp} ${shape}`;
+      const output = redactText(input);
+      expect(output, input).toContain(stamp);
+      expect(output, input).toContain("[number]");
+      // With the date or time cut out, no run of 9 digits is left.
+      expect(longestRunDigits(output.replace(stamp, "|")), input).toBeLessThan(9);
+    }
+  });
+
+  it("leaves no URL, handle, email or long run in strings that mix every shape", () => {
+    const random = createRandom(24045);
+    const extras = ["a@b.co", "@someone", "http://x.example/y", "x.example/p"];
+    for (let i = 0; i < 400; i += 1) {
+      const parts = [
+        numberShape(random, 9 + Math.floor(random() * 6)),
+        dateShape(random),
+        timeShape(random),
+        pick(random, extras),
+        pick(random, WORDS),
+      ];
+      // Fisher-Yates shuffle with the seeded generator.
+      for (let j = parts.length - 1; j > 0; j -= 1) {
+        const k = Math.floor(random() * (j + 1));
+        const held = parts[j] as string;
+        parts[j] = parts[k] as string;
+        parts[k] = held;
+      }
+      const input = parts.join(" ");
+      const output = redactText(input);
+      expect(output, input).not.toContain("://");
+      expect(output, input).not.toMatch(/@[\p{L}\p{N}_]/u);
+    }
+  });
+});
+
+describe("bounded work on longer text", () => {
+  it("handles texts of 1,000 and 3,000 characters built to stress the digit rule", () => {
+    const shapes = [
+      "1 ".repeat(1500),
+      "1.".repeat(1500),
+      "1 - ".repeat(750),
+      "(1)".repeat(1000),
+      "1:30 ".repeat(600),
+      "31.12.2025 ".repeat(270),
+      "1/2/".repeat(750),
+      "@a ".repeat(1000),
+    ];
+    for (const shape of shapes) {
+      for (const length of [1000, 3000]) {
+        expect(typeof redactText(shape.slice(0, length))).toBe("string");
+      }
+    }
+  });
+
+  it("redacts a number that starts at character 190 of a long text", () => {
+    const text = `${"word ".repeat(38)}0532 123 45 67 tail`;
+    expect(text.indexOf("0532")).toBe(190);
+    expect(redactText(text)).toBe(`${"word ".repeat(38)}[number] tail`);
+  });
+});

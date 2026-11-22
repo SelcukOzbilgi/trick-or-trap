@@ -163,13 +163,21 @@ describe("validateOutput: invalid answers", () => {
     });
   });
 
+  // Requirement 22.4 (replaces 9.2): a max_tokens answer is invalid and now
+  // carries the code `stop-max-tokens`.
   it("rejects truncated JSON with stop reason max_tokens", () => {
     const text = '{"findings":[{"candidate":"c1","pattern":"fake-urgency"';
-    expect(validate({ text, stopReason: "max_tokens" })).toEqual({ kind: "invalid" });
+    expect(validate({ text, stopReason: "max_tokens" })).toEqual({
+      kind: "invalid",
+      code: "stop-max-tokens",
+    });
   });
 
   it("rejects a complete answer when the stop reason is max_tokens", () => {
-    expect(validate(respond([], [], "max_tokens"))).toEqual({ kind: "invalid" });
+    expect(validate(respond([], [], "max_tokens"))).toEqual({
+      kind: "invalid",
+      code: "stop-max-tokens",
+    });
   });
 
   it("rejects an empty and a blank text", () => {
@@ -221,6 +229,65 @@ describe("validateOutput: invalid answers", () => {
       anomalies: [],
       returned: 0,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stop reasons (22.1 to 22.7)
+// ---------------------------------------------------------------------------
+
+describe("validateOutput: stop reasons", () => {
+  const PLACEHOLDER_STOP = "placeholder-stop";
+
+  it.each(["end_turn", "stop_sequence"])("goes on to validation for %s (22.1)", (stopReason) => {
+    const result = validate(respond([], [], stopReason));
+    expect(result.kind).toBe("ok");
+  });
+
+  it.each([
+    ["refusal", "stop-refusal"],
+    ["pause_turn", "stop-pause-turn"],
+    ["max_tokens", "stop-max-tokens"],
+    ["tool_use", "stop-tool-use"],
+    ["", "stop-unknown"],
+    [PLACEHOLDER_STOP, "stop-unknown"],
+  ])("gives invalid with a code for stop reason %j (22.2 to 22.6)", (stopReason, code) => {
+    expect(validate(respond([], [], stopReason))).toStrictEqual({ kind: "invalid", code });
+  });
+
+  it("checks the stop reason before the empty-text and parse checks", () => {
+    expect(validate({ text: "", stopReason: "refusal" })).toStrictEqual({
+      kind: "invalid",
+      code: "stop-refusal",
+    });
+    expect(validate({ text: "not json", stopReason: "pause_turn" })).toStrictEqual({
+      kind: "invalid",
+      code: "stop-pause-turn",
+    });
+  });
+
+  it("gives invalid for a refusal whose text is a valid answer with findings and verdicts (22.7)", () => {
+    const built = buildPage();
+    const flag = finding({
+      candidate: cid(built, "Only 3 left"),
+      pattern: "fake-scarcity",
+      quote: "Only 3 left",
+      reason: "vague-low-stock",
+    });
+    const note = verdict({ rule: "r1", decision: "confirm", reason: "vague-low-stock" });
+    expect(validate(respond([flag], [note], "end_turn"), built).kind).toBe("ok");
+    expect(validate(respond([flag], [note], "refusal"), built)).toStrictEqual({
+      kind: "invalid",
+      code: "stop-refusal",
+    });
+  });
+
+  it("gives invalid with no code for empty text, bad JSON and a schema failure at end_turn", () => {
+    expect(validate({ text: "", stopReason: "end_turn" })).toStrictEqual({ kind: "invalid" });
+    expect(validate({ text: "{oops", stopReason: "end_turn" })).toStrictEqual({ kind: "invalid" });
+    expect(
+      validate({ text: JSON.stringify({ findings: "x", verdicts: [] }), stopReason: "end_turn" }),
+    ).toStrictEqual({ kind: "invalid" });
   });
 });
 

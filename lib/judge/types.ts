@@ -200,13 +200,24 @@ export type LoggedStopReason =
   | "max_tokens"
   | "stop_sequence"
   | "refusal"
+  | "pause_turn"
+  | "tool_use"
   | "other";
+
+/** The code of an answer that was refused for its stop reason (requirement 22). */
+export type StopAnomalyCode =
+  | "stop-refusal"
+  | "stop-pause-turn"
+  | "stop-max-tokens"
+  | "stop-tool-use"
+  | "stop-unknown";
 
 export type AnomalyCode =
   | "too-many-findings"
   | "too-many-flagged"
   | "too-many-rejects"
-  | "too-many-lowered";
+  | "too-many-lowered"
+  | StopAnomalyCode;
 
 /**
  * The one record logged per scan (design section 17). It holds counts, codes

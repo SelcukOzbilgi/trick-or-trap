@@ -16,7 +16,7 @@ import {
   JUDGE_PATTERN_IDS,
   LOOK_ALIKE_CODES,
 } from "@/lib/judge/types";
-import type { AnomalyCode, JudgePatternId } from "@/lib/judge/types";
+import type { AnomalyCode, JudgePatternId, StopAnomalyCode } from "@/lib/judge/types";
 import type { Finding } from "@/lib/types";
 
 /**
@@ -37,7 +37,11 @@ export type ValidatedFinding = JudgeFindingItem;
 export type ValidatedVerdict = JudgeVerdictItem;
 
 export type ValidationResult =
-  | { kind: "invalid" }
+  | {
+      kind: "invalid";
+      /** Set for a refused stop reason (requirement 22); absent for empty text, bad JSON and schema failures. */
+      code?: StopAnomalyCode;
+    }
   | {
       kind: "ok";
       /** At most `MAX_FINDINGS_KEPT`, in document order, then pattern id. */
@@ -51,6 +55,25 @@ export type ValidationResult =
     };
 
 const INVALID: ValidationResult = { kind: "invalid" };
+
+/** Stop reasons after which the text is parsed (requirement 22.1). */
+const ACCEPTED_STOP_REASONS: readonly string[] = ["end_turn", "stop_sequence"];
+
+/** The code of each refused stop reason; any other value is `stop-unknown` (22.2 to 22.6). */
+function stopCodeOf(stopReason: string): StopAnomalyCode {
+  switch (stopReason) {
+    case "refusal":
+      return "stop-refusal";
+    case "pause_turn":
+      return "stop-pause-turn";
+    case "max_tokens":
+      return "stop-max-tokens";
+    case "tool_use":
+      return "stop-tool-use";
+    default:
+      return "stop-unknown";
+  }
+}
 
 /** NFC and whitespace collapse, applied to the quote and to the sent text. */
 function normaliseForQuote(text: string): string {
@@ -170,7 +193,9 @@ export function validateOutput(
   map: CandidateMap,
   ruleFindings: readonly Pick<Finding, "patternId">[],
 ): ValidationResult {
-  if (raw.stopReason === "max_tokens") return INVALID;
+  if (!ACCEPTED_STOP_REASONS.includes(raw.stopReason)) {
+    return { kind: "invalid", code: stopCodeOf(raw.stopReason) };
+  }
   if (raw.text.trim() === "") return INVALID;
 
   let parsed: unknown;

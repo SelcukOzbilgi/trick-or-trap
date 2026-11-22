@@ -322,7 +322,9 @@ describe("the log record: values", () => {
     expect(records[0].stopReason).toBe("other");
   });
 
-  it.each(["end_turn", "max_tokens", "stop_sequence", "refusal"])(
+  // Requirement 22.9 (replaces 14.2's set): the fixed set of logged stop
+  // reasons now holds pause_turn and tool_use too.
+  it.each(["end_turn", "max_tokens", "stop_sequence", "refusal", "pause_turn", "tool_use"])(
     "keeps the stop reason %s",
     async (stopReason) => {
       const client = createMockJudge(answer(EMPTY_OUTPUT, { stopReason }));
@@ -331,6 +333,40 @@ describe("the log record: values", () => {
       expect(records[0].stopReason).toBe(stopReason);
     },
   );
+
+  it.each([
+    ["refusal", "refusal", "stop-refusal"],
+    ["pause_turn", "pause_turn", "stop-pause-turn"],
+    ["max_tokens", "max_tokens", "stop-max-tokens"],
+    ["tool_use", "tool_use", "stop-tool-use"],
+    ["", "other", "stop-unknown"],
+    [`${PLACEHOLDER_RAW_VALUE}-stop`, "other", "stop-unknown"],
+  ])(
+    "logs one record with the code and the logged stop reason for stop reason %j (22.9)",
+    async (stopReason, logged, code) => {
+      const client = createMockJudge(answer(RAN_OUTPUT, { stopReason }));
+      const { deps, records } = setup(client);
+      const result = await reviewFindings(PAGE, RULE_RESULT, deps);
+      expect(result.judge.status).toBe("invalid-output");
+      expect(records).toHaveLength(1);
+      expect(records[0].judgeStatus).toBe("invalid-output");
+      expect(records[0].anomalies).toEqual([code]);
+      expect(records[0].stopReason).toBe(logged);
+      expect(records[0].findingsReturned).toBe(0);
+      expect(records[0].findingsKept).toBe(0);
+      expect(records[0].verdicts).toEqual({ confirm: 0, downgrade: 0, reject: 0 });
+      expect(Object.keys(records[0]).sort()).toEqual([...REQUIRED_FIELDS].sort());
+      const text = JSON.stringify(records[0]);
+      expect(text).not.toContain(PLACEHOLDER_RAW_VALUE);
+      for (const sentinel of SENTINELS) expect(text).not.toContain(sentinel);
+    },
+  );
+
+  it("logs no code for an invalid answer at end_turn", async () => {
+    const { records } = await runScenario(scenario("invalid-output"), "invalid-output");
+    expect(records[0].anomalies).toEqual([]);
+    expect(records[0].stopReason).toBe("end_turn");
+  });
 
   it("says in the one record that the key is missing", async () => {
     const { deps, records } = setup(undefined, { mode: "off", offReason: "missing-key" });
