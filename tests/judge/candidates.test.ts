@@ -3,6 +3,7 @@ import { contrastRatio, parseColour } from "@/lib/detectors/shared/colour";
 import {
   normaliseCandidateText,
   prepareCandidates,
+  sentCandidateText,
 } from "@/lib/judge/candidates";
 import type { PreparedCandidate } from "@/lib/judge/candidates";
 import {
@@ -1485,5 +1486,183 @@ describe("point 3: a descendant is unseen when any captured ancestor is", () => 
     ]);
     expect(found).toHaveLength(1);
     expect(found[0].text).toBe("");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 23.1 to 23.4 redact first, then cut (design 24.4, task 18.3)
+// ---------------------------------------------------------------------------
+
+describe("23.1 personal data that starts at character 190 of a long text", () => {
+  // 38 words of five characters: the next character is at index 190, so a cut
+  // at 200 before redaction would have left ten characters of the item.
+  const LEAD = "word ".repeat(38);
+
+  it("replaces a whole email and sends no part of it", () => {
+    const text = `${LEAD}shopper@example.com please reply today`;
+    expect(text.indexOf("shopper")).toBe(190);
+    const found = build([makeText("el-0", "p", text)]);
+    expect(found).toHaveLength(1);
+    expect(found[0].text).toBe(`${LEAD}[email] pl`);
+    expect(found[0].cut).toBe(true);
+    expect(found[0].text).not.toContain("shopper");
+    expect(found[0].text).not.toContain("@");
+  });
+
+  it("replaces a whole card number and sends no digit of it", () => {
+    const text = `${LEAD}4111 1111 1111 1111 thank you`;
+    expect(text.indexOf("4111")).toBe(190);
+    const found = build([makeText("el-0", "p", text)]);
+    expect(found).toHaveLength(1);
+    expect(found[0].text).toBe(`${LEAD}[number] t`);
+    expect(found[0].cut).toBe(true);
+    expect(found[0].text).not.toMatch(/\d/);
+  });
+
+  it("replaces a whole phone number and sends no digit of it", () => {
+    const text = `${LEAD}0532 123 45 67 now`;
+    expect(text.indexOf("0532")).toBe(190);
+    const found = build([makeText("el-0", "p", text)]);
+    expect(found).toHaveLength(1);
+    expect(found[0].text).toBe(`${LEAD}[number] n`);
+    expect(found[0].cut).toBe(true);
+    expect(found[0].text).not.toMatch(/\d/);
+  });
+
+  it("replaces a whole handle, link and phone number with parentheses", () => {
+    for (const [item, placeholder, leftover] of [
+      ["@shopname", "[handle]", "shopname"],
+      ["https://shop.example/page", "[link]", "shop.example"],
+      ["0 (532) 123 45 67", "[number]", "532"],
+    ] as const) {
+      const found = build([makeText("el-0", "p", `${LEAD}${item} and more words follow`)]);
+      expect(found[0].text, item).toContain(placeholder);
+      expect(found[0].text, item).not.toContain(leftover);
+      expect(found[0].text, item).not.toContain("@");
+    }
+  });
+
+  it("marks the cut only when the redacted text is longer than 200", () => {
+    // Each raw text is longer than 200 characters; the redacted text is not.
+    for (const [item, placeholder] of [
+      ["shopper@example.com", "[email]"],
+      ["4111 1111 1111 1111", "[number]"],
+      ["0532 123 45 67", "[number]"],
+    ] as const) {
+      const text = `${LEAD}${item}`;
+      expect(text.length).toBeGreaterThan(200);
+      const found = build([makeText("el-0", "p", text)]);
+      expect(found[0], item).toMatchObject({ text: `${LEAD}${placeholder}`, cut: false });
+    }
+  });
+
+  it("marks the cut at 201 redacted characters and not at 200", () => {
+    const at200 = build([makeText("el-0", "p", `${"a".repeat(192)} shopper@example.com`)]);
+    expect(at200[0].text).toBe(`${"a".repeat(192)} [email]`);
+    expect(at200[0].text.length).toBe(200);
+    expect(at200[0].cut).toBe(false);
+
+    const at201 = build([makeText("el-0", "p", `${"a".repeat(193)} shopper@example.com`)]);
+    expect(at201[0].text).toBe(`${"a".repeat(193)} [email`);
+    expect(at201[0].text.length).toBe(200);
+    expect(at201[0].cut).toBe(true);
+  });
+
+  it("leaves a date that straddles the cut readable up to the cut", () => {
+    const found = build([makeText("el-0", "p", `${LEAD}31.12.2025 23:59 is the last day`)]);
+    expect(found[0].text).toBe(`${LEAD}31.12.2025`);
+    expect(found[0].cut).toBe(true);
+  });
+
+  it("applies the mostly-redacted test to the sent text", () => {
+    expect(
+      texts([
+        makeText("el-0", "p", `${"a@b.co ".repeat(40)}`),
+        makeText("el-1", "p", `${LEAD}shopper@example.com`),
+      ]),
+    ).toEqual([`${LEAD}[email]`]);
+  });
+});
+
+describe("23.1 and 23.2 sentCandidateText", () => {
+  // 85 characters: eight plain words, an email and a phone number.
+  const UNIT = "alpha bravo charlie delta echo foxtrot golf hotel shopper@example.com 0532 123 45 67 ";
+
+  it("normalises, redacts and then cuts", () => {
+    expect(sentCandidateText("  Write  to\tshopper@example.com  now ")).toEqual({
+      text: "Write to [email] now",
+      cut: false,
+    });
+    expect(sentCandidateText("Only 3 left at 12:45 for $24.99")).toEqual({
+      text: "Only 3 left at 12:45 for $24.99",
+      cut: false,
+    });
+  });
+
+  it("does not split a surrogate pair at the cut", () => {
+    const result = sentCandidateText(`${"a".repeat(199)}😀tail`);
+    expect(result.text).toBe("a".repeat(199));
+    expect(result.cut).toBe(true);
+  });
+
+  it("removes the characters of 5.5 before it redacts", () => {
+    const zeroWidth = "\u200b";
+    expect(sentCandidateText(`shopper@exam${zeroWidth}ple.com`).text).toBe("[email]");
+  });
+
+  it("keeps normaliseCandidateText as it was: it does not redact", () => {
+    expect(normaliseCandidateText("Write to shopper@example.com now").text).toBe(
+      "Write to shopper@example.com now",
+    );
+  });
+
+  it("bounds a text of 1,000 characters and does not throw", () => {
+    const text = UNIT.repeat(12).slice(0, 1000);
+    expect(text.length).toBe(1000);
+    const result = sentCandidateText(text);
+    expect(result.text.length).toBeLessThanOrEqual(200);
+    expect(result.cut).toBe(true);
+    expect(result.text).not.toContain("@");
+    expect(result.text).not.toMatch(/\d{4}/);
+    const found = build([makeText("el-0", "p", text)]);
+    expect(found).toHaveLength(1);
+    expect(found[0].text.length).toBeLessThanOrEqual(200);
+    expect(found[0].cut).toBe(true);
+    expect(found[0].text).not.toContain("@");
+    expect(found[0].text).not.toMatch(/\d{4}/);
+  });
+
+  it("bounds a text of 3,000 characters and does not throw", () => {
+    const text = UNIT.repeat(36).slice(0, 3000);
+    expect(text.length).toBe(3000);
+    const result = sentCandidateText(text);
+    expect(result.text.length).toBeLessThanOrEqual(200);
+    expect(result.cut).toBe(true);
+    expect(result.text).not.toContain("@");
+    expect(result.text).not.toMatch(/\d{4}/);
+  });
+
+  it("cuts a long text at 2,000 characters and drops the trailing partial word first", () => {
+    // 1,990 characters of "1 ", then an email that the bound cuts after
+    // "shopper@ex". Without the drop, "@ex" would become a handle and
+    // "shopper" would stay in the sent text.
+    const text = `${"1 ".repeat(995)}shopper@example.com tail`;
+    expect(text.indexOf("shopper")).toBe(1990);
+    expect(sentCandidateText(text)).toEqual({ text: "[number]", cut: false });
+  });
+
+  it("drops everything when the first 2,000 characters hold no whitespace", () => {
+    expect(sentCandidateText("a".repeat(3000)).text).toBe("");
+    expect(sentCandidateText(`ok ${"a".repeat(2500)}`).text).toBe("ok");
+  });
+
+  it("keeps a text of exactly 2,000 characters whole before redaction", () => {
+    // 1,995 characters of "word " and then "shopp": nothing is dropped.
+    const text = `${"word ".repeat(399)}shopper@example.com`.slice(0, 2000);
+    expect(text.length).toBe(2000);
+    expect(sentCandidateText(text)).toEqual({
+      text: text.slice(0, 200).trimEnd(),
+      cut: true,
+    });
   });
 });

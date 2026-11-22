@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { sentCandidateText } from "@/lib/judge/candidates";
 import { isMostlyRedacted, redactText } from "@/lib/judge/redact";
-import { REDACTED_SHARE_MAX } from "@/lib/judge/constants";
+import {
+  MAX_CANDIDATE_CHARS,
+  REDACTED_SHARE_MAX,
+  REDACT_INPUT_MAX_CHARS,
+} from "@/lib/judge/constants";
 
 describe("4.1 email addresses", () => {
   it("replaces an email with [email]", () => {
@@ -604,5 +609,242 @@ describe("bounded work on longer text", () => {
     const text = `${"word ".repeat(38)}0532 123 45 67 tail`;
     expect(text.indexOf("0532")).toBe(190);
     expect(redactText(text)).toBe(`${"word ".repeat(38)}[number] tail`);
+  });
+});
+
+// Requirement 23.1 and 23.10, design 24.4 (task 18.2): the same kind of
+// property test, run through `sentCandidateText` (normalise, bound, redact,
+// then cut at 200), with personal data that starts between characters 185 and
+// 199 of a long text, where the old cut-first order left part of it behind.
+
+describe("23.10 property test through sentCandidateText", () => {
+  // Fixed-seed generator (mulberry32); no Math.random.
+  function createRandom(seed: number): () => number {
+    let state = seed >>> 0;
+    return () => {
+      state = (state + 0x6d2b79f5) >>> 0;
+      let t = state;
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+  // Gaps of 0 to 3 characters from the separator set, none with two spaces.
+  const GAPS = ["", " ", ".", "-", "/", " - ", " / ", " (", ") ", "-/", ".-"];
+  const PERSONAL = [
+    { item: "shopper@example.com", leftovers: ["shopper", "example"] },
+    { item: "@shopname", leftovers: ["shopname"] },
+    { item: "https://shop.example/page", leftovers: ["shop.example"] },
+  ];
+
+  function pick<T>(random: () => number, list: readonly T[]): T {
+    return list[Math.floor(random() * list.length)] as T;
+  }
+
+  function letterWord(random: () => number, min: number, max: number): string {
+    const length = min + Math.floor(random() * (max - min + 1));
+    let out = "";
+    for (let i = 0; i < length; i += 1) out += pick(random, [...LETTERS]);
+    return out;
+  }
+
+  /**
+   * Lowercase words with single spaces, exactly `length` characters, with no
+   * leading, trailing or double space, so that text built from it is already
+   * normalised and the next item starts at index `length + 1`.
+   */
+  function prefixOf(random: () => number, length: number): string {
+    let out = "";
+    while (out.length < length) {
+      out += (out === "" ? "" : " ") + letterWord(random, 2, 9);
+    }
+    out = out.slice(0, length);
+    return out.endsWith(" ") ? `${out.slice(0, -1)}q` : out;
+  }
+
+  function tailOf(random: () => number): string {
+    const words: string[] = [];
+    for (let i = 0; i < 4; i += 1) words.push(letterWord(random, 3, 8));
+    return words.join(" ");
+  }
+
+  /** A number shape with exactly `digitCount` digits, placeholder-style digits. */
+  function numberShape(random: () => number, digitCount: number): string {
+    const cycle = "1234567890";
+    let out = random() < 0.2 ? "(" : "";
+    let used = 0;
+    let offset = Math.floor(random() * 10);
+    while (used < digitCount) {
+      const group = Math.min(digitCount - used, 1 + Math.floor(random() * 4));
+      for (let i = 0; i < group; i += 1) {
+        out += cycle.charAt((offset + i) % 10);
+      }
+      offset += group;
+      used += group;
+      if (used < digitCount) out += pick(random, GAPS);
+    }
+    if (random() < 0.2) out += ")";
+    return out;
+  }
+
+  /** A plausible date or time of day; the day is at most 12, so any order fits. */
+  function stampShape(random: () => number): string {
+    if (random() < 0.5) {
+      const hours = Math.floor(random() * 25);
+      const minutes = String(Math.floor(random() * 60)).padStart(2, "0");
+      return `${hours}:${minutes}`;
+    }
+    const separator = pick(random, [".", "-", "/"]);
+    const year = 1900 + Math.floor(random() * 300);
+    const month = 1 + Math.floor(random() * 12);
+    const day = 1 + Math.floor(random() * 12);
+    if (random() < 0.5) return [year, month, day].join(separator);
+    return random() < 0.5
+      ? [day, month, year].join(separator)
+      : [month, day, year].join(separator);
+  }
+
+  /** The longest digit count of a run (gaps of the separator set) in `text`. */
+  function longestRunDigits(text: string): number {
+    const runs = text.match(/\p{Nd}(?:(?:[.\-/()]| (?! )){0,3}\p{Nd})*/gu);
+    let best = 0;
+    for (const run of runs ?? []) {
+      best = Math.max(best, run.replace(/\P{Nd}/gu, "").length);
+    }
+    return best;
+  }
+
+  /** An index from 185 to 199: the old cut at 200 fell inside the item. */
+  function startIndex(random: () => number): number {
+    return 185 + Math.floor(random() * 15);
+  }
+
+  it("leaves no part of an email, a handle or a link that starts at 185 to 199", () => {
+    const random = createRandom(23101);
+    for (let i = 0; i < 600; i += 1) {
+      const start = startIndex(random);
+      const personal = pick(random, PERSONAL);
+      const raw = `${prefixOf(random, start - 1)} ${personal.item} ${tailOf(random)}`;
+      expect(raw.indexOf(personal.item)).toBe(start);
+      const result = sentCandidateText(raw);
+      expect(result.text, raw).not.toContain("://");
+      expect(result.text, raw).not.toContain("@");
+      for (const leftover of personal.leftovers) {
+        expect(result.text, raw).not.toContain(leftover);
+      }
+      expect(result.text.length, raw).toBeLessThanOrEqual(MAX_CANDIDATE_CHARS);
+      // The cut applies to the redacted text, and only when that is longer.
+      const redacted = redactText(raw);
+      expect(result.cut, raw).toBe(redacted.length > MAX_CANDIDATE_CHARS);
+      expect(redacted.startsWith(result.text), raw).toBe(true);
+    }
+  });
+
+  it("leaves no digit of a number shape that starts at 185 to 199", () => {
+    const random = createRandom(23102);
+    for (let i = 0; i < 600; i += 1) {
+      const start = startIndex(random);
+      const digits = 9 + Math.floor(random() * 8);
+      const shape = numberShape(random, digits);
+      const raw = `${prefixOf(random, start - 1)} ${shape} ${tailOf(random)}`;
+      expect(raw.indexOf(shape)).toBe(start);
+      const result = sentCandidateText(raw);
+      // The rest of the text holds no digit, so none of the number is left.
+      expect(result.text, raw).not.toMatch(/\p{Nd}/u);
+      expect(result.text, raw).not.toMatch(/\d{9}/);
+      expect(longestRunDigits(result.text), raw).toBeLessThan(9);
+      // The placeholder is whole whenever the cut leaves room for it.
+      if (start + "[number]".length <= MAX_CANDIDATE_CHARS) {
+        expect(result.text, raw).toContain("[number]");
+      }
+      expect(result.cut, raw).toBe(redactText(raw).length > MAX_CANDIDATE_CHARS);
+    }
+  });
+
+  it("redacts a number shape and keeps a date or a time that stands before it", () => {
+    const random = createRandom(23103);
+    for (let i = 0; i < 600; i += 1) {
+      const start = startIndex(random);
+      const stamp = stampShape(random);
+      const shape = numberShape(random, 9 + Math.floor(random() * 6));
+      const middle = prefixOf(random, start - stamp.length - 2);
+      const raw = `${stamp} ${middle} ${shape} ${tailOf(random)}`;
+      expect(raw.indexOf(shape)).toBe(start);
+      const result = sentCandidateText(raw);
+      expect(result.text.startsWith(stamp), raw).toBe(true);
+      // With the date or time cut out, no digit and no run of 9 is left.
+      const rest = result.text.replace(stamp, "|");
+      expect(rest, raw).not.toMatch(/\p{Nd}/u);
+      expect(longestRunDigits(rest), raw).toBeLessThan(9);
+      expect(result.text, raw).not.toContain("://");
+      expect(result.text, raw).not.toContain("@");
+    }
+  });
+
+  it("keeps a date or a time that starts at 185 to 199 as the text says it", () => {
+    const random = createRandom(23104);
+    for (let i = 0; i < 600; i += 1) {
+      const start = startIndex(random);
+      const stamp = stampShape(random);
+      const raw = `${prefixOf(random, start - 1)} ${stamp} ${tailOf(random)}`;
+      expect(raw.indexOf(stamp)).toBe(start);
+      expect(raw.length).toBeGreaterThan(MAX_CANDIDATE_CHARS);
+      // Nothing to redact: the sent text is the plain cut of the input.
+      expect(sentCandidateText(raw), raw).toEqual({
+        text: raw.slice(0, MAX_CANDIDATE_CHARS).trimEnd(),
+        cut: true,
+      });
+    }
+  });
+
+  it("leaves no URL, handle, email or long run in strings that mix every shape", () => {
+    const random = createRandom(23105);
+    for (let i = 0; i < 400; i += 1) {
+      const parts = [
+        numberShape(random, 9 + Math.floor(random() * 6)),
+        stampShape(random),
+        pick(random, PERSONAL).item,
+        prefixOf(random, 150 + Math.floor(random() * 60)),
+        tailOf(random),
+      ];
+      // Fisher-Yates shuffle with the seeded generator.
+      for (let j = parts.length - 1; j > 0; j -= 1) {
+        const k = Math.floor(random() * (j + 1));
+        const held = parts[j] as string;
+        parts[j] = parts[k] as string;
+        parts[k] = held;
+      }
+      const raw = parts.join(" ");
+      const result = sentCandidateText(raw);
+      expect(result.text, raw).not.toContain("://");
+      expect(result.text, raw).not.toContain("@");
+      expect(result.text, raw).not.toMatch(/\d{9}/);
+    }
+  });
+
+  it("bounds long texts built to stress the redaction rules", () => {
+    const shapes = [
+      "1 ".repeat(1600),
+      "1.".repeat(1600),
+      "1 - ".repeat(800),
+      "(1)".repeat(1100),
+      "1:30 ".repeat(650),
+      "31.12.2025 ".repeat(290),
+      "1/2/".repeat(800),
+      "@a ".repeat(1100),
+      "a.".repeat(1600),
+      "a@".repeat(1600),
+      `${"word ".repeat(380)}shopper@example.com`,
+    ];
+    for (const shape of shapes) {
+      for (const length of [1000, 3000]) {
+        const result = sentCandidateText(shape.slice(0, length));
+        expect(typeof result.text).toBe("string");
+        expect(result.text.length).toBeLessThanOrEqual(MAX_CANDIDATE_CHARS);
+      }
+    }
+    expect(REDACT_INPUT_MAX_CHARS).toBe(2000);
   });
 });

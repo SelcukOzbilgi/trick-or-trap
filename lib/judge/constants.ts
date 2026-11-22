@@ -10,6 +10,13 @@ import type { JudgeUsage } from "@/lib/judge/types";
 
 export const MAX_CANDIDATES = 60;
 export const MAX_CANDIDATE_CHARS = 200;
+/**
+ * The most characters of normalised text that go into redaction (requirement
+ * 23.2, design 24.4). Longer text is cut here, and the trailing partial word is
+ * dropped, before the redaction rules run; the cut to `MAX_CANDIDATE_CHARS`
+ * comes after them.
+ */
+export const REDACT_INPUT_MAX_CHARS = 2_000;
 export const MIN_TEXT_CHARS = 2;
 export const MAX_PARTS_PER_CANDIDATE = 8;
 export const MAX_PART_CHARS = 24;

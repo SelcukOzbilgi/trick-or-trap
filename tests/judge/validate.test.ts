@@ -351,6 +351,32 @@ describe("validateOutput: findings", () => {
     expect(result.findings).toEqual([]);
   });
 
+  // Requirement 23.4 (task 18.3): the quote check reads the sent, redacted text.
+  // A date stays readable in it and can be quoted; the phone number that stood
+  // next to it was replaced, so a quote of the original digits is not found.
+  it("checks a quote against the sent text: a date can be quoted, redacted digits cannot", () => {
+    const built = buildCandidates(
+      makeSnapshot([
+        makeText("el-0", "p", "Sale ends 31.12.2025 23:59 call 0532 123 45 67 now"),
+      ]),
+      [],
+    );
+    expect(built.candidates[0].text).toBe("Sale ends 31.12.2025 23:59 call [number] now");
+    const id = built.candidates[0].id;
+    const quoteOf = (quote: string) =>
+      finding({ candidate: id, pattern: "fake-urgency", quote, reason: "pressure-wording" });
+
+    const dated = ok(validate(respond([quoteOf("ends 31.12.2025 23:59")]), built, []));
+    expect(dated.findings).toHaveLength(1);
+    expect(dated.findings[0].quote).toBe("ends 31.12.2025 23:59");
+
+    const sentForm = ok(validate(respond([quoteOf("call [number] now")]), built, []));
+    expect(sentForm.findings).toHaveLength(1);
+
+    const original = ok(validate(respond([quoteOf("call 0532 123 45 67")]), built, []));
+    expect(original.findings).toEqual([]);
+  });
+
   it("accepts Unicode form and spacing differences and returns the normalised quote", () => {
     const elements = [makeText("el-0", "p", "Caf\u00e9 offer: only 3 left")];
     const built = buildCandidates(makeSnapshot(elements), []);

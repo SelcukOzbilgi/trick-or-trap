@@ -23,6 +23,7 @@ import {
   MIN_TEXT_CONTRAST,
   MIN_VISIBLE_BOX_PX,
   RANK_SCORES,
+  REDACT_INPUT_MAX_CHARS,
   ROLE_COVERAGE_MIN,
   TOAST_MAX_CHARS,
 } from "@/lib/judge/constants";
@@ -75,9 +76,9 @@ export type PreparedCandidate = {
   tag: string;
   role: string;
   place: CandidatePlace;
-  /** Normalised and redacted text, at most 200 characters. */
+  /** Normalised and redacted text, at most 200 characters (as sent). */
   text: string;
-  /** True when the normalised text was longer than 200 characters. */
+  /** True when the redacted text was longer than 200 characters (23.1). */
   cut: boolean;
   /** The element text as read from the snapshot, before normalisation. */
   rawText: string;
@@ -168,6 +169,55 @@ export function normaliseCandidateText(raw: string): {
   cut: boolean;
 } {
   return cutAtBoundary(normaliseFull(raw), MAX_CANDIDATE_CHARS);
+}
+
+/**
+ * Bound normalised text for redaction (requirement 23.2): text over
+ * `REDACT_INPUT_MAX_CHARS` is cut there and the trailing partial word, which is
+ * everything after the last whitespace, is dropped, so that no half of an
+ * email, handle or number reaches the redaction rules. Normalised text has only
+ * single spaces. When the first 2,000 characters hold no whitespace, nothing of
+ * them is kept.
+ */
+function boundForRedaction(normalised: string): string {
+  if (normalised.length <= REDACT_INPUT_MAX_CHARS) return normalised;
+  const bounded = cutAtBoundary(normalised, REDACT_INPUT_MAX_CHARS).text;
+  const lastSpace = bounded.lastIndexOf(" ");
+  return lastSpace < 0 ? "" : bounded.slice(0, lastSpace);
+}
+
+/**
+ * The chain of requirements 23.1 and 23.3 on text that is already normalised:
+ * bound, redact the whole text, and only then cut at `max`. `cut` is true when
+ * the redacted text is longer than `max`.
+ */
+function redactThenCut(
+  normalised: string,
+  max: number,
+): { text: string; cut: boolean } {
+  return cutAtBoundary(redactText(boundForRedaction(normalised)), max);
+}
+
+/**
+ * The text of a candidate as it is sent (requirements 23.1 and 23.2, design
+ * 24.4): normalise fully, bound to `REDACT_INPUT_MAX_CHARS` without a trailing
+ * partial word, redact, and only then cut at `MAX_CANDIDATE_CHARS`. Redaction
+ * runs on the whole text, so a cut can never leave half of an email, a handle
+ * or a number. The quote check reads this text (requirement 23.4).
+ */
+export function sentCandidateText(raw: string): {
+  text: string;
+  cut: boolean;
+} {
+  return redactThenCut(normaliseFull(raw), MAX_CANDIDATE_CHARS);
+}
+
+/**
+ * The text of a part as it is sent (requirement 23.3): the same chain with a
+ * cut at `MAX_PART_CHARS`.
+ */
+function sentPartText(raw: string): string {
+  return redactThenCut(normaliseFull(raw), MAX_PART_CHARS).text;
 }
 
 // -- Element classes ----------------------------------------------------------
@@ -597,11 +647,10 @@ export function prepareCandidates(snapshot: PageSnapshot): PreparedCandidates {
         ? (textOf(label) ?? "")
         : ""
       : (textOf(el) ?? "");
-    const cut = cutAtBoundary(full, MAX_CANDIDATE_CHARS);
-    const redacted = redactText(cut.text);
-    if (redacted !== "" && isMostlyRedacted(redacted)) continue;
+    const sent = sentCandidateText(full);
+    if (sent.text !== "" && isMostlyRedacted(sent.text)) continue;
     drafts.push({ el, label, fullText: full });
-    texts.push({ text: redacted, cut: cut.cut });
+    texts.push(sent);
   }
 
   // Requirements 6.8 to 6.10.
@@ -973,11 +1022,11 @@ function partsOf(
     // is not a part.
     const visible = view.textOf(child);
     if (visible === null) continue;
-    const redacted = redactText(cutAtBoundary(visible, MAX_CANDIDATE_CHARS).text);
-    if (redacted === "" || isMostlyRedacted(redacted)) continue;
+    const sent = sentPartText(visible);
+    if (sent === "" || isMostlyRedacted(sent)) continue;
     found.push({
       id: child.id,
-      text: cutAtBoundary(redacted, MAX_PART_CHARS).text,
+      text: sent,
       box: child.box,
       order: child.order,
     });

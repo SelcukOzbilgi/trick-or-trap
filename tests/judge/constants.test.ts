@@ -65,6 +65,10 @@ describe("limits of design section 9", () => {
     expect(constants.MIN_TEXT_CONTRAST).toBe(1.2);
   });
 
+  it("pins the redaction input bound of design section 24.4 (requirement 23.2)", () => {
+    expect(constants.REDACT_INPUT_MAX_CHARS).toBe(2_000);
+  });
+
   it("pins every timing", () => {
     expect(constants.FIRST_TIMEOUT_MS).toBe(8_000);
     expect(constants.FIRST_MARGIN_MS).toBe(1_500);

@@ -1016,3 +1016,51 @@ describe("hidden text inside parts and fragments", () => {
     expect(built.truncated).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// 23.3 a part is redacted before its 24-character cut (design 24.4, task 18.3)
+// ---------------------------------------------------------------------------
+
+describe("23.3 parts: normalise, redact, then cut at 24", () => {
+  const partsOfBuilt = (partText: string): string[] | undefined =>
+    build([makeText("el-0", "p", "Only  left"), makeText("el-0-0", "span", partText)])
+      .candidates[0].parts;
+
+  it("never cuts an email, a phone number or a handle into a leak", () => {
+    // Cut at 24 first, "contact: shopper@example" would not be an email.
+    expect(partsOfBuilt("contact: shopper@example.com")).toEqual(["contact: [email]"]);
+    expect(partsOfBuilt("call 0532 123 45 67 now")).toEqual(["call [number] now"]);
+    expect(partsOfBuilt("follow us @shopname today")).toEqual(["follow us [handle] today"]);
+  });
+
+  it("cuts the redacted text at 24 characters, not the raw text", () => {
+    const [part] = partsOfBuilt("abcdefghijklmnopqr 0532 123 45 67") ?? [];
+    expect(part).toBe("abcdefghijklmnopqr [numb");
+    expect(part.length).toBe(MAX_PART_CHARS);
+    expect(part).not.toMatch(/\d/);
+  });
+
+  it("redacts a part that is longer than 200 characters before it cuts it", () => {
+    const lead = "word ".repeat(38);
+    const found = partsOfBuilt(`${lead}shopper@example.com`) ?? [];
+    expect(found).toEqual([lead.slice(0, MAX_PART_CHARS).trimEnd()]);
+    const [start] = partsOfBuilt(`shopper@example.com ${lead}`) ?? [];
+    expect(start).toBe("[email] word word word w");
+    expect(start.length).toBe(MAX_PART_CHARS);
+  });
+
+  it("keeps a date in a part when it fits before the cut", () => {
+    expect(partsOfBuilt("ends 31.12.2025 23:59")).toEqual(["ends 31.12.2025 23:59"]);
+  });
+
+  it("skips a part that is mostly placeholders after the redaction", () => {
+    expect(partsOfBuilt("shopper@example.com")).toBeUndefined();
+    expect(partsOfBuilt("0532 123 45 67")).toBeUndefined();
+  });
+
+  it("sends nothing of a 1,000-character part beyond the 24 characters", () => {
+    const long = "ab shopper@example.com cd ef gh ij kl ".repeat(30).slice(0, 1000);
+    expect(long.length).toBe(1000);
+    expect(partsOfBuilt(long)).toEqual(["ab [email] cd ef gh ij k"]);
+  });
+});
