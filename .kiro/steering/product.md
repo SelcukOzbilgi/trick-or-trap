@@ -12,22 +12,22 @@ The app has no accounts, no payments, and no rankings of shops. It does not run 
 
 ## The Boo-tique
 
-The Boo-tique (`/boo-tique` route group) is a companion fake shop built into the same Next.js app. It is the primary demo target for the hackathon video and the ground-truth fixture for detector tests. Every planted dark pattern and every honest look-alike is recorded in `docs/research/boo-tique-ground-truth.json` with a stable `id`, route, pattern name, difficulty, and expected verdict (`flag` or `no-flag`). The Boo-tique uses a visibly distinct light theme (cream and blood-red) so viewers immediately know they are looking at the demo target.
+The Boo-tique (`/boo-tique` route group) is a companion fake shop built into the same Next.js app. It is the primary demo target for the hackathon video and the ground-truth fixture for detector tests. Every planted dark pattern and every honest look-alike is recorded in `tests/fixtures/boo-tique-ground-truth.json` with a stable `id`, route, pattern name, difficulty, and expected verdict (`flag` or `no-flag`). The Boo-tique uses a visibly distinct light theme (cream and blood-red) so viewers immediately know they are looking at the demo target.
 
 ## Phases
 
-**Phase 1 — single-page patterns (five detector types, six pattern ids)**
+**Phase 1 — single-page patterns (six detector types, six pattern ids)**
 
 | Pattern id | Monster |
 |---|---|
 | `fake-urgency` | Skeleton |
 | `fake-scarcity` | Ghost |
-| `fake-activity` | Ghost |
+| `fake-activity` | Bats |
 | `confirmshaming` | Witch |
 | `preselection` | Spider |
 | `visual-interference` | Mummy |
 
-`fake-scarcity` and `fake-activity` share the Ghost monster because both exploit perceived shortage; they are separate pattern ids so detectors can be precise about which claim they observed.
+Each pattern has its own monster, so detectors can be precise about which claim they observed. The stamps (markers) and plates (field-guide cards) of all nine monsters are under `public/monsters/`.
 
 **Phase 2 — flow patterns (walked only on The Boo-tique)**
 
@@ -41,7 +41,7 @@ Phase 2 patterns are detected by the flow walker, which navigates the Boo-tique 
 
 ## Ground-truth fixture note
 
-`docs/research/boo-tique-ground-truth.json` is a research draft that uses older short names (`urgency`, `scarcity`, `activity`). The test fixture created in the Boo-tique spec must use the canonical ids listed above. The value `none` is reserved for honest look-alike entries in the fixture only; it is not a valid `PatternId`.
+The canonical ground-truth fixture is `tests/fixtures/boo-tique-ground-truth.json`, and it uses the canonical ids listed above. `docs/research/boo-tique-ground-truth.json` is the older research draft that uses short names (`urgency`, `scarcity`, `activity`). The value `none` is reserved for honest look-alike entries in the fixture only; it is not a valid `PatternId`.
 
 ## Non-goals
 
